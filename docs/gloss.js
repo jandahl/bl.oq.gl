@@ -31,7 +31,11 @@ export function splitMoodLabel(text, moodLabel) {
  * the per-morpheme rows below it in Deconstruct.
  * @param {any[]} items - glossSummaryItems(seq)'s return value
  */
-export function composedTranslation(items) {
+export function composedTranslation(items, headlineResolver = null, opts = {}) {
+	if (typeof headlineResolver === "function") {
+		const headline = headlineResolver(items, opts);
+		if (headline?.text) return headline.text;
+	}
 	const last = items[items.length - 1];
 	if (!last) return "";
 	const { rest } = splitMoodLabel(last.gloss || last.shortGloss || "", last.moodLabel);

@@ -15,7 +15,7 @@ import { splitMoodLabel, composedTranslation } from "./gloss.js";
  * @param {any[]} seq - the winning candidate's seq[] (buildWord-shaped items)
  * @param {{ word: string, approximate: boolean, closed: boolean }} buildResult
  * @param {(seq: any[], opts?: any) => any[]} glossSummaryItems
- * @param {{ reverseOrder?: boolean, lang?: "en"|"da" }} [opts] - bl-oq-ly#11:
+ * @param {{ reverseOrder?: boolean, lang?: "en"|"da", headlineGloss?: Function }} [opts] - bl-oq-ly#11:
  *   `reverseOrder` reads last-morpheme-first in the per-morpheme ROW list
  *   below the translation (e.g. "statement — I" / "to have a" / "dog" for a
  *   word literally ordered dog-have-statement). Never affects the composed
@@ -33,7 +33,7 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 
 	const presentationPreferences = opts.presentationPreferences ?? { numberPreference: "singular", determinationPreference: "indefinite" };
 	const allItems = glossSummaryItems(seq, { lang: opts.lang, ...presentationPreferences });
-	const translation = composedTranslation(allItems);
+	const translation = composedTranslation(allItems, opts.headlineGloss, { lang: opts.lang });
 	if (translation) {
 		const translationEl = document.createElement("p");
 		translationEl.className = "breakdown-translation";
