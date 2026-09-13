@@ -42,6 +42,18 @@ test("composedTranslation: falls back to shortGloss when gloss is absent", () =>
 	assert.equal(composedTranslation(items), "Dog");
 });
 
+test("composedTranslation: uses oq headline selection when supplied", () => {
+	const items = [{ gloss: "I to have a dog", shortGloss: "I to have a dog", moodLabel: null }];
+	const headlineGloss = () => ({ text: "I have a dog" });
+	assert.equal(composedTranslation(items, headlineGloss), "I have a dog");
+});
+
+test("composedTranslation: removes an infinitive marker after a supplied subject", () => {
+	const items = [{ gloss: "I to have a dog", shortGloss: "I to have a dog", moodLabel: null }];
+	const headlineGloss = () => ({ text: "I to have a dog" });
+	assert.equal(composedTranslation(items, headlineGloss), "I have a dog");
+});
+
 // Regression guard for bl-oq-ly's own history: this is the exact bug shipped
 // twice (Deconstruct, then Build's reading line) -- joining each item's own
 // fragment with a separator instead of using the last item's already-composed

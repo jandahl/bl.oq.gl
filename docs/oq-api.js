@@ -20,6 +20,7 @@ export const {
 	mergeMorphemeSources,
 	glossSummary,
 	glossSummaryItems,
+	headlineGloss,
 	API_VERSION,
 	GRAMMAR_MORPHEMES_URL,
 	// Resolved conjugation labels (oq#881, API_VERSION 0.8.0+) — the same

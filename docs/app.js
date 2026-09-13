@@ -1,4 +1,4 @@
-import { buildWord, analyzeWordAsync, glossSummaryItems, resolveMoodLabel, resolvePersonLabel } from "./oq-api.js";
+import { buildWord, analyzeWordAsync, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelChains, renderChain, relabelBlocks,
@@ -254,7 +254,7 @@ function updateReadingLine(seq) {
 	readingLine.textContent = composedTranslation(glossSummaryItems(seq, {
 		...glossOptions(),
 		...presentationPreferences,
-	}));
+	}), headlineGloss, glossOptions());
 	readingLine.hidden = false;
 }
 
@@ -539,12 +539,14 @@ function rerenderBreakdown() {
 	renderBreakdown(primary, lastDeconstructWord, lastDeconstructSeq, lastDeconstructBuilt, glossSummaryItems, {
 		reverseOrder: readLastFirst(),
 		...glossOptions(),
+		headlineGloss,
 	});
 	breakdownDiv.appendChild(primary);
 	renderAlternativeBreakdowns(breakdownDiv, lastDeconstructAlternatives, glossSummaryItems, {
 		word: lastDeconstructWord,
 		reverseOrder: readLastFirst(),
 		...glossOptions(),
+		headlineGloss,
 		builderHref: (seq) => `${location.pathname}${writeState({ chain: seq.map((item) => item.id).filter(Boolean) })}`,
 	});
 	const n = primary.querySelectorAll(".breakdown-row").length;
