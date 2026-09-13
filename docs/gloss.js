@@ -19,6 +19,14 @@ export function splitMoodLabel(text, moodLabel) {
 	return { moodLabel: null, rest: text };
 }
 
+// Compositional verb glosses are authored in infinitive form ("to have a
+// ___"), while person endings supply the subject ("I ___").  The API keeps
+// those pieces separate, but its composed headline can otherwise expose the
+// infinitive marker between them ("I to have a dog").
+export function normalizeHeadlineText(text) {
+	return text.replace(/^(I|you|he|she|we|they|someone)\s+to\s+/i, "$1 ");
+}
+
 /**
  * The composed, full-sentence translation oq's own Deconstruct/Build show
  * (e.g. "qimmeqarpunga" -> "I have a dog") isn't a separate function — it's
@@ -34,10 +42,10 @@ export function splitMoodLabel(text, moodLabel) {
 export function composedTranslation(items, headlineResolver = null, opts = {}) {
 	if (typeof headlineResolver === "function") {
 		const headline = headlineResolver(items, opts);
-		if (headline?.text) return headline.text;
+		if (headline?.text) return normalizeHeadlineText(headline.text);
 	}
 	const last = items[items.length - 1];
 	if (!last) return "";
 	const { rest } = splitMoodLabel(last.gloss || last.shortGloss || "", last.moodLabel);
-	return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : "";
+	return rest ? normalizeHeadlineText(rest.charAt(0).toUpperCase() + rest.slice(1)) : "";
 }
