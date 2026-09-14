@@ -25,8 +25,27 @@ jobs:
       - run: npm run lint
       - run: npm run test:unit
 
-  e2e:
+  # Resolve Microsoft's pre-baked Playwright image for the lockfile's
+  # @playwright/test version. That image already has Chromium and its system
+  # dependencies, so e2e avoids the per-run browser installation and its
+  # flaky apt dependency downloads.
+  resolve-playwright:
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.playwright-image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: playwright-image
+        name: Resolve the pre-baked Playwright container image tag
+        run: |
+          VERSION="$(node -p 'require("./package-lock.json").packages["node_modules/@playwright/test"].version')"
+          echo "image=mcr.microsoft.com/playwright:v$VERSION-noble" >> "$GITHUB_OUTPUT"
+
+  e2e:
+    needs: resolve-playwright
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.resolve-playwright.outputs.image }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,7 +53,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
