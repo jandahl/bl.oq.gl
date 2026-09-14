@@ -272,7 +272,7 @@ concern that belongs in oq) as Blockly connection checks.
   the client does not combine independently rolling engine and catalog URLs. The
   catalog's GitHub Pages mirror can be restored as a fallback only when it is
   pinned to the same artifact revision. The source repository is
-  [`jandahl-custom-KAL-grammarian`](https://github.com/jandahl/jandahl-custom-KAL-grammarian)'s
+  [`oq-grammarian`](https://github.com/jandahl/oq-grammarian)'s
   published `morphemes.json`. That data is **hand-authored and not yet
   dictionary-verified** (`meta.authoritative: false` — see that repo's own
   CLAUDE.md); the app surfaces this in its status line rather than hiding

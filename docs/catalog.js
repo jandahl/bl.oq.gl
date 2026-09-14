@@ -1,6 +1,6 @@
 // Fetches the published grammarian morpheme catalog and converts it into the
 // preset shape oq's buildWord()/analyzeWord() expect. See
-// jandahl-custom-KAL-grammarian's CLAUDE.md — the exported JSON always
+// oq-grammarian's CLAUDE.md — the exported JSON always
 // carries meta.authoritative: false, which we surface to the user as-is
 // rather than hiding it.
 import { mergeMorphemeSources, GRAMMAR_MORPHEMES_URL } from "./oq-api.js";
