@@ -261,7 +261,8 @@ concern that belongs in oq) as Blockly connection checks.
   **The `jandahl/oq` source repo is private**, so a commit-pinned CDN URL
   (jsDelivr/raw.githubusercontent against the repo) is not reachable from a
   browser at all — `oq-api.js` imports the published package entry point
-  `https://api.oq.gl/api/v0.1.6/public-api.js`. The module's separate
+  `https://jandahl.github.io/api.oq.gl/api/v0.1.9/public-api.js` (the v0.1.9
+  release resolved from oq-api's published `api/latest.json`). The module's separate
   `API_VERSION` reports the deployed API version, and its exported
   `GRAMMAR_MORPHEMES_URL` identifies the matching catalog. Treat a broken build as a cue to inspect
   the published package contract and its upstream data source, not
