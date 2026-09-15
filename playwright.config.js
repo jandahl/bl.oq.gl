@@ -15,7 +15,9 @@ export default defineConfig({
 	testDir: "./test/e2e",
 	fullyParallel: true,
 	forbidOnly: !!process.env.CI,
-	retries: process.env.CI ? 2 : 0,
+	// Keep one retry for transient live-endpoint failures without allowing a
+	// failing suite to consume three full browser runs.
+	retries: process.env.CI ? 1 : 0,
 	// Slightly generous: catalog fetch + Blockly injection is the app's own
 	// natural startup cost, not something to race against.
 	timeout: 30_000,
