@@ -2,7 +2,7 @@
 // forward-build and reverse-Deconstruct CI checks. Keep this live rather than
 // copying the corpus into the app: the grammarian project is its source of
 // truth and publishes the corpus specifically for downstream checks.
-export const WORKED_EXAMPLES_URL = "https://jandahl.github.io/jandahl-custom-KAL-grammarian/grammar/latest/worked_examples.json";
+export const WORKED_EXAMPLES_URL = "https://jandahl.github.io/oq-grammarian/grammar/latest/worked_examples.json";
 
 /**
  * @returns {Promise<Array<{ surface: string, gloss?: string, chain?: string[] }>>}
