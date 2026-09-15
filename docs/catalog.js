@@ -3,28 +3,26 @@
 // oq-grammarian's CLAUDE.md — the exported JSON always
 // carries meta.authoritative: false, which we surface to the user as-is
 // rather than hiding it.
+//
+// The catalog is ~9 MB. Cache Storage keeps the last good payload so a
+// return visit can parse locally instead of waiting on the network; a
+// background HEAD/GET then refreshes it when the ETag changes.
 import { mergeMorphemeSources, GRAMMAR_MORPHEMES_URL } from "./oq-api.js";
+import {
+	catalogResponseFromBuffer,
+	catalogUnchanged,
+	openCatalogCache,
+	parseCatalogBytes,
+	readBufferWithProgress,
+	readCatalogMeta,
+	writeCatalogMeta,
+} from "./catalog-cache.js";
 
 /**
- * @returns {Promise<{ presets: any[], authoritative: boolean|undefined, meta: any }>}
+ * @param {any} value
+ * @returns {{ presets: any[], authoritative: boolean|undefined, meta: any }}
  */
-export async function loadCatalog() {
-	// Revalidate the live catalog so a Pages/CDN cached response cannot hide a
-	// newly published grammarian export. Unchanged bytes remain cacheable via
-	// the server's validators; only a changed catalog is downloaded.
-	let value;
-	const failures = [];
-	for (const url of [GRAMMAR_MORPHEMES_URL]) {
-		try {
-			const res = await fetch(url, { cache: "no-cache" });
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			value = await res.json();
-			break;
-		} catch (error) {
-			failures.push(`${url}: ${error.message}`);
-		}
-	}
-	if (!value) throw new Error(`morpheme catalog fetch failed (${failures.join("; ")})`);
+export function catalogFromPayload(value) {
 	const { presets, anyOk, failed } = mergeMorphemeSources(
 		[{ status: "fulfilled", value }],
 		[{ buildable: true, source: "grammarian" }],
@@ -39,4 +37,84 @@ export async function loadCatalog() {
 		negator.plainGloss = { ...(negator.plainGloss ?? {}), en_short: "do not ___" };
 	}
 	return { presets, authoritative: value?.meta?.authoritative, meta: value?.meta ?? null };
+}
+
+async function fetchCatalogBuffer(url, onProgress) {
+	const failures = [];
+	for (const candidate of [url]) {
+		try {
+			const res = await fetch(candidate, { cache: "no-cache" });
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const buffer = await readBufferWithProgress(res, onProgress);
+			return {
+				buffer,
+				url: candidate,
+				meta: {
+					etag: res.headers.get("etag") || "",
+					lastModified: res.headers.get("last-modified") || "",
+					fetchedAt: Date.now(),
+				},
+			};
+		} catch (error) {
+			failures.push(`${candidate}: ${error.message}`);
+		}
+	}
+	throw new Error(`morpheme catalog fetch failed (${failures.join("; ")})`);
+}
+
+async function persistCatalog(cache, url, buffer, meta) {
+	try {
+		await cache.put(url, catalogResponseFromBuffer(buffer, meta));
+		await writeCatalogMeta(cache, { ...meta, url });
+	} catch {
+		// Quota or private-mode failures must not block using the in-memory catalog.
+	}
+}
+
+async function revalidateCatalog(url, cache, meta, onUpdated) {
+	try {
+		const head = await fetch(url, { method: "HEAD", cache: "no-cache" });
+		const headers = {
+			etag: head.ok ? head.headers.get("etag") || "" : "",
+			lastModified: head.ok ? head.headers.get("last-modified") || "" : "",
+		};
+		if (head.ok && catalogUnchanged(meta, headers)) {
+			await writeCatalogMeta(cache, { ...meta, ...headers, fetchedAt: Date.now(), url });
+			return;
+		}
+		const fresh = await fetchCatalogBuffer(url);
+		const value = parseCatalogBytes(fresh.buffer);
+		await persistCatalog(cache, url, fresh.buffer, fresh.meta);
+		onUpdated?.(catalogFromPayload(value));
+	} catch {
+		// Keep the cached catalog; the next visit will try again.
+	}
+}
+
+/**
+ * @param {{ onProgress?: (event: { phase: string, loaded?: number, total?: number }) => void, onUpdated?: (catalog: any) => void }} [opts]
+ * @returns {Promise<{ presets: any[], authoritative: boolean|undefined, meta: any, fromCache: boolean }>}
+ */
+export async function loadCatalog(opts = {}) {
+	const { onProgress, onUpdated } = opts;
+	const url = GRAMMAR_MORPHEMES_URL;
+	const cache = await openCatalogCache();
+	const meta = await readCatalogMeta(cache);
+	const cached = await cache.match(url);
+
+	if (cached) {
+		onProgress?.({ phase: "cached" });
+		const buffer = new Uint8Array(await cached.arrayBuffer());
+		onProgress?.({ phase: "parse", loaded: buffer.byteLength, total: buffer.byteLength });
+		const catalog = { ...catalogFromPayload(parseCatalogBytes(buffer)), fromCache: true };
+		queueMicrotask(() => {
+			revalidateCatalog(url, cache, meta, onUpdated);
+		});
+		return catalog;
+	}
+
+	const fresh = await fetchCatalogBuffer(url, onProgress);
+	const catalog = { ...catalogFromPayload(parseCatalogBytes(fresh.buffer)), fromCache: false };
+	await persistCatalog(cache, url, fresh.buffer, fresh.meta);
+	return catalog;
 }

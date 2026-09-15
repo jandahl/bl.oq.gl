@@ -1,8 +1,9 @@
-# bl-oq-ly
+# BLOQ
 
 A small Blockly learning aid for building and deconstructing Kalaallisut
-words. It is a static site in `docs/`, powered by the published
-[`oq-api`](https://jandahl.github.io/oq-api/) morphology engine.
+words and short sentences. It is a static site in `docs/`, powered by the
+published [`oq-api`](https://jandahl.github.io/oq-api/) morphology engine.
+The public name is BLOQ; the repository remains `jandahl/bl.oq.gl`.
 
 ## What it does
 

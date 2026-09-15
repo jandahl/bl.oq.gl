@@ -9,6 +9,27 @@
 
 import { splitMoodLabel, composedTranslation } from "./gloss.js";
 
+export const WORD_TONE_COUNT = 6;
+
+export function wordTone(index) {
+	const n = Number(index);
+	if (!Number.isFinite(n)) return "0";
+	return String(((n % WORD_TONE_COUNT) + WORD_TONE_COUNT) % WORD_TONE_COUNT);
+}
+
+export function renderTonedPhrases(container, phrases, className) {
+	container.replaceChildren();
+	const list = (phrases ?? []).filter((phrase) => phrase != null && String(phrase).length > 0);
+	list.forEach((phrase, i) => {
+		if (i > 0) container.append(" ");
+		const span = document.createElement("span");
+		span.className = className;
+		span.dataset.wordTone = wordTone(i);
+		span.textContent = String(phrase);
+		container.appendChild(span);
+	});
+}
+
 /**
  * @param {HTMLElement} container
  * @param {string} word - the surface form that was analyzed

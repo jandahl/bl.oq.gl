@@ -29,16 +29,27 @@
  * @param {string} search
  * @returns {{ mode: "build"|"deconstruct", word: string, chain: string[] }}
  */
+function parseWords(chainRaw) {
+	if (!chainRaw) return [];
+	if (chainRaw.includes(";")) {
+		return chainRaw.split(";").map((part) => part.split(",").map((s) => s.trim()).filter(Boolean)).filter((w) => w.length);
+	}
+	const chain = chainRaw.split(",").map((s) => s.trim()).filter(Boolean);
+	return chain.length ? [chain] : [];
+}
+
 export function readState(search) {
 	const params = new URLSearchParams(search);
 	const mode = params.get("mode");
 	const chainRaw = params.get("chain");
 	// Accept the old query-based format so existing links remain usable.
 	const word = params.get("w") ?? params.get("word") ?? "";
+	const words = parseWords(chainRaw);
 	return {
 		mode: mode === "deconstruct" || params.has("w") ? "deconstruct" : "build",
 		word,
-		chain: chainRaw ? chainRaw.split(",").map((s) => s.trim()).filter(Boolean) : [],
+		chain: words[0] ?? [],
+		words,
 	};
 }
 
@@ -51,12 +62,14 @@ export function readState(search) {
  * @param {{ mode?: string, word?: string, chain?: string[] }} state
  * @returns {string}
  */
-export function writeState({ mode, word, chain } = {}) {
+export function writeState({ mode, word, chain, words } = {}) {
 	const params = new URLSearchParams();
 	if (mode === "deconstruct") {
 		if (word) params.set("w", word);
-	} else if (chain && chain.length > 0) {
-		params.set("chain", chain.join(","));
+	} else {
+		const list = (words && words.length) ? words : (chain && chain.length ? [chain] : []);
+		if (list.length === 1) params.set("chain", list[0].join(","));
+		else if (list.length > 1) params.set("chain", list.map((w) => w.join(",")).join(";"));
 	}
 	const qs = params.toString();
 	return qs ? `?${qs}` : "";

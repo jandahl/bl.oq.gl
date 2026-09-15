@@ -95,7 +95,7 @@ test("Deconstruct: example words load into the analyzer", async ({ page }) => {
 });
 
 test("Deconstruct: examples are polymorphemic attested words across several phenomena", async ({ page }) => {
-	const examples = page.locator("#example-words [data-example-word]");
+	const examples = page.locator("#example-words .example-word-list [data-example-word]");
 	await expect(examples).toHaveCount(6);
 	const classes = await examples.evaluateAll((nodes) => nodes.map((node) => node.dataset.exampleClass));
 	expect(classes).toEqual([

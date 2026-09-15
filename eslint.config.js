@@ -18,6 +18,12 @@ const browserGlobals = {
 	navigator: "readonly",
 	history: "readonly",
 	URLSearchParams: "readonly",
+	caches: "readonly",
+	Response: "readonly",
+	Headers: "readonly",
+	TextDecoder: "readonly",
+	TextEncoder: "readonly",
+	queueMicrotask: "readonly",
 	// Loaded globally via <script> tags in index.html (blockly_compressed.js
 	// etc.), never imported — see docs/blocks.js's/theme.js's own comments on
 	// why this can't be a normal ES import.

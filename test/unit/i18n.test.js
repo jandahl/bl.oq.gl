@@ -4,11 +4,18 @@ import { getLocale, setLocale, t } from "../../docs/i18n.js";
 
 test("i18n exposes the main page's English and Danish UI labels", () => {
 	setLocale("en");
+	assert.equal(t("app.title"), "BLOQ");
 	assert.equal(t("buildHeading"), "Build a word");
 	assert.equal(t("clearFilter"), "Clear filter");
+	assert.equal(t("exampleWordsLabel"), "Words");
+	assert.equal(t("exampleSentencesLabel"), "Sentences");
+	assert.equal(t("loadingTitle"), "Loading");
+	assert.equal(t("loadingCached"), "Opening saved catalog…");
 	setLocale("da");
 	assert.equal(t("buildHeading"), "Byg et ord");
 	assert.equal(t("clearFilter"), "Ryd filter");
+	assert.equal(t("exampleWordsLabel"), "Ord");
+	assert.equal(t("loadingTitle"), "Indlæser");
 	setLocale("en");
 });
 

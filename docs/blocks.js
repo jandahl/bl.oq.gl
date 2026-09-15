@@ -60,9 +60,11 @@ import { buildNounEndingIndex, nounCandidatesFor, parseNominalCoordinate } from 
 
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
 const WORD_START_CONNECTION_TYPE = "WORD_START";
+const WORD_CHAIN_CONNECTION_TYPE = "WORD_CHAIN";
 const BLOCK_TYPE_PREFIX = "morpheme_block__";
 const VERB_ENDING_PICKER_TYPE = `${BLOCK_TYPE_PREFIX}verb_ending_picker`;
 const WORD_CONTAINER_TYPE = `${BLOCK_TYPE_PREFIX}word_container`;
+const SENTENCE_CONTAINER_TYPE = `${BLOCK_TYPE_PREFIX}sentence_container`;
 const VERB_MOOD_TYPE = `${BLOCK_TYPE_PREFIX}verb_mood`;
 const VERB_SUBJECT_TYPE = `${BLOCK_TYPE_PREFIX}verb_subject`;
 const VERB_OBJECT_TYPE = `${BLOCK_TYPE_PREFIX}verb_object`;
@@ -211,15 +213,34 @@ export function presetMatchesQuery(preset, query) {
 
 /** Registers one Blockly block type per category, each with that category's own colour and connection shape. */
 export function defineMorphemeBlocks() {
+	// Word is a C-shaped statement wrapper: morphemes snap INTO it, stem-first.
+	// Sentence uses the same wrapping pattern so whole Word blocks snap INTO a
+	// sentence. Blockly also has hat/end "sequence start / sequence end"
+	// markers, but those only linearize a stack — they don't group children as
+	// one movable unit the way Word already does. Matching Word's C-shape is
+	// the learner-facing analogy ("a sentence that words go into").
 	Blockly.Blocks[WORD_CONTAINER_TYPE] = {
 		init() {
 			this.appendStatementInput("MORPHEMES")
 				.setCheck(WORD_START_CONNECTION_TYPE)
-				.appendField("Word");
+				.appendField(new Blockly.FieldLabelSerializable("Word"), "TITLE");
 			this.appendDummyInput("END")
 				.appendField("end word");
+			this.setPreviousStatement(true, WORD_CHAIN_CONNECTION_TYPE);
+			this.setNextStatement(true, WORD_CHAIN_CONNECTION_TYPE);
 			this.setStyle("oq_container_blocks");
 			this.setTooltip("A single word built from a chain of morphemes");
+		},
+	};
+	Blockly.Blocks[SENTENCE_CONTAINER_TYPE] = {
+		init() {
+			this.appendStatementInput("WORDS")
+				.setCheck(WORD_CHAIN_CONNECTION_TYPE)
+				.appendField(new Blockly.FieldLabelSerializable("Sentence"), "TITLE");
+			this.appendDummyInput("END")
+				.appendField("end sentence");
+			this.setStyle("oq_container_blocks");
+			this.setTooltip("A sentence built from a sequence of words");
 		},
 	};
 	for (const cat of [...CATEGORY_ORDER, FALLBACK_CATEGORY]) {
@@ -233,6 +254,7 @@ export function defineMorphemeBlocks() {
 						.appendField(new Blockly.FieldDropdown(NOUN_PRESENTATION_OPTIONS), "PRESENTATION");
 				}
 				this.setPreviousStatement(
+					true,
 					cat.hasPrevious === false ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE,
 				);
 				this.setNextStatement(cat.hasNext !== false, CONNECTION_TYPE);
@@ -251,7 +273,7 @@ function isMorphemeBlockType(type) {
 	// wrongly tripping refreshBuild()'s "more than one stack" error even
 	// though there's only one real stem-to-ending stack on the workspace.
 	return typeof type === "string" && type.startsWith(BLOCK_TYPE_PREFIX)
-		&& ![WORD_CONTAINER_TYPE, VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE].includes(type);
+		&& ![WORD_CONTAINER_TYPE, SENTENCE_CONTAINER_TYPE, VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE].includes(type);
 }
 
 function isNounEndingPreset(preset) {
@@ -715,11 +737,18 @@ export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker =
 		categorystyle: "oq_container_category",
 		contents: [{ kind: "block", type: WORD_CONTAINER_TYPE }],
 	});
+	contents.push({
+		kind: "category",
+		name: "Sentences (1)",
+		categorystyle: "oq_container_category",
+		contents: [{ kind: "block", type: SENTENCE_CONTAINER_TYPE }],
+	});
 	return { kind: "categoryToolbox", contents };
 }
 
 /** Walks a stack of morpheme blocks starting at `block`, returning morpheme ids top to bottom. */
 export function chainFromTopBlock(block) {
+	if (block?.type === SENTENCE_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("WORDS"));
 	if (block?.type === WORD_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("MORPHEMES"));
 	const ids = [];
 	let cur = block;
@@ -730,13 +759,44 @@ export function chainFromTopBlock(block) {
 	return ids;
 }
 
-/** Every top-level (unparented) morpheme-block stack currently on the workspace. */
-export function topLevelChains(workspace) {
+/**
+ * Collects each word (array of morpheme ids) under `block`. A Sentence
+ * unwraps to its contained Word stack; stacked Word containers each yield
+ * one word; a loose morpheme chain is treated as a single word.
+ */
+export function wordsFromBlock(block) {
+	if (!block) return [];
+	if (block.type === SENTENCE_CONTAINER_TYPE) {
+		return wordsFromBlock(block.getInputTargetBlock("WORDS"));
+	}
+	const words = [];
+	let cur = block;
+	while (cur) {
+		if (cur.type === WORD_CONTAINER_TYPE) {
+			const ids = chainFromTopBlock(cur.getInputTargetBlock("MORPHEMES"));
+			if (ids.length) words.push(ids);
+		} else if (isMorphemeBlockType(cur.type)) {
+			const ids = chainFromTopBlock(cur);
+			if (ids.length) words.push(ids);
+			break;
+		}
+		cur = cur.getNextBlock();
+	}
+	return words;
+}
+
+/** Every top-level sentence currently on the workspace, each as an array of word-chains. */
+export function topLevelSentences(workspace) {
 	return workspace
 		.getTopBlocks(true)
-		.filter((b) => isMorphemeBlockType(b.type) || b.type === WORD_CONTAINER_TYPE)
-		.map((b) => chainFromTopBlock(b))
-		.filter((ids) => ids.length > 0);
+		.filter((b) => isMorphemeBlockType(b.type) || b.type === WORD_CONTAINER_TYPE || b.type === SENTENCE_CONTAINER_TYPE)
+		.map((b) => wordsFromBlock(b))
+		.filter((words) => words.length > 0);
+}
+
+/** Every top-level (unparented) morpheme-block stack currently on the workspace. */
+export function topLevelChains(workspace) {
+	return topLevelSentences(workspace).flat();
 }
 
 /**
@@ -759,10 +819,35 @@ export function topLevelChains(workspace) {
  */
 export function renderChain(workspace, ids, presetsById, displayOptions) {
 	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
+	const container = buildWordBlock(workspace, ids, presetsById, displayOptions);
+	container.moveBy(20, 20);
+}
+
+/** Drops multiple words into a Sentence wrapper (or a lone Word if there's only one). */
+export function renderSentence(workspace, words, presetsById, displayOptions) {
+	const list = (words ?? []).filter((ids) => ids?.length);
+	if (list.length <= 1) {
+		renderChain(workspace, list[0] ?? [], presetsById, displayOptions);
+		return;
+	}
+	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
+	const sentence = workspace.newBlock(SENTENCE_CONTAINER_TYPE);
+	sentence.initSvg();
+	sentence.render();
+	sentence.moveBy(20, 20);
+	let prevWord = null;
+	for (const ids of list) {
+		const wordBlock = buildWordBlock(workspace, ids, presetsById, displayOptions);
+		if (prevWord) prevWord.nextConnection.connect(wordBlock.previousConnection);
+		else sentence.getInput("WORDS").connection.connect(wordBlock.previousConnection);
+		prevWord = wordBlock;
+	}
+}
+
+function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 	const container = workspace.newBlock(WORD_CONTAINER_TYPE);
 	container.initSvg();
 	container.render();
-	container.moveBy(20, 20);
 	let prev = null;
 	for (const id of ids) {
 		const preset = presetsById.get(id);
@@ -793,6 +878,37 @@ export function renderChain(workspace, ids, presetsById, displayOptions) {
 		}
 		prev = block;
 	}
+	return container;
+}
+
+/** Paints built surface forms onto Word / Sentence container titles. */
+export function labelContainers(workspace, builtWords) {
+	const wordBlocks = [];
+	for (const top of workspace.getTopBlocks(true)) collectWordContainers(top, wordBlocks);
+	wordBlocks.forEach((block, i) => {
+		const result = builtWords[i];
+		block.setFieldValue(result?.word || "Word", "TITLE");
+		if (block.rendered) block.render();
+	});
+	for (const top of workspace.getTopBlocks(true)) {
+		if (top.type !== SENTENCE_CONTAINER_TYPE) continue;
+		const surface = builtWords.map((r) => r?.word).filter(Boolean).join(" ");
+		top.setFieldValue(surface || "Sentence", "TITLE");
+		if (top.rendered) top.render();
+	}
+}
+
+function collectWordContainers(block, out) {
+	if (!block) return;
+	if (block.type === SENTENCE_CONTAINER_TYPE) {
+		collectWordContainers(block.getInputTargetBlock("WORDS"), out);
+		return;
+	}
+	let cur = block;
+	while (cur) {
+		if (cur.type === WORD_CONTAINER_TYPE) out.push(cur);
+		cur = cur.getNextBlock();
+	}
 }
 
 /** Re-labels every morpheme block already on the canvas — used when a display option changes mid-session. */
@@ -808,4 +924,4 @@ export function relabelBlocks(workspace, presetsById, displayOptions) {
 	}
 }
 
-export { buildVerbEndingIndex, buildNounEndingIndex, WORD_CONTAINER_TYPE, NOUN_ENDING_PICKER_TYPE };
+export { buildVerbEndingIndex, buildNounEndingIndex, WORD_CONTAINER_TYPE, SENTENCE_CONTAINER_TYPE, NOUN_ENDING_PICKER_TYPE };
