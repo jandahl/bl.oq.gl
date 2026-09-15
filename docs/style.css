@@ -233,6 +233,8 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 
 .results-footer {
 	position: fixed;
+	/* Overlay the page bottom as a pull-up; canvas height still reserves
+	   this band so toolbox/flyout stay in the Blockly box and e2e-visible. */
 	z-index: 80;
 	left: 0;
 	right: 0;
@@ -336,31 +338,14 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 
 #blockly-div {
 	position: relative;
-	z-index: 1;
-	overflow: hidden;
-	height: min(70vh, 720px);
+	z-index: 50;
+	/* Leave room for the fixed results footer so flyout blocks are not
+	   covered (e2e + real clicks). 12rem approximates header/examples chrome. */
+	height: min(70vh, calc(100dvh - var(--results-footer-height) - 12rem), 720px);
 	min-height: 280px;
 	width: 100%;
 	border: 1px solid var(--border);
 	border-radius: 6px;
-	touch-action: none;
-	overscroll-behavior: contain;
-}
-/* Tailwind preflight sets svg { display:block; max-width:100%; height:auto },
-   which collapses Blockly toolbox/flyout glyphs and can make the workspace
-   SVG report a bogus box (focus then jumps the page to the top). */
-#blockly-div svg,
-.blocklyWidgetDiv svg,
-.blocklyDropDownDiv svg,
-.blocklyTooltipDiv svg {
-	max-width: none;
-	max-height: none;
-	height: unset;
-}
-#blockly-div svg.blocklySvg {
-	display: block;
-	position: absolute;
-	outline: none;
 }
 
 .build-heading-row {
