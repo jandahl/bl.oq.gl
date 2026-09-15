@@ -1,7 +1,7 @@
 name: CI
 
-# Runs on every push and PR. Deliberately hits oq.dicknog.dk and grammarian's
-# live published catalog in the e2e job (see playwright.config.js's own
+# Runs on every push and PR. Deliberately hits the published oq-api and
+# grammarian's live ID-first catalog in the e2e job (see playwright.config.js's own
 # comment for why) rather than a frozen local fixture — this repo's stated
 # posture is that a red build here can mean either a regression in this
 # repo's own commit OR an upstream oq/grammarian break, and only the first
