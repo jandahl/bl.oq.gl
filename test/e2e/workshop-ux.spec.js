@@ -40,6 +40,16 @@ test("examples sit in the Build section above the Blockly canvas", async ({ page
 	expect(order).toBe("examples-before-blockly");
 });
 
+test("the results drawer layers above the Blockly canvas", async ({ page }) => {
+	const layers = await page.evaluate(() => ({
+		blockly: Number.parseInt(window.getComputedStyle(document.querySelector("#blockly-div")).zIndex, 10),
+		results: Number.parseInt(window.getComputedStyle(document.querySelector("#results-footer")).zIndex, 10),
+		widget: Number.parseInt(window.getComputedStyle(document.querySelector(".blocklyWidgetDiv")).zIndex, 10),
+	}));
+	expect(layers.results).toBeGreaterThan(layers.blockly);
+	expect(layers.widget).toBeGreaterThan(layers.results);
+});
+
 test("document title stays BLOQ while typing and updates after deconstruct", async ({ page }) => {
 	await expect(page).toHaveTitle("BLOQ");
 	await page.fill("#word-input", "qimmeqarpunga");
