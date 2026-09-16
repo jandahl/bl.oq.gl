@@ -98,7 +98,7 @@ test("Deconstruct: example words load into the analyzer", async ({ page }) => {
 
 test("Deconstruct: examples are polymorphemic attested words across several phenomena", async ({ page }) => {
 	const examples = page.locator("#example-words .example-word-list [data-example-word]");
-	await expect(examples).toHaveCount(5);
+	await expect(examples).toHaveCount(6);
 	const words = await examples.evaluateAll((nodes) => nodes.map((node) => node.dataset.exampleWord));
 	expect(new Set(words).size).toBe(words.length);
 	// Bare single-stem demos (e.g. qimmeq) are not useful as Deconstruct examples.
@@ -111,7 +111,7 @@ test("Deconstruct: oq CI worked examples open in a filterable modal", async ({ p
 	const modal = page.getByRole("dialog", { name: "oq CI worked examples" });
 	await expect(modal).toBeVisible();
 	await expect(modal.locator("#worked-examples-status")).toContainText("examples", { timeout: 20_000 });
-	await expect.poll(() => modal.locator("#worked-examples-list button").count(), { timeout: 20_000 }).toBe(5);
+	await expect.poll(() => modal.locator("#worked-examples-list button").count(), { timeout: 20_000 }).toBe(6);
 	await modal.locator("#worked-examples-filter").fill("nerivugut");
 	await expect(modal.locator("#worked-examples-list button")).toHaveCount(1);
 	await expect(modal.locator("#worked-examples-list button")).toContainText("nerivugut");
