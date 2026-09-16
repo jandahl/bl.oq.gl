@@ -418,26 +418,8 @@ function injectWorkspace(serializedState = null) {
 		if (event?.isUiEvent) return;
 		refreshBuild();
 	});
-	lockScrollOnBlocklyFocus(blocklyDiv);
 	if (serializedState) Blockly.serialization.workspaces.load(serializedState, workspace);
 	registerVerbPickerReactivity(workspace);
-}
-
-function lockScrollOnBlocklyFocus(root) {
-	if (!root || root.dataset.scrollLock === "1") return;
-	root.dataset.scrollLock = "1";
-	let x = window.scrollX;
-	let y = window.scrollY;
-	const save = () => {
-		x = window.scrollX;
-		y = window.scrollY;
-	};
-	const restore = () => {
-		if (window.scrollX !== x || window.scrollY !== y) window.scrollTo(x, y);
-	};
-	root.addEventListener("pointerdown", save, true);
-	root.addEventListener("touchstart", save, { capture: true, passive: true });
-	root.addEventListener("focusin", restore, true);
 }
 
 function rebuildWorkspace() {
@@ -914,6 +896,7 @@ async function loadEngine() {
 		onUpdated: (next) => {
 			presets = next.presets;
 			presetsById = new Map(presets.map((p) => [p.id, p]));
+			if (workspace?.getToolbox()?.getFlyout()?.isVisible()) return;
 			applyToolbox();
 		},
 	});
@@ -974,6 +957,7 @@ async function startInner() {
 		mountWorkspace();
 	} finally {
 		hideLoadingModal();
+		requestAnimationFrame(() => { if (workspace) Blockly.svgResize(workspace); });
 	}
 }
 

@@ -233,9 +233,10 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 
 .results-footer {
 	position: fixed;
-	/* Overlay the page bottom as a pull-up; canvas height still reserves
-	   this band so toolbox/flyout stay in the Blockly box and e2e-visible. */
-	z-index: 80;
+	/* Below #blockly-div so toolbox/flyout stay clickable and
+	   Playwright-visible. Canvas height reserves this band so the
+	   pull-up still sits at the page bottom without covering blocks. */
+	z-index: 40;
 	left: 0;
 	right: 0;
 	bottom: 0;
@@ -346,6 +347,9 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 	width: 100%;
 	border: 1px solid var(--border);
 	border-radius: 6px;
+}
+#blockly-div svg.blocklySvg {
+	outline: none;
 }
 
 .build-heading-row {
