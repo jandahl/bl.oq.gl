@@ -13,7 +13,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("a finished analysis stays in the details panel while the canvas shows the same chain", async ({ page }) => {
-	await page.getByRole("button", { name: "qimmeqarpunga", exact: true }).click();
+	await page.fill("#word-input", "qimmeqarpunga");
+	await page.getByRole("button", { name: "Deconstruct" }).click();
 	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 20_000 });
 	await expect(page.locator("#word-input")).toHaveValue("qimmeqarpunga");
 	await expect(page.locator("#breakdown-details")).toBeVisible();
@@ -25,7 +26,8 @@ test("a finished analysis stays in the details panel while the canvas shows the 
 });
 
 test("collapsing the analysis details does not wipe the Build canvas", async ({ page }) => {
-	await page.getByRole("button", { name: "qimmeqarpunga", exact: true }).click();
+	await page.fill("#word-input", "qimmeqarpunga");
+	await page.getByRole("button", { name: "Deconstruct" }).click();
 	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 20_000 });
 	await expect(page.locator("#status-line")).toHaveText("qimmeqarpunga");
 	await expect(page.locator("#breakdown-details")).not.toHaveAttribute("open");
@@ -49,7 +51,8 @@ test("collapsing the analysis details does not wipe the Build canvas", async ({ 
 });
 
 test("a collapsed analysis stays collapsed when display options change", async ({ page }) => {
-	await page.getByRole("button", { name: "qimmeqarpunga", exact: true }).click();
+	await page.fill("#word-input", "qimmeqarpunga");
+	await page.getByRole("button", { name: "Deconstruct" }).click();
 	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 20_000 });
 	await expect(page.locator("#breakdown-details")).not.toHaveAttribute("open");
 	await page.locator("#breakdown-summary").click();
