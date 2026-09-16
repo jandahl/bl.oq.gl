@@ -60,6 +60,19 @@ function oqBlocklyStyles(oqTheme) {
 		};
 		categoryStyles[`${name}_category`] = { colour: blocklyColour(colours.border) };
 	}
+	// These are BLOQ workshop affordances, not grammar categories. Keep them
+	// outside oq's palette so containers and input boundaries are immediately
+	// distinguishable from morphemes.
+	blockStyles.bloq_word_container_blocks = {
+		colourPrimary: "#4b6584", colourSecondary: "#7890aa", colourTertiary: "#25364a",
+	};
+	blockStyles.bloq_sentence_container_blocks = {
+		colourPrimary: "#8a4f72", colourSecondary: "#b77b9d", colourTertiary: "#51213d",
+	};
+	blockStyles.bloq_input_blocks = {
+		colourPrimary: "#68717a", colourSecondary: "#9da5ab", colourTertiary: "#30363b",
+	};
+	categoryStyles.bloq_input_category = { colour: "#68717a" };
 	return { blockStyles, categoryStyles };
 }
 

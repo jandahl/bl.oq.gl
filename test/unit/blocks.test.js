@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, presetMatchesQuery } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery } from "../../docs/blocks.js";
 
 // These blocks.js exports don't touch the `Blockly` global, so they're
 // unit-testable directly under
@@ -178,6 +178,7 @@ test("buildToolbox: always includes Word and Sentence container categories", () 
 	const names = toolbox.contents.map((c) => c.name);
 	assert.ok(names.includes("Words (1)"));
 	assert.ok(names.includes("Sentences (1)"));
+	assert.ok(names.includes("Input boundaries (2)"));
 	const words = toolbox.contents.find((c) => c.name === "Words (1)");
 	const sentences = toolbox.contents.find((c) => c.name === "Sentences (1)");
 	assert.equal(words.contents[0].type, "morpheme_block__word_container");
@@ -211,4 +212,20 @@ test("wordsFromBlock: a sentence of stacked word containers yields one chain per
 		getInputTargetBlock: (name) => name === "WORDS" ? wordA : null,
 	};
 	assert.deepEqual(wordsFromBlock(sentence), [["qimmeq"], ["nerivoq"]]);
+});
+
+test("topLevelSentences: an input boundary scopes parsing and ignores loose experiment blocks", () => {
+	const stem = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => null };
+	const word = {
+		type: "morpheme_block__word_container",
+		getInputTargetBlock: (name) => name === "MORPHEMES" ? stem : null,
+		getNextBlock: () => null,
+	};
+	const sentence = {
+		type: "morpheme_block__sentence_container",
+		getInputTargetBlock: (name) => name === "WORDS" ? word : null,
+	};
+	const start = { type: "input_start", getNextBlock: () => sentence };
+	const loose = { type: "morpheme_block__stem_v", data: "aallarpoq", getNextBlock: () => null };
+	assert.deepEqual(topLevelSentences({ getTopBlocks: () => [start, loose] }), [[['qimmeq']]]);
 });
