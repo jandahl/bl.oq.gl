@@ -1,17 +1,13 @@
-// The same published worked-example corpus that jandahl/oq uses for its
-// forward-build and reverse-Deconstruct CI checks. Keep this live rather than
-// copying the corpus into the app: the grammarian project is its source of
-// truth and publishes the corpus specifically for downstream checks.
-export const WORKED_EXAMPLES_URL = "https://jandahl.github.io/oq-grammarian/grammar/latest/worked_examples.json";
+import { STANDARD_EXAMPLES, getStandardExamples } from "./oq-api.js";
+
+// Standard examples are part of the pinned oq-api release. Keep the public
+// constant available for consumers that need the immutable catalog, and use a
+// defensive copy when the UI filters or enriches entries.
+export { STANDARD_EXAMPLES, getStandardExamples };
 
 /**
  * @returns {Promise<Array<{ surface: string, gloss?: string, chain?: string[] }>>}
  */
 export async function loadWorkedExamples() {
-	const res = await fetch(WORKED_EXAMPLES_URL);
-	if (!res.ok) throw new Error(`worked examples fetch failed: ${res.status}`);
-	const value = await res.json();
-	const entries = Array.isArray(value?.flat) ? value.flat : value?.entries;
-	if (!Array.isArray(entries)) throw new Error("worked examples have an unexpected shape");
-	return entries.filter((entry) => typeof entry?.surface === "string" && entry.surface.length > 0);
+	return getStandardExamples().worked;
 }

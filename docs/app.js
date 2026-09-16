@@ -1,4 +1,4 @@
-import { buildWord, analyzeWordAsync, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel } from "./oq-api.js";
+import { buildWord, analyzeWordAsync, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, STANDARD_EXAMPLES } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentence, relabelBlocks, labelContainers,
@@ -161,6 +161,7 @@ function bindDom() {
 		document.getElementById("morpheme-filter-clear"),
 	);
 	blocklyThemeSelect = enhanceSegmented(document.getElementById("blockly-theme-select"));
+	renderStandardExamples();
 	exampleWordButtons = document.querySelectorAll("[data-example-word]");
 	workedExamplesBtn = document.getElementById("worked-examples-btn");
 	workedExamplesModal = document.getElementById("worked-examples-modal");
@@ -228,6 +229,29 @@ function selectExample(word) {
 		setFieldValue(wordInput, word);
 		return runDeconstruct();
 	});
+}
+
+function renderStandardExamples() {
+	const words = document.querySelector(".example-word-list");
+	const sentences = document.querySelector(".example-sentence-list");
+	words.replaceChildren(...STANDARD_EXAMPLES.worked.map((example) => {
+		const button = document.createElement("button");
+		button.type = "button";
+		button.className = "example-pill";
+		button.dataset.exampleWord = example.surface;
+		button.textContent = example.surface;
+		button.title = example.gloss;
+		return button;
+	}));
+	sentences.replaceChildren(...STANDARD_EXAMPLES.sentences.map((example) => {
+		const button = document.createElement("button");
+		button.type = "button";
+		button.className = "example-pill";
+		button.dataset.exampleWord = example.words.join(" ");
+		button.textContent = example.words.join(" ");
+		button.title = example.gloss;
+		return button;
+	}));
 }
 
 function renderWorkedExamples() {
