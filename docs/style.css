@@ -233,10 +233,9 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 
 .results-footer {
 	position: fixed;
-	/* Below #blockly-div so toolbox/flyout stay clickable and
-	   Playwright-visible. Canvas height reserves this band so the
-	   pull-up still sits at the page bottom without covering blocks. */
-	z-index: 40;
+	/* Keep the results drawer above the workspace stacking context. Blockly's
+	   detached menus remain above both layers via .blocklyWidgetDiv below. */
+	z-index: 100;
 	left: 0;
 	right: 0;
 	bottom: 0;
@@ -339,7 +338,7 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 
 #blockly-div {
 	position: relative;
-	z-index: 50;
+	z-index: 1;
 	/* Leave room for the fixed results footer so flyout blocks are not
 	   covered (e2e + real clicks). 12rem approximates header/examples chrome. */
 	height: min(70vh, calc(100dvh - var(--results-footer-height) - 12rem), 720px);

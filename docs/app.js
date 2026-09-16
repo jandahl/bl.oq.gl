@@ -189,18 +189,23 @@ function bindDom() {
 // them stay in sync with each other -- the earlier "hiding ids also hid the
 // spelling" bug (bl-oq-ly#14) came from exactly this kind of state living in
 // two places instead of one.
-const SHOW_IDS_KEY = "bloq:show-ids";
-const SHOW_IDS_KEY_LEGACY = "bl-oq-ly:show-ids";
-const READING_ORDER_KEY = "bloq:reading-order";
-const READING_ORDER_KEY_LEGACY = "bl-oq-ly:reading-order";
-const LANG_KEY = "bloq:lang";
-const LANG_KEY_LEGACY = "bl-oq-ly:lang";
-const SPELLING_KEY = "bloq:spelling-mode";
-const SPELLING_KEY_LEGACY = "bl-oq-ly:spelling-mode";
+const SHOW_IDS_KEY = "bl-oq-ly:show-ids";
+const SHOW_IDS_KEY_RENAMED = "bloq:show-ids";
+const READING_ORDER_KEY = "bl-oq-ly:reading-order";
+const READING_ORDER_KEY_RENAMED = "bloq:reading-order";
+const LANG_KEY = "bl-oq-ly:lang";
+const LANG_KEY_RENAMED = "bloq:lang";
+const SPELLING_KEY = "bl-oq-ly:spelling-mode";
+const SPELLING_KEY_RENAMED = "bloq:spelling-mode";
 
 
 function stored(key, legacyKey) {
 	return localStorage.getItem(key) ?? (legacyKey ? localStorage.getItem(legacyKey) : null);
+}
+
+function storePreference(key, renamedKey, value) {
+	localStorage.setItem(key, value);
+	localStorage.setItem(renamedKey, value);
 }
 
 const APP_TITLE = "BLOQ";
@@ -256,12 +261,12 @@ function readLastFirst() {
 }
 
 function initDisplayOptions() {
-	uiLangSelect.value = stored("bloq:ui-lang", "bl-oq-ly:ui-lang") === "da" ? "da" : "en";
-	showIdsCheckbox.checked = stored(SHOW_IDS_KEY, SHOW_IDS_KEY_LEGACY) === "true";
-	readingOrderCheckbox.checked = stored(READING_ORDER_KEY, READING_ORDER_KEY_LEGACY) !== "false"; // default on
-	langSelect.value = ["en", "da", "both"].includes(stored(LANG_KEY, LANG_KEY_LEGACY)) ? stored(LANG_KEY, LANG_KEY_LEGACY) : "en";
-	spellingSelect.value = ["both", "spelling-only", "gloss-only"].includes(stored(SPELLING_KEY, SPELLING_KEY_LEGACY))
-		? stored(SPELLING_KEY, SPELLING_KEY_LEGACY) : "both";
+	uiLangSelect.value = stored("bl-oq-ly:ui-lang", "bloq:ui-lang") === "da" ? "da" : "en";
+	showIdsCheckbox.checked = stored(SHOW_IDS_KEY, SHOW_IDS_KEY_RENAMED) === "true";
+	readingOrderCheckbox.checked = stored(READING_ORDER_KEY, READING_ORDER_KEY_RENAMED) !== "false"; // default on
+	langSelect.value = ["en", "da", "both"].includes(stored(LANG_KEY, LANG_KEY_RENAMED)) ? stored(LANG_KEY, LANG_KEY_RENAMED) : "en";
+	spellingSelect.value = ["both", "spelling-only", "gloss-only"].includes(stored(SPELLING_KEY, SPELLING_KEY_RENAMED))
+		? stored(SPELLING_KEY, SPELLING_KEY_RENAMED) : "both";
 
 	function onDisplayOptionChange() {
 		if (workspace) relabelBlocks(workspace, presetsById, displayOptions());
@@ -270,26 +275,26 @@ function initDisplayOptions() {
 		if (lastDeconstructIds) rerenderBreakdown();
 	}
 	uiLangSelect.addEventListener("change", () => {
-		localStorage.setItem("bloq:ui-lang", uiLangSelect.value);
+		storePreference("bl-oq-ly:ui-lang", "bloq:ui-lang", uiLangSelect.value);
 		setLocale(uiLangSelect.value);
 		applyLocale();
 		syncDocumentTitle();
 		applyTheme(document.documentElement.dataset.theme || "auto");
 	});
 	showIdsCheckbox.addEventListener("change", () => {
-		localStorage.setItem(SHOW_IDS_KEY, String(showIdsCheckbox.checked));
+		storePreference(SHOW_IDS_KEY, SHOW_IDS_KEY_RENAMED, String(showIdsCheckbox.checked));
 		onDisplayOptionChange();
 	});
 	langSelect.addEventListener("change", () => {
-		localStorage.setItem(LANG_KEY, langSelect.value);
+		storePreference(LANG_KEY, LANG_KEY_RENAMED, langSelect.value);
 		onDisplayOptionChange();
 	});
 	spellingSelect.addEventListener("change", () => {
-		localStorage.setItem(SPELLING_KEY, spellingSelect.value);
+		storePreference(SPELLING_KEY, SPELLING_KEY_RENAMED, spellingSelect.value);
 		onDisplayOptionChange();
 	});
 	readingOrderCheckbox.addEventListener("change", () => {
-		localStorage.setItem(READING_ORDER_KEY, String(readingOrderCheckbox.checked));
+		storePreference(READING_ORDER_KEY, READING_ORDER_KEY_RENAMED, String(readingOrderCheckbox.checked));
 		// Only Deconstruct's per-morpheme rows are reversible -- Build's
 		// reading line is a composed sentence, unaffected (see gloss.js).
 		if (lastDeconstructIds) rerenderBreakdown();
@@ -353,8 +358,8 @@ function nounPresentationPreferences() {
 // Blockly's own toolbox/flyout/workspace chrome is themed separately via
 // theme.js + workspace.setTheme(), since it doesn't read CSS custom
 // properties at all — see that file's comment.
-const THEME_KEY = "bloq:theme";
-const THEME_KEY_LEGACY = "bl-oq-ly:theme";
+const THEME_KEY = "bl-oq-ly:theme";
+const THEME_KEY_RENAMED = "bloq:theme";
 const THEME_CYCLE = ["auto", "light", "dark"];
 function isEffectivelyDark() {
 	const explicit = document.documentElement.dataset.theme;
@@ -371,12 +376,12 @@ function syncBlocklyTheme() {
 }
 
 function initBlocklyTheme() {
-	const saved = stored("bloq:blockly-theme", "bl-oq-ly:blockly-theme");
+	const saved = stored("bl-oq-ly:blockly-theme", "bloq:blockly-theme");
 	selectedBlocklyTheme = ["classic", "zelos"].includes(saved) ? saved : "classic";
 	blocklyThemeSelect.value = selectedBlocklyTheme;
 	blocklyThemeSelect.addEventListener("change", () => {
 		selectedBlocklyTheme = blocklyThemeSelect.value;
-		localStorage.setItem("bloq:blockly-theme", selectedBlocklyTheme);
+		storePreference("bl-oq-ly:blockly-theme", "bloq:blockly-theme", selectedBlocklyTheme);
 		rebuildWorkspace();
 	});
 }
@@ -440,12 +445,12 @@ function applyTheme(theme) {
 }
 
 function initTheme() {
-	const saved = stored(THEME_KEY, THEME_KEY_LEGACY);
+	const saved = stored(THEME_KEY, THEME_KEY_RENAMED);
 	applyTheme(THEME_CYCLE.includes(saved) ? saved : "auto");
 	themeToggleBtn.addEventListener("click", () => {
 		const current = document.documentElement.dataset.theme || "auto";
 		const next = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length];
-		localStorage.setItem(THEME_KEY, next);
+		storePreference(THEME_KEY, THEME_KEY_RENAMED, next);
 		applyTheme(next);
 	});
 	// Keep "auto" reactive to a live OS theme change, not just at load time.
@@ -945,7 +950,7 @@ async function startInner() {
 		try { workspace.dispose(); } catch { /* DOM was replaced (React remount / HMR) */ }
 		workspace = null;
 	}
-	setLocale(stored("bloq:ui-lang", "bl-oq-ly:ui-lang") || "en");
+	setLocale(stored("bl-oq-ly:ui-lang", "bloq:ui-lang") || "en");
 	applyLocale();
 	syncDocumentTitle();
 	try {
