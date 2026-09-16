@@ -2,8 +2,8 @@
 
 ## Project
 
-`bl.oq.gl` is a static Blockly learning aid for building and deconstructing
-Kalaallisut words. The app lives in `docs/` and has no bundling step.
+`bl.oq.gl` (BLOQ) is a static Blockly learning aid for building and deconstructing
+Kalaallisut words and short sentences. The app lives in `docs/` and has no bundling step.
 
 ## Important boundaries
 
@@ -30,7 +30,8 @@ uses the live oq-api and grammarian catalog.
 
 - `docs/app.js` — app wiring and analysis flow
 - `docs/blocks.js` — Blockly blocks and chain rendering
-- `docs/catalog.js` — runtime catalog loading
+- `docs/catalog.js` — runtime catalog loading with Cache Storage
+- `docs/catalog-cache.js` — catalog cache helpers
 - `docs/oq-api.js` — oq-api integration
 - `test/unit/` — fast unit tests
 - `test/e2e/` — browser tests

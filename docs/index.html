@@ -3,13 +3,25 @@
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-	<title>bl-oq-ly</title>
+	<title>BLOQ</title>
 	<link rel="stylesheet" href="./style.css" />
+	<link rel="preload" href="./vendor/blockly.js" as="script" />
+	<link rel="modulepreload" href="https://jandahl.github.io/api.oq.gl/api/v0.1.9/public-api.js" />
+	<link rel="preload" href="https://grammarian.oq.gl/v2/grammar/morphemes-by-id.json" as="fetch" crossorigin="anonymous" />
 </head>
 <body>
+	<div id="loading-modal" class="loading-overlay" role="dialog" aria-modal="true" aria-labelledby="loading-heading" aria-describedby="loading-status">
+		<div class="loading-card">
+			<h2 id="loading-heading" data-i18n="loadingTitle">Loading</h2>
+			<p id="loading-status" data-i18n="loading">Loading morpheme catalog…</p>
+			<div class="loading-bar is-indeterminate" id="loading-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="loading-status">
+				<div class="loading-bar-fill" id="loading-progress-fill"></div>
+			</div>
+		</div>
+	</div>
 	<header>
 		<div class="header-top">
-			<h1>bl-oq-ly</h1>
+			<h1 data-i18n="app.title">BLOQ</h1>
 			<div class="header-actions">
 				<button id="theme-toggle" class="theme-toggle" type="button">Theme: Auto</button>
 				<button id="display-toggle" class="theme-toggle" type="button" data-i18n="display" aria-controls="display-panel" aria-expanded="false">Settings</button>
@@ -69,7 +81,6 @@
 				</summary>
 				<div id="breakdown"></div>
 			</details>
-
 		</section>
 
 		<section class="page-section build-section" aria-labelledby="build-heading">
@@ -89,14 +100,37 @@
 					<h3 id="example-words-heading" data-i18n="tryExample">Try an example</h3>
 					<button id="worked-examples-btn" type="button" data-i18n="extendedExamples">Extended examples</button>
 				</div>
-				<p class="section-instruction" data-i18n="exampleDescription">Deconstructs the word and drops the verified chain onto the canvas.</p>
-				<div class="example-word-list">
-					<button type="button" data-example-word="nerivugut" data-example-class="intransitive verb">nerivugut</button>
-					<button type="button" data-example-word="aallarpoq" data-example-class="intransitive verb">aallarpoq</button>
-					<button type="button" data-example-word="qimmeqarpoq" data-example-class="derivational affix">qimmeqarpoq</button>
-					<button type="button" data-example-word="qimmeqarpunga" data-example-class="inflectional ending">qimmeqarpunga</button>
-					<button type="button" data-example-word="qimmequna" data-example-class="enclitic">qimmequna</button>
-					<button type="button" data-example-word="takuvakkit" data-example-class="transitive verb">takuvakkit</button>
+				<p class="section-instruction" data-i18n="exampleDescription">Deconstructs a word or sentence and drops the verified chain onto the canvas.</p>
+				<div class="example-groups">
+					<div class="example-group">
+						<h4 class="example-group-label" data-i18n="exampleWordsLabel">Words</h4>
+						<div class="example-word-list">
+							<button type="button" class="example-pill" data-example-word="nerivugut" data-example-class="intransitive verb">nerivugut</button>
+							<button type="button" class="example-pill" data-example-word="aallarpoq" data-example-class="intransitive verb">aallarpoq</button>
+							<button type="button" class="example-pill" data-example-word="qimmeqarpoq" data-example-class="derivational affix">qimmeqarpoq</button>
+							<button type="button" class="example-pill" data-example-word="qimmeqarpunga" data-example-class="inflectional ending">qimmeqarpunga</button>
+							<button type="button" class="example-pill" data-example-word="qimmequna" data-example-class="enclitic">qimmequna</button>
+							<button type="button" class="example-pill" data-example-word="takuvakkit" data-example-class="transitive verb">takuvakkit</button>
+						</div>
+					</div>
+					<div class="example-group">
+						<h4 class="example-group-label" data-i18n="exampleSentencesLabel">Sentences</h4>
+						<div class="example-sentence-list">
+							<button type="button" class="example-sentence" data-example-word="qimmeqarpunga aallarpoq" data-example-class="sentence" aria-label="qimmeqarpunga aallarpoq">
+								<span class="example-pill">qimmeqarpunga</span>
+								<span class="example-pill">aallarpoq</span>
+							</button>
+							<button type="button" class="example-sentence" data-example-word="nerivugut takuvakkit" data-example-class="sentence" aria-label="nerivugut takuvakkit">
+								<span class="example-pill">nerivugut</span>
+								<span class="example-pill">takuvakkit</span>
+							</button>
+							<button type="button" class="example-sentence" data-example-word="aallarpoq qimmeqarpoq nerivugut" data-example-class="sentence" aria-label="aallarpoq qimmeqarpoq nerivugut">
+								<span class="example-pill">aallarpoq</span>
+								<span class="example-pill">qimmeqarpoq</span>
+								<span class="example-pill">nerivugut</span>
+							</button>
+						</div>
+					</div>
 				</div>
 			</section>
 

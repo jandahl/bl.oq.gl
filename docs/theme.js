@@ -98,12 +98,12 @@ export function buildBlocklyThemes() {
 	};
 
 	const classic = {
-		light: defineTheme("bl-oq-ly-classic-light", Blockly.Themes.Classic, lightStyles, WORD_CLASS_THEMES.light),
-		dark: defineTheme("bl-oq-ly-classic-dark", Blockly.Themes.Classic, darkStyles, WORD_CLASS_THEMES.default),
+		light: defineTheme("bloq-classic-light", Blockly.Themes.Classic, lightStyles, WORD_CLASS_THEMES.light),
+		dark: defineTheme("bloq-classic-dark", Blockly.Themes.Classic, darkStyles, WORD_CLASS_THEMES.default),
 	};
 	const zelos = {
-		light: defineTheme("bl-oq-ly-zelos-light", Blockly.Themes.Zelos, lightStyles, WORD_CLASS_THEMES.light),
-		dark: defineTheme("bl-oq-ly-zelos-dark", Blockly.Themes.Zelos, darkStyles, WORD_CLASS_THEMES.default),
+		light: defineTheme("bloq-zelos-light", Blockly.Themes.Zelos, lightStyles, WORD_CLASS_THEMES.light),
+		dark: defineTheme("bloq-zelos-dark", Blockly.Themes.Zelos, darkStyles, WORD_CLASS_THEMES.default),
 	};
 
 	return { classic, zelos, light: classic.light, dark: classic.dark };

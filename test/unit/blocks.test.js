@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, presetMatchesQuery } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, presetMatchesQuery } from "../../docs/blocks.js";
 
 // These blocks.js exports don't touch the `Blockly` global, so they're
 // unit-testable directly under
@@ -171,4 +171,44 @@ test("chainFromTopBlock: a null/undefined chain link stops the walk cleanly", ()
 test("chainFromTopBlock: ignores a non-morpheme block type (defensive; shouldn't occur in practice since only morpheme blocks connect)", () => {
 	const stray = { type: "some_other_block", data: "x", getNextBlock: () => null };
 	assert.deepEqual(chainFromTopBlock(stray), []);
+});
+
+test("buildToolbox: always includes Word and Sentence container categories", () => {
+	const toolbox = buildToolbox([], { showIds: false });
+	const names = toolbox.contents.map((c) => c.name);
+	assert.ok(names.includes("Words (1)"));
+	assert.ok(names.includes("Sentences (1)"));
+	const words = toolbox.contents.find((c) => c.name === "Words (1)");
+	const sentences = toolbox.contents.find((c) => c.name === "Sentences (1)");
+	assert.equal(words.contents[0].type, "morpheme_block__word_container");
+	assert.equal(sentences.contents[0].type, "morpheme_block__sentence_container");
+});
+
+test("chainFromTopBlock: unwraps a word container to its morpheme stack", () => {
+	const inner = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => null };
+	const container = {
+		type: "morpheme_block__word_container",
+		getInputTargetBlock: () => inner,
+	};
+	assert.deepEqual(chainFromTopBlock(container), ["qimmeq"]);
+});
+
+test("wordsFromBlock: a sentence of stacked word containers yields one chain per word", () => {
+	const stemA = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => null };
+	const stemB = { type: "morpheme_block__stem_n", data: "nerivoq", getNextBlock: () => null };
+	const wordB = {
+		type: "morpheme_block__word_container",
+		getInputTargetBlock: (name) => name === "MORPHEMES" ? stemB : null,
+		getNextBlock: () => null,
+	};
+	const wordA = {
+		type: "morpheme_block__word_container",
+		getInputTargetBlock: (name) => name === "MORPHEMES" ? stemA : null,
+		getNextBlock: () => wordB,
+	};
+	const sentence = {
+		type: "morpheme_block__sentence_container",
+		getInputTargetBlock: (name) => name === "WORDS" ? wordA : null,
+	};
+	assert.deepEqual(wordsFromBlock(sentence), [["qimmeq"], ["nerivoq"]]);
 });

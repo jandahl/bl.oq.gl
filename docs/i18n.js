@@ -1,6 +1,6 @@
 const messages = {
 	en: {
-		"app.title": "bl-oq-ly", "theme.auto": "Theme: Auto", "theme.light": "Theme: Light", "theme.dark": "Theme: Dark", "display": "Settings", "settingsHeading": "Display and language",
+		"app.title": "BLOQ", "theme.auto": "Theme: Auto", "theme.light": "Theme: Light", "theme.dark": "Theme: Dark", "display": "Settings", "settingsHeading": "Display and language",
 		"subtitle": "A block-based learning aid for building and taking apart Kalaallisut words. Prototype — nothing here is authoritative.", "analyzeHeading": "Analyze a word", "buildHeading": "Build a word", "buildInstruction": "Choose a category, then drag a block onto the canvas — or try an example below.",
 		"attested": "Attested word", "deconstruct": "Deconstruct", "glossLanguage": "Gloss language", "wordPlaceholder": "e.g. qimmeqarpunga", "clearWord": "Clear word", "clearFilter": "Clear filter",
 		"english": "English", "danish": "Dansk", "both": "Both", "uiLanguage": "UI language", "morphemeLabels": "Morpheme labels",
@@ -8,11 +8,12 @@ const messages = {
 		"classic": "Classic", "zelos": "Zelos", "showIds": "Add internal API ids", "readLast": "Read last morpheme first",
 		"paletteHide": "Hide palette", "paletteShow": "Show palette", "paletteFilter": "Filter by Kalaallisut form, id, or gloss…",
 		"copyLink": "Copy link", "linkCopied": "Copied", "clearCanvas": "Clear canvas", "emptyCanvasHint": "Drag a morpheme in, or try an example above.",
-		"tryExample": "Try an example", "exampleDescription": "Deconstructs the word and drops the verified chain onto the canvas.",
-		"extendedExamples": "Extended examples", "loading": "Loading morpheme catalog…", "morphemeChain": "Morpheme chain", "footerText": "An experimental learning tool for exploring Kalaallisut word structure.",
+		"tryExample": "Try an example", "exampleDescription": "Deconstructs a word or sentence and drops the verified chain onto the canvas.",
+		"exampleWordsLabel": "Words", "exampleSentencesLabel": "Sentences",
+		"extendedExamples": "Extended examples", "loading": "Loading morpheme catalog…", "loadingTitle": "Loading", "loadingCached": "Opening saved catalog…", "loadingParse": "Preparing morphemes…", "morphemeChain": "Morpheme chain", "footerText": "An experimental learning tool for exploring Kalaallisut word structure.",
 	},
 	da: {
-		"app.title": "bl-oq-ly", "theme.auto": "Tema: Automatisk", "theme.light": "Tema: Lys", "theme.dark": "Tema: Mørk", "display": "Indstillinger", "settingsHeading": "Visning og sprog",
+		"app.title": "BLOQ", "theme.auto": "Tema: Automatisk", "theme.light": "Tema: Lys", "theme.dark": "Tema: Mørk", "display": "Indstillinger", "settingsHeading": "Visning og sprog",
 		"subtitle": "Et blokbaseret læringsværktøj til at bygge og analysere kalaallisut-ord. Prototype — intet her er autoritativt.", "analyzeHeading": "Analysér et ord", "buildHeading": "Byg et ord", "buildInstruction": "Vælg en kategori, og træk en blok over på lærredet — eller prøv et eksempel nedenfor.",
 		"attested": "Attesteret ord", "deconstruct": "Dekonstruér", "glossLanguage": "Glossprog", "wordPlaceholder": "f.eks. qimmeqarpunga", "clearWord": "Ryd ord", "clearFilter": "Ryd filter",
 		"english": "English", "danish": "Dansk", "both": "Begge", "uiLanguage": "Brugerfladesprog", "morphemeLabels": "Morfemlabels",
@@ -20,8 +21,9 @@ const messages = {
 		"classic": "Klassisk", "zelos": "Zelos", "showIds": "Tilføj interne API-id'er", "readLast": "Læs sidste morfem først",
 		"paletteHide": "Skjul palette", "paletteShow": "Vis palette", "paletteFilter": "Filtrér efter kalaallisut-form, id eller gloss…",
 		"copyLink": "Kopiér link", "linkCopied": "Kopieret", "clearCanvas": "Ryd lærred", "emptyCanvasHint": "Træk et morfem ind, eller prøv et eksempel ovenfor.",
-		"tryExample": "Prøv et eksempel", "exampleDescription": "Analyserer ordet og lægger den verificerede kæde på lærredet.",
-		"extendedExamples": "Udvidede eksempler", "loading": "Indlæser morfemkatalog…", "morphemeChain": "Morfemkæde", "footerText": "Et eksperimentelt læringsværktøj til at udforske kalaallisut-ords struktur.",
+		"tryExample": "Prøv et eksempel", "exampleDescription": "Analyserer et ord eller en sætning og lægger den verificerede kæde på lærredet.",
+		"exampleWordsLabel": "Ord", "exampleSentencesLabel": "Sætninger",
+		"extendedExamples": "Udvidede eksempler", "loading": "Indlæser morfemkatalog…", "loadingTitle": "Indlæser", "loadingCached": "Åbner gemt katalog…", "loadingParse": "Forbereder morfemer…", "morphemeChain": "Morfemkæde", "footerText": "Et eksperimentelt læringsværktøj til at udforske kalaallisut-ords struktur.",
 	},
 };
 

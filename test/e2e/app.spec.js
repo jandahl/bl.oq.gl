@@ -49,6 +49,8 @@ test.beforeEach(async ({ page }) => {
 	});
 	await page.goto("/");
 	await expect(page.locator("#status-line")).toContainText("Loaded", { timeout: 20_000 });
+	await expect(page.locator("#loading-modal")).toBeHidden();
+	await expect(page.locator(".blocklyToolbox")).toBeVisible();
 });
 
 test("catalog loads with a real morpheme count", async ({ page }) => {
@@ -95,7 +97,7 @@ test("Deconstruct: example words load into the analyzer", async ({ page }) => {
 });
 
 test("Deconstruct: examples are polymorphemic attested words across several phenomena", async ({ page }) => {
-	const examples = page.locator("#example-words [data-example-word]");
+	const examples = page.locator("#example-words .example-word-list [data-example-word]");
 	await expect(examples).toHaveCount(6);
 	const classes = await examples.evaluateAll((nodes) => nodes.map((node) => node.dataset.exampleClass));
 	expect(classes).toEqual([
@@ -126,10 +128,16 @@ test("Deconstruct: oq CI worked examples open in a filterable modal", async ({ p
 	await expect(modal).toBeHidden();
 });
 
-async function dragFirstFlyoutBlockIntoWorkspace(page, categoryLabelText) {
+async function openToolboxCategory(page, categoryLabelText) {
 	await closeSettings(page);
+	await page.locator("#blockly-div").scrollIntoViewIfNeeded();
 	const category = page.locator('[role="treeitem"]').filter({ hasText: categoryLabelText }).first();
+	await expect(category).toBeVisible();
 	await category.click({ force: true });
+}
+
+async function dragFirstFlyoutBlockIntoWorkspace(page, categoryLabelText) {
+	await openToolboxCategory(page, categoryLabelText);
 	const block = page.locator(".blocklyFlyout .blocklyDraggable").first();
 	await expect(block).toBeVisible({ timeout: 10_000 });
 	const box = await block.boundingBox();
@@ -176,7 +184,7 @@ test("Build: toolbox blocks are colour-coded per category, not a single shared c
 
 test("Build: block labels always show the real Kalaallisut spelling, and hide grammarian's internal id by default (bl-oq-ly#10/#14)", async ({ page }) => {
 	await page.fill("#morpheme-filter", "N_qaq_Vb");
-	await page.locator('[role="treeitem"]').first().click({ force: true });
+	await openToolboxCategory(page, "Derivational affixes");
 	await page.waitForTimeout(400);
 	const label = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
 	expect(label).toContain("-qaq");
@@ -186,7 +194,7 @@ test("Build: block labels always show the real Kalaallisut spelling, and hide gr
 	await page.click("#opt-show-ids");
 	await closeSettings(page);
 	await page.waitForTimeout(400);
-	await page.locator('[role="treeitem"]').first().click({ force: true });
+	await openToolboxCategory(page, "Derivational affixes");
 	await page.waitForTimeout(400);
 	const labelWithId = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
 	expect(labelWithId).toContain("N_qaq_Vb");
@@ -199,16 +207,14 @@ test("Build: the morpheme display option explicitly prepends the morpheme", asyn
 	expect(options).toEqual(["Form + gloss", "Form only", "Gloss only"]);
 
 	await page.fill("#morpheme-filter", "nngit");
-	await page.locator('[role="treeitem"]', { hasText: "Sentential affixes" }).click({ force: true });
+	await openToolboxCategory(page, "Sentential affixes");
 	const label = await page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit(?:\s|\u00a0)—/ }).textContent();
 	expect(label.indexOf("-nngit")).toBe(0);
 });
 
 test("Build: filtering by -nngit surfaces the ordinary negator by its Kalaallisut form", async ({ page }) => {
 	await page.fill("#morpheme-filter", "nngit");
-	const sententialCategory = page.locator('[role="treeitem"]', { hasText: "Sentential affixes" });
-	await expect(sententialCategory).toBeVisible();
-	await sententialCategory.click({ force: true });
+	await openToolboxCategory(page, "Sentential affixes");
 	await expect(page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit(?:\s|\u00a0)—/ })).toBeVisible();
 });
 
@@ -405,18 +411,14 @@ test("Danish gloss language: block labels and Deconstruct's translation switch t
 });
 
 test("Spelling-visibility mode: gloss-only and spelling-only each show exactly what they promise (bl-oq-ly#17)", async ({ page }) => {
-	const stemCat = page.locator('[role="treeitem"]').filter({ hasText: "Stems — nouns" }).first();
-
 	await choose(page, "#opt-spelling", "gloss-only");
-	await closeSettings(page);
-	await stemCat.click({ force: true });
+	await openToolboxCategory(page, "Stems — nouns");
 	await expect(page.locator(".blocklyFlyout .blocklyDraggable text").first()).toBeVisible({ timeout: 10_000 });
 	const glossOnlyLabel = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
 	expect(glossOnlyLabel).not.toContain(" — "); // "both" mode's only separator -- gloss-only never joins two parts
 
 	await choose(page, "#opt-spelling", "spelling-only");
-	await closeSettings(page);
-	await stemCat.click({ force: true });
+	await openToolboxCategory(page, "Stems — nouns");
 	await page.waitForTimeout(400);
 	const spellingOnlyLabel = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
 	expect(spellingOnlyLabel).not.toContain(" — ");
@@ -462,8 +464,7 @@ test("Build: palette Hide/Show actually hides the toolbox, and never throws (bl-
 });
 
 test("Build: filter narrows the toolbox and closes any already-open flyout (bl-oq-ly#9: a stale flyout used to keep showing unfiltered content)", async ({ page }) => {
-	await closeSettings(page);
-	await page.locator('[role="treeitem"]').filter({ hasText: "Derivational affixes" }).first().click({ force: true });
+	await openToolboxCategory(page, "Derivational affixes");
 	await page.waitForTimeout(400);
 	await expect(page.locator(".blocklyFlyout .blocklyDraggable").first()).toBeVisible();
 	await page.fill("#morpheme-filter", "qimme");
@@ -474,7 +475,7 @@ test("Build: filter narrows the toolbox and closes any already-open flyout (bl-o
 	// would pass even while stale content sits there invisibly -- what
 	// actually matters is that no flyout block is actually visible.
 	await expect(page.locator(".blocklyFlyout .blocklyDraggable:visible")).toHaveCount(0);
-	await expect(page.locator('[role="treeitem"]')).toHaveText([/Stems — nouns \(1\)/, /Words \(1\)/]);
+	await expect(page.locator('[role="treeitem"]')).toHaveText([/Stems — nouns \(1\)/, /Words \(1\)/, /Sentences \(1\)/]);
 });
 
 test("Build: theme toggle actually re-themes Blockly's own chrome, not just the page (bl-oq-ly#7)", async ({ page }) => {

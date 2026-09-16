@@ -40,6 +40,22 @@ test("examples sit in the Build section above the Blockly canvas", async ({ page
 	expect(order).toBe("examples-before-blockly");
 });
 
+test("document title stays BLOQ while typing and updates after deconstruct", async ({ page }) => {
+	await expect(page).toHaveTitle("BLOQ");
+	await page.fill("#word-input", "qimmeqarpunga");
+	await expect(page).toHaveTitle("BLOQ");
+	await page.getByRole("button", { name: "Deconstruct" }).click();
+	await expect(page).toHaveTitle("qimmeqarpunga - BLOQ", { timeout: 20_000 });
+});
+
+test("a sentence example deconstructs each word onto the canvas", async ({ page }) => {
+	await page.getByRole("button", { name: "qimmeqarpunga aallarpoq" }).click();
+	await expect(page.locator("#word-input")).toHaveValue("qimmeqarpunga aallarpoq");
+	await expect(page.locator("#status-line")).toContainText("qimmeqarpunga", { timeout: 30_000 });
+	await expect(page.locator("#status-line")).toContainText("aallarpoq");
+	await expect(page).toHaveTitle("qimmeqarpunga aallarpoq - BLOQ");
+});
+
 test("desktop Blockly uses a tall canvas, not a short 480px strip", async ({ page }) => {
 	await page.setViewportSize({ width: 1280, height: 900 });
 	const box = await page.locator("#blockly-div").boundingBox();

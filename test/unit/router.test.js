@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readState, writeState, routeForState } from "../../docs/router.js";
 
 test("readState: a bare/empty search string falls back to build mode, no word, no chain", () => {
-	assert.deepEqual(readState(""), { mode: "build", word: "", chain: [] });
-	assert.deepEqual(readState("?"), { mode: "build", word: "", chain: [] });
+	assert.deepEqual(readState(""), { mode: "build", word: "", chain: [], words: [] });
+	assert.deepEqual(readState("?"), { mode: "build", word: "", chain: [], words: [] });
 });
 
 test("readState: an invalid/unrecognized mode value falls back to build rather than throwing", () => {
@@ -14,16 +14,17 @@ test("readState: an invalid/unrecognized mode value falls back to build rather t
 
 test("readState: reads the canonical single-page query string", () => {
 	assert.deepEqual(readState("?w=qimmeqarpunga"), {
-		mode: "deconstruct", word: "qimmeqarpunga", chain: [],
+		mode: "deconstruct", word: "qimmeqarpunga", chain: [], words: [],
 	});
 	assert.deepEqual(readState("?chain=qimmeq,N_qaq_Vb,V_IND_INTR_1SG"), {
 		mode: "build", word: "", chain: ["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"],
+		words: [["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"]],
 	});
 });
 
 test("readState: accepts the old mode/word link format", () => {
 	assert.deepEqual(readState("?mode=deconstruct&word=qimmeqarpunga"), {
-		mode: "deconstruct", word: "qimmeqarpunga", chain: [],
+		mode: "deconstruct", word: "qimmeqarpunga", chain: [], words: [],
 	});
 });
 
@@ -50,17 +51,28 @@ test("writeState: a multi-morpheme chain is comma-joined in order", () => {
 	);
 });
 
+test("writeState/readState: multiple words encode as semicolon-separated chains", () => {
+	const state = {
+		mode: "build",
+		word: "",
+		chain: ["qimmeq"],
+		words: [["qimmeq"], ["nerivoq"]],
+	};
+	assert.equal(writeState(state), "?chain=qimmeq%3Bnerivoq");
+	assert.deepEqual(readState(writeState(state)), state);
+});
+
 test("writeState/readState round-trip: what writeState produces, readState reads back identically", () => {
 	const states = [
-		{ mode: "build", word: "", chain: [] },
-		{ mode: "deconstruct", word: "qimmeqarpunga", chain: [] },
-		{ mode: "build", word: "", chain: ["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"] },
+		{ mode: "build", word: "", chain: [], words: [] },
+		{ mode: "deconstruct", word: "qimmeqarpunga", chain: [], words: [] },
+		{ mode: "build", word: "", chain: ["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"], words: [["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"]] },
 	];
 	for (const state of states) assert.deepEqual(readState(writeState(state)), state);
 });
 
 test("writeState: a word containing characters that need percent-encoding (e.g. a space) survives the round-trip", () => {
-	const state = { mode: "deconstruct", word: "qimmeq arpunga", chain: [] };
+	const state = { mode: "deconstruct", word: "qimmeq arpunga", chain: [], words: [] };
 	assert.deepEqual(readState(writeState(state)), state);
 });
 
