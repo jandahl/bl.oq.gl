@@ -475,7 +475,7 @@ test("Build: filter narrows the toolbox and closes any already-open flyout (bl-o
 	// would pass even while stale content sits there invisibly -- what
 	// actually matters is that no flyout block is actually visible.
 	await expect(page.locator(".blocklyFlyout .blocklyDraggable:visible")).toHaveCount(0);
-	await expect(page.locator('[role="treeitem"]')).toHaveText([/Stems — nouns \(1\)/, /Words \(1\)/, /Sentences \(1\)/]);
+	await expect(page.locator('[role="treeitem"]')).toHaveText([/Stems — nouns \(1\)/, /Words \(1\)/, /Sentences \(1\)/, /Input boundaries \(2\)/]);
 });
 
 test("Build: theme toggle actually re-themes Blockly's own chrome, not just the page (bl-oq-ly#7)", async ({ page }) => {

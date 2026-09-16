@@ -7,7 +7,7 @@
 	<link rel="stylesheet" href="./style.css" />
 	<link rel="preload" href="./vendor/blockly.js" as="script" />
 	<link rel="modulepreload" href="https://jandahl.github.io/api.oq.gl/api/v0.1.9/public-api.js" />
-	<link rel="preload" href="https://grammarian.oq.gl/v2/grammar/morphemes-by-id.json" as="fetch" crossorigin="anonymous" />
+	<link rel="preload" href="https://jandahl.github.io/oq-grammarian/v2/grammar/morphemes-by-id.json" as="fetch" crossorigin="anonymous" />
 </head>
 <body>
 	<div id="loading-modal" class="loading-overlay" role="dialog" aria-modal="true" aria-labelledby="loading-heading" aria-describedby="loading-status">
@@ -100,7 +100,7 @@
 					<h3 id="example-words-heading" data-i18n="tryExample">Try an example</h3>
 					<button id="worked-examples-btn" type="button" data-i18n="extendedExamples">Extended examples</button>
 				</div>
-				<p class="section-instruction" data-i18n="exampleDescription">Deconstructs a word or sentence and drops the verified chain onto the canvas.</p>
+				<p class="section-instruction" data-i18n="exampleDescription">Deconstructs a word and drops the verified chain onto the canvas.</p>
 				<div class="example-groups">
 					<div class="example-group">
 						<h4 class="example-group-label" data-i18n="exampleWordsLabel">Words</h4>
@@ -111,24 +111,6 @@
 							<button type="button" class="example-pill" data-example-word="qimmeqarpunga" data-example-class="inflectional ending">qimmeqarpunga</button>
 							<button type="button" class="example-pill" data-example-word="qimmequna" data-example-class="enclitic">qimmequna</button>
 							<button type="button" class="example-pill" data-example-word="takuvakkit" data-example-class="transitive verb">takuvakkit</button>
-						</div>
-					</div>
-					<div class="example-group">
-						<h4 class="example-group-label" data-i18n="exampleSentencesLabel">Sentences</h4>
-						<div class="example-sentence-list">
-							<button type="button" class="example-sentence" data-example-word="qimmeqarpunga aallarpoq" data-example-class="sentence" aria-label="qimmeqarpunga aallarpoq">
-								<span class="example-pill">qimmeqarpunga</span>
-								<span class="example-pill">aallarpoq</span>
-							</button>
-							<button type="button" class="example-sentence" data-example-word="nerivugut takuvakkit" data-example-class="sentence" aria-label="nerivugut takuvakkit">
-								<span class="example-pill">nerivugut</span>
-								<span class="example-pill">takuvakkit</span>
-							</button>
-							<button type="button" class="example-sentence" data-example-word="aallarpoq qimmeqarpoq nerivugut" data-example-class="sentence" aria-label="aallarpoq qimmeqarpoq nerivugut">
-								<span class="example-pill">aallarpoq</span>
-								<span class="example-pill">qimmeqarpoq</span>
-								<span class="example-pill">nerivugut</span>
-							</button>
 						</div>
 					</div>
 				</div>

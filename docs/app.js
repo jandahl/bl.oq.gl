@@ -135,6 +135,7 @@ let selectedBlocklyTheme = "classic";
 let workedExamples = [];
 let windowBound = false;
 let startInflight = null;
+let suppressBuildUrlSync = false;
 
 function bindDom() {
 	statusEl = document.getElementById("status");
@@ -669,16 +670,12 @@ function seqForChain(ids) {
 
 function refreshBuild() {
 	if (!workspace) return;
-	// Keeps Build's link current with the canvas on every change -- cheap
-	// (replaceState, no history entry) and correct regardless of which
-	// early-return below fires, since the chain itself is already final by
-	// this point even when buildWord() goes on to reject it.
-	syncURL({ push: false });
 	const sentences = topLevelSentences(workspace);
 	if (sentences.length === 0) {
 		setStatus(t("emptyCanvasHint"), "");
 		updateReadingLine(null);
 		labelContainers(workspace, []);
+		syncURL({ push: false });
 		return;
 	}
 	if (sentences.length > 1) {
@@ -706,7 +703,8 @@ function refreshBuild() {
 		built.push(result);
 		seqs.push(seq);
 	}
-	labelContainers(workspace, built);
+	const translations = seqs.map((seq) => composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions()));
+	labelContainers(workspace, built, translations);
 	const kind = built.some((r) => r.approximate) ? "approx" : "ok";
 	const allClosed = built.every((r) => r.closed);
 	const meta = words.length > 1
@@ -714,6 +712,13 @@ function refreshBuild() {
 		: (allClosed ? "complete word" : "mid-derivation — keep building");
 	setStatusWords(built.map((r) => `${r.approximate ? "≈ " : ""}${r.word}`), kind, meta);
 	updateReadingLine(seqs);
+	// A valid edit to the Build canvas is now the shareable state. Do not let
+	// the previous Deconstruct query survive after the parser turns green.
+	if (!suppressBuildUrlSync) {
+		mode = "build";
+		lastDeconstructWord = "";
+		syncURL({ push: false });
+	}
 }
 
 function rerenderBreakdown() {
@@ -807,6 +812,7 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 		if (!skipCanvas && workspace) {
 			const chains = parts.map((p) => p.ids).filter((ids) => ids.length);
 			if (chains.length) {
+				suppressBuildUrlSync = true;
 				renderSentence(workspace, chains, presetsById, displayOptions());
 				workspace.scrollCenter();
 				requestAnimationFrame(() => Blockly.svgResize(workspace));
@@ -814,7 +820,11 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 			}
 		}
 		syncURL({ push: true });
+		// Blockly may deliver the programmatic render event on the next frame;
+		// keep it from replacing the just-pushed Deconstruct URL with a Build URL.
+		window.setTimeout(() => { suppressBuildUrlSync = false; }, 250);
 	} catch (err) {
+		suppressBuildUrlSync = false;
 		if (err?.name === "AbortError" || run !== deconstructRun) return;
 		setStatus(`Analysis failed: ${err.message}`, "error");
 	}

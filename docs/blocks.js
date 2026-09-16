@@ -61,6 +61,7 @@ import { buildNounEndingIndex, nounCandidatesFor, parseNominalCoordinate } from 
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
 const WORD_START_CONNECTION_TYPE = "WORD_START";
 const WORD_CHAIN_CONNECTION_TYPE = "WORD_CHAIN";
+const INPUT_CHAIN_CONNECTION_TYPE = "INPUT_CHAIN";
 const BLOCK_TYPE_PREFIX = "morpheme_block__";
 const VERB_ENDING_PICKER_TYPE = `${BLOCK_TYPE_PREFIX}verb_ending_picker`;
 const WORD_CONTAINER_TYPE = `${BLOCK_TYPE_PREFIX}word_container`;
@@ -214,21 +215,18 @@ export function presetMatchesQuery(preset, query) {
 /** Registers one Blockly block type per category, each with that category's own colour and connection shape. */
 export function defineMorphemeBlocks() {
 	// Word is a C-shaped statement wrapper: morphemes snap INTO it, stem-first.
-	// Sentence uses the same wrapping pattern so whole Word blocks snap INTO a
-	// sentence. Blockly also has hat/end "sequence start / sequence end"
-	// markers, but those only linearize a stack — they don't group children as
-	// one movable unit the way Word already does. Matching Word's C-shape is
-	// the learner-facing analogy ("a sentence that words go into").
+	// Sentence wraps whole Word blocks and also exposes outer connectors so it
+	// can sit between the optional Input start/end boundary markers.
 	Blockly.Blocks[WORD_CONTAINER_TYPE] = {
 		init() {
 			this.appendStatementInput("MORPHEMES")
 				.setCheck(WORD_START_CONNECTION_TYPE)
 				.appendField(new Blockly.FieldLabelSerializable("Word"), "TITLE");
 			this.appendDummyInput("END")
-				.appendField("end word");
-			this.setPreviousStatement(true, WORD_CHAIN_CONNECTION_TYPE);
-			this.setNextStatement(true, WORD_CHAIN_CONNECTION_TYPE);
-			this.setStyle("oq_container_blocks");
+				.appendField(new Blockly.FieldLabelSerializable(""), "TRANSLATION");
+			this.setPreviousStatement(true, [WORD_CHAIN_CONNECTION_TYPE, INPUT_CHAIN_CONNECTION_TYPE]);
+			this.setNextStatement(true, [WORD_CHAIN_CONNECTION_TYPE, INPUT_CHAIN_CONNECTION_TYPE]);
+			this.setStyle("bloq_word_container_blocks");
 			this.setTooltip("A single word built from a chain of morphemes");
 		},
 	};
@@ -238,9 +236,27 @@ export function defineMorphemeBlocks() {
 				.setCheck(WORD_CHAIN_CONNECTION_TYPE)
 				.appendField(new Blockly.FieldLabelSerializable("Sentence"), "TITLE");
 			this.appendDummyInput("END")
-				.appendField("end sentence");
-			this.setStyle("oq_container_blocks");
+				.appendField(new Blockly.FieldLabelSerializable(""), "TRANSLATION");
+			this.setPreviousStatement(true, INPUT_CHAIN_CONNECTION_TYPE);
+			this.setNextStatement(true, INPUT_CHAIN_CONNECTION_TYPE);
+			this.setStyle("bloq_sentence_container_blocks");
 			this.setTooltip("A sentence built from a sequence of words");
+		},
+	};
+	Blockly.Blocks["input_start"] = {
+		init() {
+			this.appendDummyInput().appendField("Input start");
+			this.setNextStatement(true, INPUT_CHAIN_CONNECTION_TYPE);
+			this.setStyle("bloq_input_blocks");
+			this.setTooltip("Marks the beginning of the input being parsed");
+		},
+	};
+	Blockly.Blocks["input_end"] = {
+		init() {
+			this.appendDummyInput().appendField("Input end");
+			this.setPreviousStatement(true, INPUT_CHAIN_CONNECTION_TYPE);
+			this.setStyle("bloq_input_blocks");
+			this.setTooltip("Marks the end of the input being parsed");
 		},
 	};
 	for (const cat of [...CATEGORY_ORDER, FALLBACK_CATEGORY]) {
@@ -743,11 +759,18 @@ export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker =
 		categorystyle: "oq_container_category",
 		contents: [{ kind: "block", type: SENTENCE_CONTAINER_TYPE }],
 	});
+	contents.push({
+		kind: "category",
+		name: "Input boundaries (2)",
+		categorystyle: "bloq_input_category",
+		contents: [{ kind: "block", type: "input_start" }, { kind: "block", type: "input_end" }],
+	});
 	return { kind: "categoryToolbox", contents };
 }
 
 /** Walks a stack of morpheme blocks starting at `block`, returning morpheme ids top to bottom. */
 export function chainFromTopBlock(block) {
+	if (block?.type === "input_start") return chainFromTopBlock(block.getNextBlock());
 	if (block?.type === SENTENCE_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("WORDS"));
 	if (block?.type === WORD_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("MORPHEMES"));
 	const ids = [];
@@ -766,6 +789,7 @@ export function chainFromTopBlock(block) {
  */
 export function wordsFromBlock(block) {
 	if (!block) return [];
+	if (block.type === "input_start") return wordsFromBlock(block.getNextBlock());
 	if (block.type === SENTENCE_CONTAINER_TYPE) {
 		return wordsFromBlock(block.getInputTargetBlock("WORDS"));
 	}
@@ -787,9 +811,11 @@ export function wordsFromBlock(block) {
 
 /** Every top-level sentence currently on the workspace, each as an array of word-chains. */
 export function topLevelSentences(workspace) {
-	return workspace
-		.getTopBlocks(true)
-		.filter((b) => isMorphemeBlockType(b.type) || b.type === WORD_CONTAINER_TYPE || b.type === SENTENCE_CONTAINER_TYPE)
+	const topBlocks = workspace.getTopBlocks(true);
+	const hasInputBoundary = topBlocks.some((b) => b.type === "input_start");
+	return topBlocks
+		.filter((b) => !hasInputBoundary || b.type === "input_start")
+		.filter((b) => b.type === "input_start" || isMorphemeBlockType(b.type) || b.type === WORD_CONTAINER_TYPE || b.type === SENTENCE_CONTAINER_TYPE)
 		.map((b) => wordsFromBlock(b))
 		.filter((words) => words.length > 0);
 }
@@ -881,25 +907,32 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 	return container;
 }
 
-/** Paints built surface forms onto Word / Sentence container titles. */
-export function labelContainers(workspace, builtWords) {
+/** Paints built surface forms and translations onto Word / Sentence containers. */
+export function labelContainers(workspace, builtWords, translations = []) {
 	const wordBlocks = [];
 	for (const top of workspace.getTopBlocks(true)) collectWordContainers(top, wordBlocks);
 	wordBlocks.forEach((block, i) => {
 		const result = builtWords[i];
 		block.setFieldValue(result?.word || "Word", "TITLE");
+		block.setFieldValue(translations[i] || "", "TRANSLATION");
 		if (block.rendered) block.render();
 	});
 	for (const top of workspace.getTopBlocks(true)) {
 		if (top.type !== SENTENCE_CONTAINER_TYPE) continue;
 		const surface = builtWords.map((r) => r?.word).filter(Boolean).join(" ");
 		top.setFieldValue(surface || "Sentence", "TITLE");
+		const translation = translations.filter(Boolean).map((text, i) => i === 0 ? text : text.charAt(0).toLowerCase() + text.slice(1)).join(" ");
+		top.setFieldValue(translation, "TRANSLATION");
 		if (top.rendered) top.render();
 	}
 }
 
 function collectWordContainers(block, out) {
 	if (!block) return;
+	if (block.type === "input_start") {
+		collectWordContainers(block.getNextBlock(), out);
+		return;
+	}
 	if (block.type === SENTENCE_CONTAINER_TYPE) {
 		collectWordContainers(block.getInputTargetBlock("WORDS"), out);
 		return;
