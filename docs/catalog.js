@@ -18,6 +18,12 @@ import {
 	writeCatalogMeta,
 } from "./catalog-cache.js";
 
+// GitHub Actions runners cannot reach the Cloudflare Pages host reliably. This
+// is the published mirror of the same grammarian catalog; keep the pinned
+// oq-api URL first so compatibility remains defined by oq-api itself.
+export const GRAMMAR_MORPHEMES_FALLBACK_URL =
+	"https://jandahl.github.io/oq-grammarian/v2/grammar/morphemes-by-id.json";
+
 /**
  * @param {any} value
  * @returns {{ presets: any[], authoritative: boolean|undefined, meta: any }}
@@ -41,7 +47,7 @@ export function catalogFromPayload(value) {
 
 async function fetchCatalogBuffer(url, onProgress) {
 	const failures = [];
-	for (const candidate of [url]) {
+	for (const candidate of Array.isArray(url) ? url : [url]) {
 		try {
 			const res = await fetch(candidate, { cache: "no-cache" });
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -97,10 +103,20 @@ async function revalidateCatalog(url, cache, meta, onUpdated) {
  */
 export async function loadCatalog(opts = {}) {
 	const { onProgress, onUpdated } = opts;
-	const url = GRAMMAR_MORPHEMES_URL;
+	const urls = [GRAMMAR_MORPHEMES_URL, GRAMMAR_MORPHEMES_FALLBACK_URL];
 	const cache = await openCatalogCache();
 	const meta = await readCatalogMeta(cache);
-	const cached = await cache.match(url);
+	let cachedUrl = urls.find((candidate) => meta?.url === candidate);
+	let cached = cachedUrl ? await cache.match(cachedUrl) : null;
+	if (!cached) {
+		for (const candidate of urls) {
+			cached = await cache.match(candidate);
+			if (cached) {
+				cachedUrl = candidate;
+				break;
+			}
+		}
+	}
 
 	if (cached) {
 		onProgress?.({ phase: "cached" });
@@ -108,13 +124,13 @@ export async function loadCatalog(opts = {}) {
 		onProgress?.({ phase: "parse", loaded: buffer.byteLength, total: buffer.byteLength });
 		const catalog = { ...catalogFromPayload(parseCatalogBytes(buffer)), fromCache: true };
 		queueMicrotask(() => {
-			revalidateCatalog(url, cache, meta, onUpdated);
+			revalidateCatalog(cachedUrl, cache, meta, onUpdated);
 		});
 		return catalog;
 	}
 
-	const fresh = await fetchCatalogBuffer(url, onProgress);
+	const fresh = await fetchCatalogBuffer(urls, onProgress);
 	const catalog = { ...catalogFromPayload(parseCatalogBytes(fresh.buffer)), fromCache: false };
-	await persistCatalog(cache, url, fresh.buffer, fresh.meta);
+	await persistCatalog(cache, fresh.url, fresh.buffer, fresh.meta);
 	return catalog;
 }
