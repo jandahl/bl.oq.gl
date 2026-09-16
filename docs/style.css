@@ -339,6 +339,10 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 #blockly-div {
 	position: relative;
 	z-index: 1;
+	/* Keep the bottom of the workspace comfortably above the fixed Results
+	   foldout when users leave it open. main's padding contributes
+	   another foldout-height of clearance below this explicit margin. */
+	margin-bottom: max(6rem, calc(var(--results-footer-height) * 2));
 	/* Leave room for the fixed results footer so flyout blocks are not
 	   covered (e2e + real clicks). 12rem approximates header/examples chrome. */
 	height: min(70vh, calc(100dvh - var(--results-footer-height) - 12rem), 720px);
