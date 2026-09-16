@@ -135,6 +135,7 @@ let selectedBlocklyTheme = "classic";
 let workedExamples = [];
 let windowBound = false;
 let startInflight = null;
+let suppressBuildUrlSync = false;
 
 function bindDom() {
 	statusEl = document.getElementById("status");
@@ -713,9 +714,11 @@ function refreshBuild() {
 	updateReadingLine(seqs);
 	// A valid edit to the Build canvas is now the shareable state. Do not let
 	// the previous Deconstruct query survive after the parser turns green.
-	mode = "build";
-	lastDeconstructWord = "";
-	syncURL({ push: false });
+	if (!suppressBuildUrlSync) {
+		mode = "build";
+		lastDeconstructWord = "";
+		syncURL({ push: false });
+	}
 }
 
 function rerenderBreakdown() {
@@ -809,6 +812,7 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 		if (!skipCanvas && workspace) {
 			const chains = parts.map((p) => p.ids).filter((ids) => ids.length);
 			if (chains.length) {
+				suppressBuildUrlSync = true;
 				renderSentence(workspace, chains, presetsById, displayOptions());
 				workspace.scrollCenter();
 				requestAnimationFrame(() => Blockly.svgResize(workspace));
@@ -816,7 +820,11 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 			}
 		}
 		syncURL({ push: true });
+		// Blockly may deliver the programmatic render event on the next frame;
+		// keep it from replacing the just-pushed Deconstruct URL with a Build URL.
+		requestAnimationFrame(() => { suppressBuildUrlSync = false; });
 	} catch (err) {
+		suppressBuildUrlSync = false;
 		if (err?.name === "AbortError" || run !== deconstructRun) return;
 		setStatus(`Analysis failed: ${err.message}`, "error");
 	}
