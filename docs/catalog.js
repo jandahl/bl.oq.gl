@@ -19,8 +19,9 @@ import {
 } from "./catalog-cache.js";
 
 // GitHub Actions runners cannot reach the Cloudflare Pages host reliably. This
-// is the published mirror of the same grammarian catalog; keep the pinned
-// oq-api URL first so compatibility remains defined by oq-api itself.
+// is the published mirror of the same grammarian catalog. Prefer it for the
+// browser because the Cloudflare Pages host can hang for end users and CI;
+// retain the oq-api URL as a secondary compatibility fallback.
 export const GRAMMAR_MORPHEMES_FALLBACK_URL =
 	"https://jandahl.github.io/oq-grammarian/v2/grammar/morphemes-by-id.json";
 
@@ -103,7 +104,7 @@ async function revalidateCatalog(url, cache, meta, onUpdated) {
  */
 export async function loadCatalog(opts = {}) {
 	const { onProgress, onUpdated } = opts;
-	const urls = [GRAMMAR_MORPHEMES_URL, GRAMMAR_MORPHEMES_FALLBACK_URL];
+	const urls = [GRAMMAR_MORPHEMES_FALLBACK_URL, GRAMMAR_MORPHEMES_URL];
 	const cache = await openCatalogCache();
 	const meta = await readCatalogMeta(cache);
 	let cachedUrl = urls.find((candidate) => meta?.url === candidate);
