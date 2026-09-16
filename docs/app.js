@@ -822,7 +822,7 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 		syncURL({ push: true });
 		// Blockly may deliver the programmatic render event on the next frame;
 		// keep it from replacing the just-pushed Deconstruct URL with a Build URL.
-		requestAnimationFrame(() => { suppressBuildUrlSync = false; });
+		window.setTimeout(() => { suppressBuildUrlSync = false; }, 250);
 	} catch (err) {
 		suppressBuildUrlSync = false;
 		if (err?.name === "AbortError" || run !== deconstructRun) return;
