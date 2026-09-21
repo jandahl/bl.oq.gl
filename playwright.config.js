@@ -13,11 +13,16 @@ import { defineConfig, devices } from "@playwright/test";
 // deliberately, not overlooked.
 export default defineConfig({
 	testDir: "./test/e2e",
-	fullyParallel: true,
+	// Every test context loads the live ~9 MB grammarian catalog. Parallel
+	// downloads make the upstream endpoint intermittently miss the startup
+	// timeout and turn one transient fetch failure into a cascade of failures.
+	// Keep the live-endpoint suite deterministic; unit tests remain parallelizable.
+	fullyParallel: false,
+	workers: 1,
 	forbidOnly: !!process.env.CI,
 	// Keep one retry for transient live-endpoint failures without allowing a
 	// failing suite to consume three full browser runs.
-	retries: process.env.CI ? 1 : 0,
+	retries: 1,
 	// Slightly generous: catalog fetch + Blockly injection is the app's own
 	// natural startup cost, not something to race against.
 	timeout: 30_000,

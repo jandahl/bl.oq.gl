@@ -22,7 +22,7 @@ import {
 // is the published mirror of the same grammarian catalog; keep the pinned
 // oq-api URL first so compatibility remains defined by oq-api itself.
 export const GRAMMAR_MORPHEMES_FALLBACK_URL =
-	"https://jandahl.github.io/oq-grammarian/v1/grammar/morphemes-by-id.json";
+	"https://jandahl.github.io/oq-grammarian/v2/grammar/morphemes-by-id.json";
 
 /**
  * @param {any} value
