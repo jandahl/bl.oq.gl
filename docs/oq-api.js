@@ -10,9 +10,9 @@
 // Pin the engine in production. oq-api's exported GRAMMAR_MORPHEMES_URL is
 // the compatibility boundary for the matching grammarian catalog; consumers
 // must not pair a rolling API with an independently rolling legacy catalog.
-// Resolved from oq-api's published api/latest.json (v0.3.26). Use the GitHub
+// Resolved from oq-api's published api/latest.json (v0.3.27). Use the GitHub
 // Pages mirror because api.oq.gl is protected by Cloudflare WAF from CI.
-const OQ_API_URL = "https://jandahl.github.io/api.oq.gl/api/v0.3.26/public-api.js";
+const OQ_API_URL = "https://jandahl.github.io/api.oq.gl/api/v0.3.27/public-api.js";
 
 export const {
 	buildWord,
@@ -51,12 +51,13 @@ export const {
 	conjugate,
 	conjugateSchwaStem,
 	conjugateForm,
-	// Have-N one-call transform (oq-api 0.3.26+): host N + optional count/howMany/intensifier +
+	// Have-N one-call transform (oq-api 0.3.27+): host N + optional count/howMany/intensifier +
 	// -qaq + conjugation ending via buildWord. Never invents stems.
 	// Returns { ok, word, phrase, numeral, seq, errorKey, missingIds, … }.
 	haveNForm,
 	HAVE_N_CARDINALS,
 	HAVE_N_HOW_MANY,
+	HAVE_N_MANY,
 	HAVE_N_INTENSIFIERS,
 	glossSentence,
 	t,
