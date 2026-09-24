@@ -33,6 +33,36 @@ turned into verified Build chains, and missing morphemes fail visibly.
 The catalog is hand-authored and currently marked non-authoritative by its
 upstream. The app surfaces that status.
 
+
+## Conjugation (oq-api one-call)
+
+BLOQ's Build path still composes via `buildWord(seq)` and the verb-ending
+picker (morpheme IDs). The pinned oq-api also exposes the same one-call
+conjugation transform oq.gl uses:
+
+```js
+import {
+  buildEndingCatalog, conjugateForm, API_VERSION,
+} from "./oq-api.js";
+
+const catalog = buildEndingCatalog(flat); // from grammarian morphemes
+const formed = conjugateForm("nerivoq", {
+  catalog,
+  mood: "IND",
+  subject: { person: 1, number: "SG" },
+  // object: { person: 3, number: "SG" }, // implies transitive
+  // transitive: true,
+  stemHint: null, // trusted override for intr + tr (0.3.23+)
+  gloss: "eat",
+});
+// formed → { ok, word, approximate, stem, ending, schwa, errorKey, translation }
+```
+
+Public options on `conjugateForm`'s `spec`: `catalog`, `mood`, `subject` (or
+top-level `person`/`number`), optional `object` / `transitive`, `stemHint`,
+`gloss`. Never invents a stem — ambiguous citations decline without a verified
+`stemHint`.
+
 ## Run locally
 
 ```bash
