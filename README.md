@@ -66,7 +66,7 @@ top-level `person`/`number`), optional `object` / `transitive`, `stemHint`,
 
 ## Have-N (oq-api one-call)
 
-Same pin also exposes the have-N transform (oq-api 0.3.27+): host noun + optional count / howMany (qassit) / intensifier +
+Same pin also exposes the have-N transform (oq-api 0.3.28+): host noun + optional count / howMany (qassit) / many (qassiit) / truth (ilumut?) / intensifier +
 optional count + `-qaq` + conjugation ending → surface via `buildWord`
 (never invented stems).
 
