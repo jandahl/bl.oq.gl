@@ -63,6 +63,34 @@ top-level `person`/`number`), optional `object` / `transitive`, `stemHint`,
 `gloss`. Never invents a stem — ambiguous citations decline without a verified
 `stemHint`.
 
+
+## Have-N (oq-api one-call)
+
+Same pin also exposes the have-N transform (oq-api 0.3.24+): host noun +
+optional count + `-qaq` + conjugation ending → surface via `buildWord`
+(never invented stems).
+
+```js
+import {
+  buildEndingCatalog, haveNForm, HAVE_N_CARDINALS, API_VERSION,
+} from "./oq-api.js";
+
+const endingCatalog = buildEndingCatalog(flat);
+const formed = haveNForm({
+  host: "qimmeq",
+  catalog: byId,           // grammarian by-id map / list
+  endingCatalog,
+  mood: "IND",
+  subject: { person: 1, number: "SG" },
+  // count: 3,             // optional 1–10 → instrumental companion
+});
+// formed → { ok, word, phrase, numeral, seq, errorKey, missingIds, … }
+```
+
+`HAVE_N_CARDINALS` maps 1–10 → cardinal ids (`arfineq` for six). Missing host
+(e.g. `nuliaq`) returns `errorKey: "missing_host"` — do not invent; ping
+Grammarian if the UI inventory needs the host.
+
 ## Run locally
 
 ```bash
