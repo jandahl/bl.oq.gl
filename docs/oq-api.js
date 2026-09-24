@@ -10,9 +10,9 @@
 // Pin the engine in production. oq-api's exported GRAMMAR_MORPHEMES_URL is
 // the compatibility boundary for the matching grammarian catalog; consumers
 // must not pair a rolling API with an independently rolling legacy catalog.
-// Resolved from oq-api's published api/latest.json (v0.3.11). Use the GitHub
+// Resolved from oq-api's published api/latest.json (v0.3.23). Use the GitHub
 // Pages mirror because api.oq.gl is protected by Cloudflare WAF from CI.
-const OQ_API_URL = "https://jandahl.github.io/api.oq.gl/api/v0.3.11/public-api.js";
+const OQ_API_URL = "https://jandahl.github.io/api.oq.gl/api/v0.3.23/public-api.js";
 
 export const {
 	buildWord,
@@ -25,13 +25,33 @@ export const {
 	headlineGloss,
 	API_VERSION,
 	GRAMMAR_MORPHEMES_URL,
-	// Resolved conjugation labels (oq#881, API_VERSION 0.8.0+) — the same
-	// friendly text oq's own "conjugate to..." modal shows for a mood/person
-	// paradigm coordinate, so the verb ending picker doesn't have to
-	// re-derive its own wording independently. See verb-endings.js.
+	// Resolved conjugation labels (oq#881) — the same friendly text oq's own
+	// "conjugate to..." modal shows for a mood/person paradigm coordinate,
+	// so the verb ending picker doesn't have to re-derive its own wording
+	// independently. See verb-endings.js.
 	resolveMoodLabel,
 	resolvePersonLabel,
 	resolveFieldLabel,
+	// One-call conjugation transform (oq-api 0.3.22+) plus catalog helpers.
+	// Prefer conjugateForm when a consumer wants headword + mood/person(/object)
+	// → surface without assembling derive*/findEnding/conjugate locally.
+	// Options (spec): catalog, mood, subject|{person,number}, object?,
+	// transitive?, stemHint? (intr + tr since 0.3.23), gloss?.
+	// Returns { ok, word, approximate, stem, ending, schwa, errorKey, translation }.
+	buildEndingCatalog,
+	catalogMoods,
+	endingsForMood,
+	subjectsForMood,
+	objectsForSubject,
+	findEnding,
+	deriveIntransitiveStem,
+	deriveTransitiveStem,
+	deriveSchwaStem,
+	canConjugate,
+	conjugate,
+	conjugateSchwaStem,
+	conjugateForm,
+	glossSentence,
 	t,
 	setActiveLocale,
 	getActiveLocale,
