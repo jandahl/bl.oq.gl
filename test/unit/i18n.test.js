@@ -10,12 +10,12 @@ test("i18n exposes the main page's English and Danish UI labels", () => {
 	assert.equal(t("exampleWordsLabel"), "Words");
 	assert.equal(t("exampleSentencesLabel"), "Sentences");
 	assert.equal(t("loadingTitle"), "Loading");
-	assert.equal(t("loadingCached"), "Opening saved catalog…");
+	assert.equal(t("showMood"), "Show mood labels");
 	setLocale("da");
 	assert.equal(t("buildHeading"), "Byg et ord");
 	assert.equal(t("clearFilter"), "Ryd filter");
 	assert.equal(t("exampleWordsLabel"), "Ord");
-	assert.equal(t("loadingTitle"), "Indlæser");
+	assert.equal(t("showMood"), "Vis modusmarkeringer");
 	setLocale("en");
 });
 

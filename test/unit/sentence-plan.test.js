@@ -8,6 +8,7 @@ import {
 	canvasSentences,
 	canvasAssemblies,
 	withInitialCapital,
+	assemblyReading,
 } from "../../docs/sentence-plan.js";
 
 function assemble(lattice) {
@@ -130,6 +131,25 @@ test("a span phrase that disagrees with the closed chain is not drawn", () => {
 	assert.equal(plan.sentences[0].words[0].heldLabel, "in the attested phrase");
 	assert.equal(plan.sentences[0].words[1].status, "span");
 	assert.deepEqual(canvasSentences(plan), []);
+});
+
+test("mood labels are off unless asked for, and case roles stay", () => {
+	const clause = {
+		mode: "clause",
+		text: "statement: I have a dog | at: the house",
+		parts: [
+			{ role: "statement", kind: "verb", text: "I have a dog" },
+			{ role: "at", kind: "np", text: "the house" },
+		],
+	};
+	assert.equal(assemblyReading(clause), "I have a dog | at: the house");
+	assert.equal(assemblyReading(clause, true), "statement: I have a dog | at: the house");
+	assert.equal(assemblyReading({
+		mode: "clause",
+		text: "udsagn: jeg har en hund",
+		parts: [{ role: "udsagn", kind: "verb", text: "jeg har en hund" }],
+	}), "jeg har en hund");
+	assert.equal(assemblyReading({ mode: "serial", text: "Piitap, she is in Peter's room", parts: [] }), "Piitap, she is in Peter's room");
 });
 
 test("a new sentence takes an initial capital and leaves the rest alone", () => {
