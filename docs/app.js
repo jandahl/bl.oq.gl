@@ -1,7 +1,7 @@
-import { buildWord, analyzeWordAsync, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, STANDARD_EXAMPLES } from "./oq-api.js";
+import { buildWord, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, STANDARD_EXAMPLES } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
 import {
-	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentence, relabelBlocks, labelContainers,
+	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentence, renderSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
 	presetMatchesQuery,
 } from "./blocks.js";
@@ -9,6 +9,7 @@ import { renderBreakdown, renderAlternativeBreakdowns, renderTonedPhrases, wordT
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
 import { readState, writeState, routeForState } from "./router.js";
+import { isSentenceInput, planFromLattice, canvasSentences, withInitialCapital } from "./sentence-plan.js";
 import { loadWorkedExamples } from "./worked-examples.js";
 import { setLocale, applyLocale, t } from "./i18n.js";
 
@@ -131,6 +132,7 @@ let lastDeconstructSeq = null;
 let lastDeconstructBuilt = null;
 let lastDeconstructAlternatives = null;
 let lastDeconstructParts = null;
+let lastSentencePlan = null;
 let selectedBlocklyTheme = "classic";
 let workedExamples = [];
 let windowBound = false;
@@ -312,6 +314,10 @@ function initDisplayOptions() {
 	});
 	langSelect.addEventListener("change", () => {
 		storePreference(LANG_KEY, LANG_KEY_RENAMED, langSelect.value);
+		if (lastSentencePlan && wordInput.value.trim()) {
+			runDeconstruct();
+			return;
+		}
 		onDisplayOptionChange();
 	});
 	spellingSelect.addEventListener("change", () => {
@@ -368,6 +374,34 @@ function updateReadingLine(seqOrSeqs) {
 		span.textContent = text;
 		readingLine.appendChild(span);
 	});
+	readingLine.hidden = false;
+}
+
+function updateSentenceReading(plan) {
+	const lines = (plan?.sentences ?? [])
+		.map((sentence) => sentence.assembly?.text)
+		.filter(Boolean);
+	if (!lines.length && plan?.assembly?.text) lines.push(plan.assembly.text);
+	if (!lines.length) {
+		readingLine.hidden = true;
+		return;
+	}
+	readingLine.replaceChildren();
+	lines.forEach((text, i) => {
+		const span = document.createElement("span");
+		span.className = "reading-word reading-sentence";
+		span.dataset.wordTone = wordTone(i);
+		span.textContent = text;
+		readingLine.appendChild(span);
+	});
+	const da = plan?.assemblyDa?.text;
+	if (da && displayOptions().lang === "both") {
+		const extra = document.createElement("span");
+		extra.className = "reading-word reading-alt";
+		extra.textContent = da;
+		readingLine.append(" ");
+		readingLine.appendChild(extra);
+	}
 	readingLine.hidden = false;
 }
 
@@ -587,6 +621,7 @@ function currentShareState() {
 		word,
 		chain: words.length === 1 ? words[0] : [],
 		words,
+		sentences,
 	};
 }
 
@@ -628,6 +663,7 @@ function clearCanvas() {
 	lastDeconstructAlternatives = null;
 	lastDeconstructIds = null;
 	lastDeconstructParts = null;
+	lastSentencePlan = null;
 	mode = "build";
 	setFieldValue(wordInput, "");
 	breakdownDiv.innerHTML = "";
@@ -661,25 +697,59 @@ function applyShareState(state) {
 		setFieldValue(wordInput, state.word);
 		if (!lastDeconstructWord) lastDeconstructWord = state.word;
 	}
-	const words = (state.words && state.words.length) ? state.words : (state.chain.length ? [state.chain] : []);
-	if (words.length > 0 && workspace) {
+	const sentences = state.sentences?.length
+		? state.sentences
+		: ((state.words && state.words.length) ? [state.words] : (state.chain.length ? [state.chain] : []));
+	if (sentences.length > 0 && workspace) {
 		const current = topLevelSentences(workspace);
-		const same = current.length === 1 && current[0].length === words.length
-			&& current[0].every((ids, i) => ids.length === words[i].length && ids.every((id, j) => id === words[i][j]));
+		const same = current.length === sentences.length
+			&& current.every((words, s) => words.length === sentences[s].length
+				&& words.every((ids, i) => ids.length === sentences[s][i].length && ids.every((id, j) => id === sentences[s][i][j])));
 		if (!same) {
-			renderSentence(workspace, words, presetsById, displayOptions());
+			renderSentences(workspace, sentences, presetsById, displayOptions());
 			workspace.scrollCenter();
 		}
 		refreshBuild();
 	}
 	if (state.word) {
 		if (lastDeconstructWord !== state.word || !lastDeconstructSeq) {
-			runDeconstruct({ skipCanvas: words.length > 0 });
+			runDeconstruct({ skipCanvas: sentences.length > 0 });
 		} else {
 			rerenderBreakdown();
 		}
 	}
 	syncDocumentTitle();
+}
+
+function canvasMatchesPlan(plan) {
+	if (!plan || !workspace) return false;
+	const containers = workspace.getTopBlocks(false).filter((block) => block.type === "morpheme_block__sentence_container");
+	if (containers.length !== (plan.sentences?.length ?? 0)) return false;
+	return JSON.stringify(topLevelSentences(workspace)) === JSON.stringify(canvasSentences(plan));
+}
+
+function showPlanStatus(plan) {
+	const words = plan.sentences.flatMap((sentence) => sentence.words);
+	const missing = words.filter((word) => word.status === "missing" || word.status === "invalid");
+	if (missing.length) {
+		setStatus(missing.map((word) => `${word.raw}: ${word.note}`).join(" · "), "error", planStatusMeta(plan));
+		return;
+	}
+	const chains = canvasSentences(plan);
+	const surfaces = sentenceInitialWords(plan);
+	if (!surfaces.length) {
+		setStatus(plan.assembly?.text || "No closed reading to place on the canvas.", plan.assembly?.text ? "approx" : "error", planStatusMeta(plan));
+		return;
+	}
+	const cautious = words.some((word) => word.status !== "verified") || chains.length === 0;
+	setStatusWords(surfaces, cautious ? "approx" : "ok", planStatusMeta(plan));
+}
+
+function sentenceInitialWords(plan) {
+	return (plan?.sentences ?? []).flatMap((sentence) => sentence.words.map((word, index) => {
+		const text = word.built?.word || word.raw;
+		return index === 0 ? withInitialCapital(text) : text;
+	}));
 }
 
 function seqForChain(ids) {
@@ -696,56 +766,83 @@ function refreshBuild() {
 	if (!workspace) return;
 	const sentences = topLevelSentences(workspace);
 	if (sentences.length === 0) {
+		if (lastSentencePlan && canvasMatchesPlan(lastSentencePlan)) {
+			labelContainers(workspace, []);
+			showPlanStatus(lastSentencePlan);
+			updateSentenceReading(lastSentencePlan);
+			if (!suppressBuildUrlSync) {
+				mode = "deconstruct";
+				syncURL({ push: false });
+			}
+			return;
+		}
 		setStatus(t("emptyCanvasHint"), "");
 		updateReadingLine(null);
 		labelContainers(workspace, []);
 		syncURL({ push: false });
 		return;
 	}
-	if (sentences.length > 1) {
-		setStatus("More than one sentence on the canvas — combine into a single sentence.", "error");
-		updateReadingLine(null);
-		return;
-	}
-	const words = sentences[0];
 	const built = [];
 	const seqs = [];
-	for (let i = 0; i < words.length; i++) {
-		const seq = seqForChain(words[i]);
-		if (!seq) {
-			setStatus("Unknown morpheme in stack.", "error");
-			updateReadingLine(null);
-			return;
+	for (let s = 0; s < sentences.length; s++) {
+		const words = sentences[s];
+		for (let i = 0; i < words.length; i++) {
+			const seq = seqForChain(words[i]);
+			if (!seq) {
+				setStatus("Unknown morpheme in stack.", "error");
+				updateReadingLine(null);
+				return;
+			}
+			const result = buildWord(seq);
+			if (!result.ok) {
+				const where = sentences.length > 1 ? `sentence ${s + 1}, ` : (words.length > 1 ? `word ${i + 1}, ` : "");
+				setStatus(`✗ ${result.reason || "invalid sequence"}`, "error", `${where}at position ${result.errorAt >= 0 ? result.errorAt + 1 : "?"}`);
+				updateReadingLine(null);
+				return;
+			}
+			built.push(result);
+			seqs.push(seq);
 		}
-		const result = buildWord(seq);
-		if (!result.ok) {
-			const where = words.length > 1 ? `word ${i + 1}, ` : "";
-			setStatus(`✗ ${result.reason || "invalid sequence"}`, "error", `${where}at position ${result.errorAt >= 0 ? result.errorAt + 1 : "?"}`);
-			updateReadingLine(null);
-			return;
-		}
-		built.push(result);
-		seqs.push(seq);
 	}
+	const wordCount = sentences.reduce((n, words) => n + words.length, 0);
 	const translations = seqs.map((seq) => composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions()));
 	labelContainers(workspace, built, translations);
 	const kind = built.some((r) => r.approximate) ? "approx" : "ok";
 	const allClosed = built.every((r) => r.closed);
-	const meta = words.length > 1
-		? (allClosed ? `${words.length} words` : "mid-derivation — keep building")
-		: (allClosed ? "complete word" : "mid-derivation — keep building");
+	const meta = sentences.length > 1
+		? `${sentences.length} sentences`
+		: (wordCount > 1
+			? (allClosed ? `${wordCount} words` : "mid-derivation — keep building")
+			: (allClosed ? "complete word" : "mid-derivation — keep building"));
 	setStatusWords(built.map((r) => `${r.approximate ? "≈ " : ""}${r.word}`), kind, meta);
+	// A sentence deconstruct stays a sentence while the blocks are still the
+	// lattice's chains. Blockly replays create-events after the render, and
+	// those must not collapse the clause gloss back into a single-word build.
+	if (lastSentencePlan && canvasMatchesPlan(lastSentencePlan)) {
+		showPlanStatus(lastSentencePlan);
+		updateSentenceReading(lastSentencePlan);
+		if (!suppressBuildUrlSync) {
+			mode = "deconstruct";
+			syncURL({ push: false });
+		}
+		return;
+	}
 	updateReadingLine(seqs);
 	// A valid edit to the Build canvas is now the shareable state. Do not let
 	// the previous Deconstruct query survive after the parser turns green.
 	if (!suppressBuildUrlSync) {
 		mode = "build";
 		lastDeconstructWord = "";
+		lastSentencePlan = null;
 		syncURL({ push: false });
 	}
 }
 
 function rerenderBreakdown() {
+	if (lastSentencePlan) {
+		renderSentenceBreakdown(lastSentencePlan);
+		return;
+	}
 	const parts = lastDeconstructParts?.length
 		? lastDeconstructParts
 		: (lastDeconstructSeq
@@ -788,13 +885,232 @@ function rerenderBreakdown() {
 	if (firstShow) breakdownDetails.open = false;
 }
 
+const READING_BAND_LABEL = {
+	gold: "gold",
+	hard_exact: "exact",
+	soft_exact: "soft",
+	none: "unparsed",
+};
+
+function sentenceLang() {
+	return displayOptions().lang === "da" ? "da" : "en";
+}
+
+function materializePlan(plan) {
+	for (const sentence of plan.sentences) {
+		for (const word of sentence.words) {
+			if (!word.canvasIds.length) continue;
+			const seq = seqForChain(word.canvasIds);
+			if (!seq) {
+				word.status = "missing";
+				word.canvasIds = [];
+				word.note = "Catalog entry has no builder sequence.";
+				continue;
+			}
+			const built = buildWord(seq);
+			word.seq = seq;
+			word.built = built;
+			if (!built.ok) {
+				word.status = "invalid";
+				word.canvasIds = [];
+				word.note = built.reason || "This closed reading does not build.";
+			}
+		}
+	}
+	return plan;
+}
+
+function planStatusMeta(plan) {
+	const count = plan.sentences.length;
+	const modes = [...new Set(plan.sentences.map((sentence) => sentence.assembly?.mode).filter(Boolean))];
+	const mode = modes.join(" + ") || "sentence";
+	return count > 1 ? `${count} sentences · ${mode}` : mode;
+}
+
+function renderSentenceBreakdown(plan) {
+	breakdownDiv.innerHTML = "";
+	if (plan.sentences.length > 1 && plan.assembly?.text) {
+		const lead = document.createElement("p");
+		lead.className = "sentence-assembly sentence-assembly-all";
+		lead.textContent = plan.assembly.text;
+		breakdownDiv.appendChild(lead);
+	}
+	const metas = [];
+	plan.sentences.forEach((sentence, s) => {
+		const section = document.createElement("section");
+		section.className = "sentence-breakdown";
+		section.dataset.wordTone = wordTone(s);
+		const head = document.createElement("header");
+		head.className = "sentence-breakdown-head";
+		const source = document.createElement("p");
+		source.className = "sentence-source";
+		source.textContent = sentence.source;
+		head.appendChild(source);
+		if (sentence.assembly?.text) {
+			const line = document.createElement("p");
+			line.className = "sentence-assembly";
+			const badge = document.createElement("span");
+			badge.className = `sentence-mode mode-${sentence.assembly.mode || "serial"}`;
+			badge.textContent = sentence.assembly.mode || "serial";
+			line.append(badge, " ", sentence.assembly.text);
+			head.appendChild(line);
+			metas.push(sentence.assembly.text);
+		}
+		if (sentence.assemblyDa?.text && displayOptions().lang === "both") {
+			const da = document.createElement("p");
+			da.className = "sentence-assembly sentence-assembly-da";
+			da.textContent = sentence.assemblyDa.text;
+			head.appendChild(da);
+		}
+		section.appendChild(head);
+		sentence.words.forEach((word, i) => {
+			const article = document.createElement("article");
+			article.classList.add("word-toned", "sentence-word-breakdown");
+			article.dataset.wordTone = wordTone(i);
+			if (s === 0 && i === 0) article.id = "primary-breakdown";
+			const band = document.createElement("p");
+			band.className = `reading-band band-${word.band || "none"}`;
+			band.textContent = `${READING_BAND_LABEL[word.band] || word.band} · ${word.surface}`;
+			article.appendChild(band);
+			if (word.seq && word.built?.ok) {
+				renderBreakdown(article, word.surface, word.seq, word.built, glossSummaryItems, {
+					reverseOrder: readLastFirst(),
+					...glossOptions(),
+					headlineGloss,
+				});
+			} else {
+				const heading = document.createElement("div");
+				heading.className = "breakdown-word";
+				heading.textContent = word.raw;
+				article.appendChild(heading);
+				if (word.headline && word.headline !== word.raw) {
+					const gloss = document.createElement("p");
+					gloss.className = "breakdown-translation";
+					gloss.textContent = word.headline;
+					article.appendChild(gloss);
+				}
+				if (word.compositional && word.compositional !== word.headline) {
+					const unused = document.createElement("p");
+					unused.className = "breakdown-note";
+					unused.textContent = `Closed chain not used: ${word.compositional}`;
+					article.appendChild(unused);
+				}
+				const note = document.createElement("p");
+				note.className = "breakdown-note";
+				note.textContent = word.note || "Not placed on the canvas.";
+				article.appendChild(note);
+			}
+			if (word.alternatives?.length) {
+				const list = document.createElement("ul");
+				list.className = "sentence-also";
+				for (const alt of word.alternatives) {
+					const item = document.createElement("li");
+					item.textContent = `${READING_BAND_LABEL[alt.band] || alt.band}: ${alt.headline || alt.ids.join(" + ")}`;
+					list.appendChild(item);
+				}
+				article.appendChild(list);
+			}
+			section.appendChild(article);
+		});
+		breakdownDiv.appendChild(section);
+	});
+	breakdownSummaryMeta.textContent = metas.join("  ·  ");
+	const firstShow = breakdownDetails.hidden;
+	breakdownDetails.hidden = false;
+	if (firstShow) breakdownDetails.open = false;
+}
+
+async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
+	const tokens = tokenizeSentence(surface);
+	breakdownDiv.innerHTML = "";
+	setStatus(`Analyzing ${tokens.length} words as a sentence…`, "");
+	lastDeconstructIds = null;
+	lastDeconstructSeq = null;
+	lastDeconstructAlternatives = null;
+	lastDeconstructParts = null;
+	try {
+		const analyses = new Map();
+		for (const token of tokens) {
+			const key = token.surface.trim().toLowerCase();
+			if (analyses.has(key)) continue;
+			const result = await analyzeWordAsync(token.surface, presets, {}, { signal: deconstructAbort.signal });
+			if (run !== deconstructRun) return;
+			analyses.set(key, result);
+		}
+		const lang = sentenceLang();
+		const lattice = analyzeSentence(surface, presets, {
+			lang,
+			maxReadings: 3,
+			analysisResultsByWord: analyses,
+		});
+		if (run !== deconstructRun) return;
+		const daLattice = displayOptions().lang === "both"
+			? analyzeSentence(surface, presets, { lang: "da", maxReadings: 3, analysisResultsByWord: analyses })
+			: null;
+		const plan = materializePlan(planFromLattice(lattice, {
+			presetsById,
+			assembleClause,
+			lang,
+			analysesByWord: analyses,
+			daLattice,
+		}));
+		lastDeconstructWord = surface;
+		lastSentencePlan = plan;
+		const placed = plan.sentences.flatMap((sentence) => sentence.words.filter((word) => word.seq && word.built?.ok));
+		lastDeconstructSeq = placed[0]?.seq ?? null;
+		lastDeconstructBuilt = placed[0]?.built ?? null;
+		lastDeconstructIds = placed.map((word) => word.canvasIds);
+		mode = "deconstruct";
+		syncDocumentTitle();
+		rerenderBreakdown();
+		if (!skipCanvas && workspace && plan.sentences.length) {
+			suppressBuildUrlSync = true;
+			renderSentencePlan(workspace, plan.sentences.map((sentence) => ({
+				source: sentence.source,
+				assembly: sentence.assembly?.text || "",
+				words: sentence.words.map((word) => ({
+					surface: word.surface || word.raw,
+					raw: word.raw,
+					canvasIds: word.canvasIds,
+					heldLabel: word.heldLabel,
+				})),
+			})), presetsById, displayOptions());
+			workspace.scrollCenter();
+			requestAnimationFrame(() => Blockly.svgResize(workspace));
+			refreshBuild();
+		}
+		const words = plan.sentences.flatMap((sentence) => sentence.words);
+		const missing = words.filter((word) => word.status === "missing" || word.status === "invalid");
+		if (missing.length) {
+			setStatus(missing.map((word) => `${word.raw}: ${word.note}`).join(" · "), "error", planStatusMeta(plan));
+		} else if (!plan.sentences.some((sentence) => sentence.assembly?.text) && canvasSentences(plan).length === 0) {
+			setStatus("No closed reading to place on the canvas.", "error", planStatusMeta(plan));
+		} else {
+			const cautious = words.some((word) => word.status !== "verified");
+			setStatusWords(sentenceInitialWords(plan), cautious ? "approx" : "ok", planStatusMeta(plan));
+			updateSentenceReading(plan);
+		}
+		syncURL({ push: true });
+		window.setTimeout(() => { suppressBuildUrlSync = false; }, 250);
+	} catch (err) {
+		suppressBuildUrlSync = false;
+		if (err?.name === "AbortError" || run !== deconstructRun) return;
+		setStatus(`Analysis failed: ${err.message}`, "error");
+	}
+}
+
 async function runDeconstruct({ skipCanvas = false } = {}) {
 	const surface = wordInput.value.trim();
 	if (deconstructAbort) deconstructAbort.abort();
 	const run = ++deconstructRun;
 	if (!surface) return;
-	const tokens = surface.split(/\s+/).filter(Boolean);
 	deconstructAbort = new AbortController();
+	lastSentencePlan = null;
+	if (isSentenceInput(surface)) {
+		await runSentenceDeconstruct(surface, { skipCanvas, run });
+		return;
+	}
+	const tokens = surface.split(/\s+/).filter(Boolean);
 	breakdownDiv.innerHTML = "";
 	setStatus(tokens.length === 1 ? `Analyzing "${tokens[0]}"…` : `Analyzing ${tokens.length} words…`, "");
 	lastDeconstructIds = null;

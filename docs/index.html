@@ -22,6 +22,9 @@
 		</div>
 	</div>
 	<header>
+		<div class="header-banner">
+			<img src="./assets/header.svg" alt="" width="640" height="50" />
+		</div>
 		<div class="header-top">
 			<h1 data-i18n="app.title">BLOQ</h1>
 			<div class="header-actions">
@@ -29,11 +32,11 @@
 				<button id="display-toggle" class="theme-toggle" type="button" data-i18n="display" aria-controls="display-panel" aria-expanded="false">Settings</button>
 			</div>
 		</div>
-		<p class="subtitle" data-i18n="subtitle">A block-based learning aid for building and taking apart Kalaallisut words. Prototype — nothing here is authoritative.</p>
+		<p class="subtitle" data-i18n="subtitle">A block-based learning aid for building and taking apart Kalaallisut words and short sentences. Prototype — nothing here is authoritative.</p>
 		<form class="deconstruct-input" id="deconstruct-form">
-			<label for="word-input" data-i18n="attested">Attested word</label>
+			<label for="word-input" data-i18n="attested">Word or sentence</label>
 			<div class="clearable">
-				<input id="word-input" type="text" data-i18n-placeholder="wordPlaceholder" placeholder="e.g. qimmeqarpunga" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off" />
+				<input id="word-input" type="text" data-i18n-placeholder="wordPlaceholder" placeholder="e.g. qimmeqarpunga or Piitap inaaniippoq." autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off" />
 				<button type="button" class="clear-field" id="word-input-clear" hidden aria-label="Clear word" data-i18n-aria-label="clearWord">×</button>
 			</div>
 			<button id="analyze-btn" type="submit" data-i18n="deconstruct">Deconstruct</button>
@@ -75,7 +78,7 @@
 
 	<main>
 		<section class="page-section analyze-section" aria-labelledby="analyze-heading">
-			<h2 id="analyze-heading" data-i18n="analyzeHeading">Analyze a word</h2>
+			<h2 id="analyze-heading" data-i18n="analyzeHeading">Analyze</h2>
 			<details id="breakdown-details" hidden>
 				<summary id="breakdown-summary">
 					<span class="disclosure-label">Morpheme chain</span>
@@ -102,7 +105,7 @@
 					<h3 id="example-words-heading" data-i18n="tryExample">Try an example</h3>
 					<button id="worked-examples-btn" type="button" data-i18n="extendedExamples">Extended examples</button>
 				</div>
-				<p class="section-instruction" data-i18n="exampleDescription">Deconstructs a word and drops the verified chain onto the canvas.</p>
+				<p class="section-instruction" data-i18n="exampleDescription">Deconstructs a word or sentence and drops the closed chains onto the canvas.</p>
 				<div class="example-groups">
 					<div class="example-group">
 						<h4 class="example-group-label" data-i18n="exampleWordsLabel">Words</h4>

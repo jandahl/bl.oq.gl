@@ -57,6 +57,7 @@
 
 import { buildVerbEndingIndex, candidatesFor, parsePersonNumber, personNumberLabel, moodDisplayLabel } from "./verb-endings.js";
 import { buildNounEndingIndex, nounCandidatesFor, parseNominalCoordinate } from "./noun-endings.js";
+import { withInitialCapital } from "./sentence-plan.js";
 
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
 const WORD_START_CONNECTION_TYPE = "WORD_START";
@@ -861,13 +862,109 @@ export function renderSentence(workspace, words, presetsById, displayOptions) {
 	sentence.initSvg();
 	sentence.render();
 	sentence.moveBy(20, 20);
+	connectWords(workspace, sentence, list, presetsById, displayOptions);
+}
+
+/**
+ * One Blockly sentence per source sentence. A single sentence of one word
+ * stays a Word block, matching the original workshop. `assemblies[i]` is
+ * the clause gloss; it is kept only while that sentence's morpheme ids
+ * still match what was deconstructed.
+ */
+export function renderSentences(workspace, sentences, presetsById, displayOptions, assemblies = [], { forceSentence = false } = {}) {
+	const list = (sentences ?? [])
+		.map((words) => (words ?? []).filter((ids) => ids?.length))
+		.filter((words) => words.length);
+	if (list.length === 0) {
+		for (const block of workspace.getTopBlocks(false)) block.dispose(false);
+		return;
+	}
+	if (list.length === 1 && !forceSentence) {
+		renderSentence(workspace, list[0], presetsById, displayOptions);
+		const top = workspace.getTopBlocks(false).find((block) =>
+			block.type === SENTENCE_CONTAINER_TYPE || block.type === WORD_CONTAINER_TYPE);
+		stampAssembly(top, list[0], assemblies[0]);
+		return;
+	}
+	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
+	let y = 20;
+	list.forEach((words, index) => {
+		const sentence = workspace.newBlock(SENTENCE_CONTAINER_TYPE);
+		sentence.initSvg();
+		sentence.render();
+		sentence.moveBy(20, y);
+		connectWords(workspace, sentence, words, presetsById, displayOptions);
+		stampAssembly(sentence, words, assemblies[index]);
+		sentence.render();
+		const height = sentence.getHeightWidth?.().height ?? 160;
+		y += Math.max(height, 140) + 36;
+	});
+}
+
+/**
+ * One sentence container per source sentence, including words that must not
+ * become morpheme chains (names, attested phrases, missing ids). Those are
+ * word shells. `assembly` is the clause gloss and stays only while the
+ * drawable chains still match.
+ * @param {Array<{ source?: string, assembly?: string, words?: Array<{ surface?: string, raw?: string, canvasIds?: string[], heldLabel?: string }> }>} sentences
+ */
+export function renderSentencePlan(workspace, sentences, presetsById, displayOptions) {
+	const list = Array.isArray(sentences) ? sentences : [];
+	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
+	if (!list.length) return;
+	let y = 20;
+	for (const item of list) {
+		const sentence = workspace.newBlock(SENTENCE_CONTAINER_TYPE);
+		sentence.bloqSource = item.source || "Sentence";
+		sentence.initSvg();
+		sentence.render();
+		sentence.moveBy(20, y);
+		sentence.setFieldValue(sentence.bloqSource, "TITLE");
+		const drawable = [];
+		let prevWord = null;
+		for (const word of item.words ?? []) {
+			const ids = (word.canvasIds ?? []).filter(Boolean);
+			const wordBlock = ids.length
+				? buildWordBlock(workspace, ids, presetsById, displayOptions)
+				: buildHeldWord(workspace, !prevWord ? withInitialCapital(word.surface || word.raw) : (word.surface || word.raw), word.heldLabel || "not drawn");
+			if (ids.length) drawable.push(ids);
+			if (prevWord) prevWord.nextConnection.connect(wordBlock.previousConnection);
+			else sentence.getInput("WORDS").connection.connect(wordBlock.previousConnection);
+			prevWord = wordBlock;
+		}
+		stampAssembly(sentence, drawable, item.assembly || "");
+		if (item.assembly) sentence.setFieldValue(item.assembly, "TRANSLATION");
+		sentence.render();
+		const height = sentence.getHeightWidth?.().height ?? 80;
+		y += Math.max(height, 72) + 28;
+	}
+}
+
+function buildHeldWord(workspace, surface, label) {
+	const container = workspace.newBlock(WORD_CONTAINER_TYPE);
+	container.bloqHeld = label || "not drawn";
+	container.initSvg();
+	container.render();
+	container.setFieldValue(surface || "…", "TITLE");
+	container.setFieldValue(container.bloqHeld, "TRANSLATION");
+	container.setTooltip(container.bloqHeld);
+	return container;
+}
+
+function connectWords(workspace, sentence, words, presetsById, displayOptions) {
 	let prevWord = null;
-	for (const ids of list) {
+	for (const ids of words) {
 		const wordBlock = buildWordBlock(workspace, ids, presetsById, displayOptions);
 		if (prevWord) prevWord.nextConnection.connect(wordBlock.previousConnection);
 		else sentence.getInput("WORDS").connection.connect(wordBlock.previousConnection);
 		prevWord = wordBlock;
 	}
+}
+
+function stampAssembly(block, words, assembly) {
+	if (!block || !assembly) return;
+	block.bloqAssembly = assembly;
+	block.bloqAssemblyKey = JSON.stringify(words ?? []);
 }
 
 function buildWordBlock(workspace, ids, presetsById, displayOptions) {
@@ -911,17 +1008,35 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 export function labelContainers(workspace, builtWords, translations = []) {
 	const wordBlocks = [];
 	for (const top of workspace.getTopBlocks(true)) collectWordContainers(top, wordBlocks);
-	wordBlocks.forEach((block, i) => {
+	const chainBlocks = wordBlocks.filter((block) => !block.bloqHeld);
+	chainBlocks.forEach((block, i) => {
 		const result = builtWords[i];
 		block.setFieldValue(result?.word || "Word", "TITLE");
 		block.setFieldValue(translations[i] || "", "TRANSLATION");
 		if (block.rendered) block.render();
 	});
+	const indexByBlock = new Map(chainBlocks.map((block, i) => [block, i]));
 	for (const top of workspace.getTopBlocks(true)) {
 		if (top.type !== SENTENCE_CONTAINER_TYPE) continue;
-		const surface = builtWords.map((r) => r?.word).filter(Boolean).join(" ");
-		top.setFieldValue(surface || "Sentence", "TITLE");
-		const translation = translations.filter(Boolean).map((text, i) => i === 0 ? text : text.charAt(0).toLowerCase() + text.slice(1)).join(" ");
+		const words = [];
+		collectWordContainers(top, words);
+		const first = words[0];
+		if (first) {
+			const title = first.getFieldValue("TITLE");
+			if (title && title !== "Word") first.setFieldValue(withInitialCapital(title), "TITLE");
+		}
+		const owned = words.map((block) => builtWords[indexByBlock.get(block)]);
+		const builtSurface = owned.map((result) => result?.word).filter(Boolean).join(" ");
+		const assembled = top.bloqAssembly && JSON.stringify(wordsFromBlock(top)) === top.bloqAssemblyKey
+			? top.bloqAssembly
+			: null;
+		const surface = assembled && top.bloqSource ? top.bloqSource : (builtSurface || top.bloqSource || "Sentence");
+		top.setFieldValue(surface === "Sentence" ? surface : withInitialCapital(surface), "TITLE");
+		const translation = assembled ?? words
+			.map((block) => translations[indexByBlock.get(block)])
+			.filter(Boolean)
+			.map((text, i) => i === 0 ? text : text.charAt(0).toLowerCase() + text.slice(1))
+			.join(" ");
 		top.setFieldValue(translation, "TRANSLATION");
 		if (top.rendered) top.render();
 	}

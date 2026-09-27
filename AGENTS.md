@@ -29,6 +29,7 @@ uses the live oq-api and grammarian catalog.
 ## Files
 
 - `docs/app.js` — app wiring and analysis flow
+- `docs/sentence-plan.js` — sentence lattice → Blockly sentences
 - `docs/blocks.js` — Blockly blocks and chain rendering
 - `docs/catalog.js` — runtime catalog loading with Cache Storage
 - `docs/catalog-cache.js` — catalog cache helpers

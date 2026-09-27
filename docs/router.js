@@ -8,6 +8,11 @@
 // an automatic Deconstruct result does not leak its morpheme IDs into the
 // copied link.
 //
+// `chain` is one sentence of words (morpheme ids comma-joined, words
+// semicolon-joined). Several sentences on the canvas use `|` between those
+// groups: `qimmeq;nerivoq|illu`. Deconstruct of running text still shares
+// the source as `w` and rebuilds the lattice on load.
+//
 // Deliberately NOT included: theme, language, spelling mode, show-ids,
 // reading order (app.js's own localStorage-backed *_KEY constants). Those
 // are "how I like to see things," not "what I'm looking at" -- baking a
@@ -21,13 +26,15 @@
 // the actual history.pushState/replaceState calls and the popstate listener.
 
 /**
- * Reads {mode, word, chain} out of a URLSearchParams-compatible search
- * string (e.g. `location.search`). Anything missing or invalid falls back
- * to a safe default (`mode: "build"`, `word: ""`, `chain: []`) rather than
- * throwing -- a hand-edited or stale link should degrade gracefully, not
- * break the app on load.
+ * Reads {mode, word, chain, words, sentences} out of a URLSearchParams-
+ * compatible search string (e.g. `location.search`). Anything missing or
+ * invalid falls back to a safe default rather than throwing -- a
+ * hand-edited or stale link should degrade gracefully, not break the app
+ * on load.
+ * `chain` is the first word of the first sentence (legacy single stack).
+ * `words` is the first sentence. `sentences` is every sentence.
  * @param {string} search
- * @returns {{ mode: "build"|"deconstruct", word: string, chain: string[] }}
+ * @returns {{ mode: "build"|"deconstruct", word: string, chain: string[], words: string[][], sentences: string[][][] }}
  */
 function parseWords(chainRaw) {
 	if (!chainRaw) return [];
@@ -38,38 +45,49 @@ function parseWords(chainRaw) {
 	return chain.length ? [chain] : [];
 }
 
+function parseSentences(chainRaw) {
+	if (!chainRaw) return [];
+	return chainRaw.split("|").map((group) => parseWords(group)).filter((words) => words.length);
+}
+
 export function readState(search) {
 	const params = new URLSearchParams(search);
 	const mode = params.get("mode");
 	const chainRaw = params.get("chain");
 	// Accept the old query-based format so existing links remain usable.
 	const word = params.get("w") ?? params.get("word") ?? "";
-	const words = parseWords(chainRaw);
+	const sentences = parseSentences(chainRaw);
+	const words = sentences[0] ?? [];
 	return {
 		mode: mode === "deconstruct" || params.has("w") ? "deconstruct" : "build",
 		word,
 		chain: words[0] ?? [],
 		words,
+		sentences,
 	};
 }
 
 /**
  * Builds the query string (leading "?", or "" for entirely-default/empty
- * state) for {mode, word, chain}. Omits a param at its default/empty value
- * so an untouched app still links to a bare path, not a query string full
- * of defaults. The active mode owns its state: Deconstruct uses the short
- * `w` key, while Build uses `chain`; inactive-mode state is never emitted.
- * @param {{ mode?: string, word?: string, chain?: string[] }} state
+ * state) for {mode, word, chain, words, sentences}. Omits a param at its
+ * default/empty value so an untouched app still links to a bare path.
+ * The active mode owns its state: Deconstruct uses the short `w` key,
+ * while Build uses `chain`; inactive-mode state is never emitted.
+ * @param {{ mode?: string, word?: string, chain?: string[], words?: string[][], sentences?: string[][][] }} [state]
  * @returns {string}
  */
-export function writeState({ mode, word, chain, words } = {}) {
+export function writeState({ mode, word, chain, words, sentences } = {}) {
 	const params = new URLSearchParams();
 	if (mode === "deconstruct") {
 		if (word) params.set("w", word);
 	} else {
-		const list = (words && words.length) ? words : (chain && chain.length ? [chain] : []);
-		if (list.length === 1) params.set("chain", list[0].join(","));
-		else if (list.length > 1) params.set("chain", list.map((w) => w.join(",")).join(";"));
+		const sentenceList = (sentences && sentences.length)
+			? sentences
+			: ((words && words.length) ? [words] : (chain && chain.length ? [[chain]] : []));
+		const encoded = sentenceList
+			.map((sentence) => sentence.map((ids) => ids.join(",")).join(";"))
+			.filter(Boolean);
+		if (encoded.length) params.set("chain", encoded.join("|"));
 	}
 	const qs = params.toString();
 	return qs ? `?${qs}` : "";
