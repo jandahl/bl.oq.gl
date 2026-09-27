@@ -62,7 +62,7 @@ test("a multi-word input deconstructs each word onto the canvas", async ({ page 
 	await page.fill("#word-input", "qimmeqarpunga aallarpoq");
 	await page.getByRole("button", { name: "Deconstruct" }).click();
 	await expect(page.locator("#word-input")).toHaveValue("qimmeqarpunga aallarpoq");
-	await expect(page.locator("#status-line")).toContainText("qimmeqarpunga", { timeout: 30_000 });
+	await expect(page.locator("#status-line")).toContainText("Qimmeqarpunga", { timeout: 30_000 });
 	await expect(page.locator("#status-line")).toContainText("aallarpoq");
 	await expect(page).toHaveTitle("qimmeqarpunga aallarpoq - BLOQ");
 });

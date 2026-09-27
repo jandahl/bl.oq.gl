@@ -9,9 +9,15 @@ The public name is BLOQ; the repository remains `jandahl/bl.oq.gl`.
 
 - **Build**: drag morphemes into a stem-first stack. Each change runs oq's
   word builder and shows either the resulting word or the grammar error.
-- **Deconstruct**: enter a word to find a verified morpheme chain. The app
-  shows oq's composed translation, a per-morpheme breakdown, and the chain as
-  editable Blockly blocks.
+- **Deconstruct**: enter a word or running text. A single word still uses the
+  full word analysis (including other verified breakdowns). Two or more words
+  use oq-api's sentence lattice (`analyzeSentence` + `assembleClause`): each
+  source sentence becomes a Blockly sentence, closed morpheme chains become
+  editable word blocks, and the clause gloss is the sentence's reading.
+  A closed chain is drawn only when it is the reading the clause uses.
+  Names the catalog does not contain, attested phrases whose chain means
+  something else, and open or approximate analyses stay visible and are not
+  drawn as verified blocks.
 - **Explore**: filter morphemes, choose English or Danish glosses, adjust
   display/theme settings, and share Build or Deconstruct state through the
   URL.
