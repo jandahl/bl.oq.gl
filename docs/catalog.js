@@ -17,10 +17,12 @@ import {
 	readCatalogMeta,
 	writeCatalogMeta,
 } from "./catalog-cache.js";
+import { raceCatalogResponses } from "./catalog-fetch.js";
 
-// GitHub Actions runners cannot reach the Cloudflare Pages host reliably. This
-// is the published mirror of the same grammarian catalog; keep the pinned
-// oq-api URL first so compatibility remains defined by oq-api itself.
+// GitHub Actions runners cannot reach the Cloudflare Pages host reliably.
+// This is the published mirror of the same grammarian catalog. Both hosts
+// are fetched together: the oq-api URL still wins when it answers within a
+// few seconds, and a hung primary is aborted so the mirror can proceed.
 export const GRAMMAR_MORPHEMES_FALLBACK_URL =
 	"https://jandahl.github.io/oq-grammarian/v2/grammar/morphemes-by-id.json";
 
@@ -46,26 +48,31 @@ export function catalogFromPayload(value) {
 }
 
 async function fetchCatalogBuffer(url, onProgress) {
-	const failures = [];
-	for (const candidate of Array.isArray(url) ? url : [url]) {
+	const candidates = (Array.isArray(url) ? url : [url]).filter(Boolean);
+	let response;
+	let winner = candidates[0];
+	if (candidates.length <= 1) {
 		try {
-			const res = await fetch(candidate, { cache: "no-cache" });
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const buffer = await readBufferWithProgress(res, onProgress);
-			return {
-				buffer,
-				url: candidate,
-				meta: {
-					etag: res.headers.get("etag") || "",
-					lastModified: res.headers.get("last-modified") || "",
-					fetchedAt: Date.now(),
-				},
-			};
+			response = await fetch(winner, { cache: "no-cache" });
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
 		} catch (error) {
-			failures.push(`${candidate}: ${error.message}`);
+			throw new Error(`morpheme catalog fetch failed (${winner}: ${error.message})`);
 		}
+	} else {
+		const raced = await raceCatalogResponses(candidates);
+		response = raced.response;
+		winner = raced.url;
 	}
-	throw new Error(`morpheme catalog fetch failed (${failures.join("; ")})`);
+	const buffer = await readBufferWithProgress(response, onProgress);
+	return {
+		buffer,
+		url: winner,
+		meta: {
+			etag: response.headers.get("etag") || "",
+			lastModified: response.headers.get("last-modified") || "",
+			fetchedAt: Date.now(),
+		},
+	};
 }
 
 async function persistCatalog(cache, url, buffer, meta) {
