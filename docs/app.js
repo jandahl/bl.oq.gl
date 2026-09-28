@@ -9,7 +9,7 @@ import { renderBreakdown, renderAlternativeBreakdowns, renderTonedPhrases, wordT
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
 import { readState, writeState, routeForState } from "./router.js";
-import { isSentenceInput, planFromLattice, canvasSentences, withInitialCapital } from "./sentence-plan.js";
+import { isSentenceInput, planFromLattice, canvasSentences, withInitialCapital, assemblyReading } from "./sentence-plan.js";
 import { loadWorkedExamples } from "./worked-examples.js";
 import { setLocale, applyLocale, t } from "./i18n.js";
 
@@ -106,6 +106,7 @@ let workedExamplesFilter;
 let workedExamplesStatus;
 let workedExamplesList;
 let showIdsCheckbox;
+let showMoodCheckbox;
 let readingOrderCheckbox;
 let langSelect;
 let uiLangSelect;
@@ -172,6 +173,7 @@ function bindDom() {
 	workedExamplesStatus = document.getElementById("worked-examples-status");
 	workedExamplesList = document.getElementById("worked-examples-list");
 	showIdsCheckbox = document.getElementById("opt-show-ids");
+	showMoodCheckbox = document.getElementById("opt-show-mood");
 	readingOrderCheckbox = document.getElementById("opt-reading-order");
 	langSelect = enhanceSegmented(document.getElementById("opt-lang"));
 	uiLangSelect = enhanceSegmented(document.getElementById("opt-ui-lang"));
@@ -201,6 +203,8 @@ const LANG_KEY = "bl-oq-ly:lang";
 const LANG_KEY_RENAMED = "bloq:lang";
 const SPELLING_KEY = "bl-oq-ly:spelling-mode";
 const SPELLING_KEY_RENAMED = "bloq:spelling-mode";
+const SHOW_MOOD_KEY = "bl-oq-ly:show-mood";
+const SHOW_MOOD_KEY_RENAMED = "bloq:show-mood";
 
 
 function stored(key, legacyKey) {
@@ -222,6 +226,28 @@ function syncDocumentTitle() {
 
 function displayOptions() {
 	return { showIds: showIdsCheckbox.checked, lang: langSelect.value, spellingMode: spellingSelect.value };
+}
+
+function showMoodLabels() {
+	return showMoodCheckbox.checked;
+}
+
+function visibleAssembly(assembly) {
+	return assemblyReading(assembly, showMoodLabels());
+}
+
+function syncMoodLabels() {
+	if (!lastSentencePlan || !workspace) return;
+	const blocks = workspace.getTopBlocks(true).filter((block) => block.type === "morpheme_block__sentence_container");
+	lastSentencePlan.sentences.forEach((sentence, index) => {
+		const block = blocks[index];
+		if (!block || !sentence.assembly?.text) return;
+		const text = visibleAssembly(sentence.assembly);
+		block.bloqAssembly = text;
+		block.setFieldValue(text, "TRANSLATION");
+	});
+	updateSentenceReading(lastSentencePlan);
+	renderSentenceBreakdown(lastSentencePlan);
 }
 
 function glossOptions() { const lang = displayOptions().lang; return { lang: lang === "both" ? "en" : lang, showOther: lang === "both" }; }
@@ -290,6 +316,7 @@ function readLastFirst() {
 function initDisplayOptions() {
 	uiLangSelect.value = stored("bl-oq-ly:ui-lang", "bloq:ui-lang") === "da" ? "da" : "en";
 	showIdsCheckbox.checked = stored(SHOW_IDS_KEY, SHOW_IDS_KEY_RENAMED) === "true";
+	showMoodCheckbox.checked = stored(SHOW_MOOD_KEY, SHOW_MOOD_KEY_RENAMED) === "true"; // default off
 	readingOrderCheckbox.checked = stored(READING_ORDER_KEY, READING_ORDER_KEY_RENAMED) !== "false"; // default on
 	langSelect.value = ["en", "da", "both"].includes(stored(LANG_KEY, LANG_KEY_RENAMED)) ? stored(LANG_KEY, LANG_KEY_RENAMED) : "en";
 	spellingSelect.value = ["both", "spelling-only", "gloss-only"].includes(stored(SPELLING_KEY, SPELLING_KEY_RENAMED))
@@ -311,6 +338,10 @@ function initDisplayOptions() {
 	showIdsCheckbox.addEventListener("change", () => {
 		storePreference(SHOW_IDS_KEY, SHOW_IDS_KEY_RENAMED, String(showIdsCheckbox.checked));
 		onDisplayOptionChange();
+	});
+	showMoodCheckbox.addEventListener("change", () => {
+		storePreference(SHOW_MOOD_KEY, SHOW_MOOD_KEY_RENAMED, String(showMoodCheckbox.checked));
+		syncMoodLabels();
 	});
 	langSelect.addEventListener("change", () => {
 		storePreference(LANG_KEY, LANG_KEY_RENAMED, langSelect.value);
@@ -379,9 +410,9 @@ function updateReadingLine(seqOrSeqs) {
 
 function updateSentenceReading(plan) {
 	const lines = (plan?.sentences ?? [])
-		.map((sentence) => sentence.assembly?.text)
+		.map((sentence) => visibleAssembly(sentence.assembly))
 		.filter(Boolean);
-	if (!lines.length && plan?.assembly?.text) lines.push(plan.assembly.text);
+	if (!lines.length && plan?.assembly) lines.push(visibleAssembly(plan.assembly));
 	if (!lines.length) {
 		readingLine.hidden = true;
 		return;
@@ -394,7 +425,7 @@ function updateSentenceReading(plan) {
 		span.textContent = text;
 		readingLine.appendChild(span);
 	});
-	const da = plan?.assemblyDa?.text;
+	const da = visibleAssembly(plan?.assemblyDa);
 	if (da && displayOptions().lang === "both") {
 		const extra = document.createElement("span");
 		extra.className = "reading-word reading-alt";
@@ -932,7 +963,7 @@ function renderSentenceBreakdown(plan) {
 	if (plan.sentences.length > 1 && plan.assembly?.text) {
 		const lead = document.createElement("p");
 		lead.className = "sentence-assembly sentence-assembly-all";
-		lead.textContent = plan.assembly.text;
+		lead.textContent = visibleAssembly(plan.assembly);
 		breakdownDiv.appendChild(lead);
 	}
 	const metas = [];
@@ -952,14 +983,15 @@ function renderSentenceBreakdown(plan) {
 			const badge = document.createElement("span");
 			badge.className = `sentence-mode mode-${sentence.assembly.mode || "serial"}`;
 			badge.textContent = sentence.assembly.mode || "serial";
-			line.append(badge, " ", sentence.assembly.text);
+			const reading = visibleAssembly(sentence.assembly);
+			line.append(badge, " ", reading);
 			head.appendChild(line);
-			metas.push(sentence.assembly.text);
+			metas.push(reading);
 		}
 		if (sentence.assemblyDa?.text && displayOptions().lang === "both") {
 			const da = document.createElement("p");
 			da.className = "sentence-assembly sentence-assembly-da";
-			da.textContent = sentence.assemblyDa.text;
+			da.textContent = visibleAssembly(sentence.assemblyDa);
 			head.appendChild(da);
 		}
 		section.appendChild(head);
@@ -1067,7 +1099,7 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 			suppressBuildUrlSync = true;
 			renderSentencePlan(workspace, plan.sentences.map((sentence) => ({
 				source: sentence.source,
-				assembly: sentence.assembly?.text || "",
+				assembly: visibleAssembly(sentence.assembly),
 				words: sentence.words.map((word) => ({
 					surface: word.surface || word.raw,
 					raw: word.raw,

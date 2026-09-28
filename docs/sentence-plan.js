@@ -54,6 +54,36 @@ export function groupTokensIntoSentences(tokens, sourceText = "") {
 	return groups;
 }
 
+/** Mood names `assembleClause` writes in front of a verb gloss. */
+const MOOD_ROLES = new Set([
+	"statement", "question", "command", "wish", "when/because", "while", "if",
+	"who/which", "whenever", "exclamation", "verb",
+	"udsagn", "spørgsmål", "byde", "ønske", "da/fordi", "mens", "hvis", "som",
+	"hver gang", "udråb",
+]);
+
+/**
+ * Clause text is `statement: I have a dog`. The mood prefix is optional and
+ * off by default. Case roles stay (`at: the house`). Serial and compound
+ * text is already a gloss and is left alone.
+ * @param {{ mode?: string, text?: string, parts?: Array<{ role?: string, kind?: string, text?: string }> }|null|undefined} assembly
+ * @param {boolean} [showMood]
+ * @returns {string}
+ */
+export function assemblyReading(assembly, showMood = false) {
+	const text = String(assembly?.text ?? "");
+	if (!text || showMood || assembly?.mode !== "clause") return text;
+	const parts = Array.isArray(assembly?.parts) ? assembly.parts : [];
+	if (!parts.length) return text;
+	return parts.map((part) => {
+		const gloss = String(part?.text ?? "").trim();
+		if (!gloss) return "";
+		const role = String(part?.role ?? "");
+		if (part?.kind === "verb" || MOOD_ROLES.has(role)) return gloss;
+		return role ? `${role}: ${gloss}` : gloss;
+	}).filter(Boolean).join(" | ");
+}
+
 function newlineBetween(a, b, sourceText) {
 	const start = Number(a?.end);
 	const end = Number(b?.start);
