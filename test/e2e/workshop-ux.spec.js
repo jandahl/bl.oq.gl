@@ -59,10 +59,14 @@ test("document title stays BLOQ while typing and updates after deconstruct", asy
 });
 
 test("a multi-word input deconstructs each word onto the canvas", async ({ page }) => {
+	// Two live analyses plus the sentence lattice. A 30s test budget dies
+	// while the status line is still "Analyzing…", and the title check then
+	// reports an empty document from teardown rather than the real title.
+	test.setTimeout(90_000);
 	await page.fill("#word-input", "qimmeqarpunga aallarpoq");
 	await page.getByRole("button", { name: "Deconstruct" }).click();
 	await expect(page.locator("#word-input")).toHaveValue("qimmeqarpunga aallarpoq");
-	await expect(page.locator("#status-line")).toContainText("Qimmeqarpunga", { timeout: 30_000 });
+	await expect(page.locator("#status-line")).toContainText("Qimmeqarpunga", { timeout: 60_000 });
 	await expect(page.locator("#status-line")).toContainText("aallarpoq");
 	await expect(page).toHaveTitle("qimmeqarpunga aallarpoq - BLOQ");
 });
