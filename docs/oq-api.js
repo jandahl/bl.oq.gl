@@ -10,9 +10,9 @@
 // Pin the engine in production. oq-api's exported GRAMMAR_MORPHEMES_URL is
 // the compatibility boundary for the matching grammarian catalog; consumers
 // must not pair a rolling API with an independently rolling legacy catalog.
-// Resolved from oq-api's published API.md (v0.3.54). Use the GitHub
+// Resolved from oq-api's published release (v0.3.55). Use the GitHub
 // Pages mirror because api.oq.gl is protected by Cloudflare WAF from CI.
-const OQ_API_URL = "https://jandahl.github.io/oq-api/api/v0.3.54/public-api.js";
+const OQ_API_URL = "https://jandahl.github.io/oq-api/api/v0.3.55/public-api.js";
 
 export const {
 	buildWord,

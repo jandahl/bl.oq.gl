@@ -1,6 +1,6 @@
 contract_version: 1
 api: oq-api
-api_version: 0.3.54
+api_version: 0.3.55
 consumer: jandahl/bl.oq.gl
 consumes: []
 evidence: {}
