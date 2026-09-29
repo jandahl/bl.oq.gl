@@ -510,6 +510,15 @@ test("Deconstruct: qimmeqarpunga produces the composed sentence AND the per-morp
 	for (const t of rowText) expect(t).not.toMatch(/[A-Z]_[A-Z]/);
 });
 
+test("Deconstruct: sentence input uses oq-api's sentence lattice and creates a sentence chain [api-feature:sentence-analysis]", async ({ page }) => {
+	await page.fill("#word-input", "Piitap inaaniippoq");
+	await page.click("#analyze-btn");
+	await expect.poll(() => page.evaluate(() =>
+		Blockly.getMainWorkspace().getTopBlocks(false)
+			.some((block) => block.type === "morpheme_block__sentence_container"),
+	), { timeout: 20_000 }).toBe(true);
+});
+
 test("Deconstruct: lower-ranked verified breakdowns are folded and link to their own builder chains", async ({ page }) => {
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
