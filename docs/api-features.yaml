@@ -2,5 +2,9 @@ contract_version: 1
 api: oq-api
 api_version: 0.3.55
 consumer: jandahl/bl.oq.gl
-consumes: []
-evidence: {}
+consumes:
+  - sentence-analysis
+evidence:
+  sentence-analysis:
+    tests:
+      - test/unit/sentence-plan.test.js

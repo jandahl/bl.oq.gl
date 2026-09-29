@@ -168,7 +168,7 @@ test("a new sentence takes an initial capital and leaves the rest alone", () => 
 	assert.equal(plan.sentences[1].source, "Qimmeqarpunga.");
 });
 
-test("planFromLattice makes one Blockly sentence per source sentence and keeps the clause gloss", () => {
+test("planFromLattice makes one Blockly sentence per source sentence and keeps the clause gloss [api-feature:sentence-analysis]", () => {
 	const lattice = {
 		text: "illu. nerivoq",
 		tokens: [
