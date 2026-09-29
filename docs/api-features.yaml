@@ -1,0 +1,6 @@
+contract_version: 1
+api: oq-api
+api_version: 0.3.54
+consumer: jandahl/bl.oq.gl
+consumes: []
+evidence: {}
