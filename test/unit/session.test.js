@@ -5,6 +5,8 @@ import {
 	clearAnalysisCaches,
 	seqForChain,
 	planMatchesCanvas,
+	normalizeDeconstructIds,
+	deconstructIdsMatchSentences,
 	computeBuild,
 } from "../../docs/session.js";
 
@@ -122,7 +124,26 @@ test("computeBuild: matching sentence plan keeps deconstruct share", () => {
 	assert.equal(result.reading, "plan");
 });
 
+
+test("normalizeDeconstructIds / deconstructIdsMatchSentences: single word and multi-word shapes", () => {
+	assert.deepEqual(normalizeDeconstructIds(["qimmeq", "N_qaq_Vb"]), [[["qimmeq", "N_qaq_Vb"]]]);
+	assert.deepEqual(
+		normalizeDeconstructIds([["qimmeq"], ["neri", "V_IND_INTR_3SG"]]),
+		[[["qimmeq"], ["neri", "V_IND_INTR_3SG"]]],
+	);
+	assert.equal(
+		deconstructIdsMatchSentences([[["qimmeq", "N_qaq_Vb"]]], ["qimmeq", "N_qaq_Vb"]),
+		true,
+	);
+	assert.equal(
+		deconstructIdsMatchSentences([[["qimmeq", "N_qaq_Vb", "extra"]]], ["qimmeq", "N_qaq_Vb"]),
+		false,
+	);
+	assert.equal(deconstructIdsMatchSentences([], ["qimmeq"]), false);
+});
+
 test("computeBuild has no history or timer side effects", () => {
+
 	const result = computeBuild({
 		sentences: [],
 		presetsById: new Map(),

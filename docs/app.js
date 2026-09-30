@@ -6,7 +6,8 @@ import {
 	presetMatchesQuery,
 } from "./blocks.js";
 import {
-	createSession, clearAnalysisCaches, seqForChain as resolveSeqForChain, planMatchesCanvas, computeBuild,
+	createSession, clearAnalysisCaches, seqForChain as resolveSeqForChain, planMatchesCanvas,
+	deconstructIdsMatchSentences, computeBuild,
 } from "./session.js";
 import { renderBreakdown, renderAlternativeBreakdowns, renderTonedPhrases, wordTone } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
@@ -834,6 +835,16 @@ function applyBuildShare(result) {
 		return;
 	}
 	if (result.share.clearDeconstruct) {
+		// Label paints after a Deconstruct render fire Blockly change events.
+		// Those must not demote an intact Deconstruct canvas to a Build ?chain=
+		// share; only a real chain edit should. Caller owns any history push.
+		if (
+			session.mode === "deconstruct"
+			&& session.workspace
+			&& deconstructIdsMatchSentences(topLevelSentences(session.workspace), session.lastDeconstructIds)
+		) {
+			return;
+		}
 		session.mode = "build";
 		session.lastDeconstructWord = "";
 		session.lastSentencePlan = null;

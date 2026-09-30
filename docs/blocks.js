@@ -947,42 +947,46 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 	return container;
 }
 
-/** Paints built surface forms and translations onto Word / Sentence containers. */
+/** Paints built surface forms and translations onto Word / Sentence containers.
+ * Field updates are event-suppressed so a Deconstruct/Build refresh cannot be
+ * mistaken for a user canvas edit by the workspace change listener. */
 export function labelContainers(workspace, builtWords, translations = []) {
-	const wordBlocks = [];
-	for (const top of workspace.getTopBlocks(true)) collectWordContainers(top, wordBlocks);
-	const chainBlocks = wordBlocks.filter((block) => !block.bloqHeld);
-	chainBlocks.forEach((block, i) => {
-		const result = builtWords[i];
-		block.setFieldValue(result?.word || "Word", "TITLE");
-		block.setFieldValue(translations[i] || "", "TRANSLATION");
-		if (block.rendered) block.render();
-	});
-	const indexByBlock = new Map(chainBlocks.map((block, i) => [block, i]));
-	for (const top of workspace.getTopBlocks(true)) {
-		if (top.type !== SENTENCE_CONTAINER_TYPE) continue;
-		const words = [];
-		collectWordContainers(top, words);
-		const first = words[0];
-		if (first) {
-			const title = first.getFieldValue("TITLE");
-			if (title && title !== "Word") first.setFieldValue(withInitialCapital(title), "TITLE");
+	withBlocklyEventsDisabled(() => {
+		const wordBlocks = [];
+		for (const top of workspace.getTopBlocks(true)) collectWordContainers(top, wordBlocks);
+		const chainBlocks = wordBlocks.filter((block) => !block.bloqHeld);
+		chainBlocks.forEach((block, i) => {
+			const result = builtWords[i];
+			block.setFieldValue(result?.word || "Word", "TITLE");
+			block.setFieldValue(translations[i] || "", "TRANSLATION");
+			if (block.rendered) block.render();
+		});
+		const indexByBlock = new Map(chainBlocks.map((block, i) => [block, i]));
+		for (const top of workspace.getTopBlocks(true)) {
+			if (top.type !== SENTENCE_CONTAINER_TYPE) continue;
+			const words = [];
+			collectWordContainers(top, words);
+			const first = words[0];
+			if (first) {
+				const title = first.getFieldValue("TITLE");
+				if (title && title !== "Word") first.setFieldValue(withInitialCapital(title), "TITLE");
+			}
+			const owned = words.map((block) => builtWords[indexByBlock.get(block)]);
+			const builtSurface = owned.map((result) => result?.word).filter(Boolean).join(" ");
+			const assembled = top.bloqAssembly && JSON.stringify(wordsFromBlock(top)) === top.bloqAssemblyKey
+				? top.bloqAssembly
+				: null;
+			const surface = assembled && top.bloqSource ? top.bloqSource : (builtSurface || top.bloqSource || "Sentence");
+			top.setFieldValue(surface === "Sentence" ? surface : withInitialCapital(surface), "TITLE");
+			const translation = assembled ?? words
+				.map((block) => translations[indexByBlock.get(block)])
+				.filter(Boolean)
+				.map((text, i) => i === 0 ? text : text.charAt(0).toLowerCase() + text.slice(1))
+				.join(" ");
+			top.setFieldValue(translation, "TRANSLATION");
+			if (top.rendered) top.render();
 		}
-		const owned = words.map((block) => builtWords[indexByBlock.get(block)]);
-		const builtSurface = owned.map((result) => result?.word).filter(Boolean).join(" ");
-		const assembled = top.bloqAssembly && JSON.stringify(wordsFromBlock(top)) === top.bloqAssemblyKey
-			? top.bloqAssembly
-			: null;
-		const surface = assembled && top.bloqSource ? top.bloqSource : (builtSurface || top.bloqSource || "Sentence");
-		top.setFieldValue(surface === "Sentence" ? surface : withInitialCapital(surface), "TITLE");
-		const translation = assembled ?? words
-			.map((block) => translations[indexByBlock.get(block)])
-			.filter(Boolean)
-			.map((text, i) => i === 0 ? text : text.charAt(0).toLowerCase() + text.slice(1))
-			.join(" ");
-		top.setFieldValue(translation, "TRANSLATION");
-		if (top.rendered) top.render();
-	}
+	});
 }
 
 function collectWordContainers(block, out) {

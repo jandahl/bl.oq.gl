@@ -86,6 +86,32 @@ export function planMatchesCanvas(sentences, plan, { sentenceContainerCount = nu
 }
 
 /**
+ * Normalize lastDeconstructIds (single word string[], one sentence string[][],
+ * or already-sentence string[][][]) to the topLevelSentences() shape.
+ * @param {any} ids
+ * @returns {string[][][]}
+ */
+export function normalizeDeconstructIds(ids) {
+	if (!Array.isArray(ids) || !ids.length) return [];
+	if (typeof ids[0] === "string") return [[ids]];
+	if (typeof ids[0]?.[0] === "string") return [ids];
+	return ids;
+}
+
+/**
+ * Whether the live canvas still shows the last Deconstruct result's chains.
+ * Used so programmatic label paints (and deferred Blockly events from a
+ * Deconstruct render) do not demote an intact Deconstruct share to Build.
+ * @param {string[][][]} sentences
+ * @param {any} lastDeconstructIds
+ */
+export function deconstructIdsMatchSentences(sentences, lastDeconstructIds) {
+	const expected = normalizeDeconstructIds(lastDeconstructIds);
+	if (!expected.length || !sentences?.length) return false;
+	return JSON.stringify(sentences) === JSON.stringify(expected);
+}
+
+/**
  * Pure Build pass over canvas sentence chains. No history, mode, DOM, or timers.
  *
  * @param {{
