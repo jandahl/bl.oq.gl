@@ -282,3 +282,40 @@ test("canvasTree: two sentences, a held word, and a loose chain round-trip to th
 	assert.equal(sameIdTree(ids, [[["qimmeq", "extra"]], [["aallarpoq"]]]), false);
 	void stemB;
 });
+
+test("chainFromTopBlock: a horizontal word follows NEXT plugs, not a vertical stack", () => {
+	const ending = { type: "morpheme_block__inflection", data: "V_IND", getInputTargetBlock: () => null, getNextBlock: () => null };
+	const stem = {
+		type: "morpheme_block__stem_v",
+		data: "neri",
+		getInputTargetBlock: (name) => name === "NEXT" ? ending : null,
+		getNextBlock: () => null,
+	};
+	const word = {
+		type: "morpheme_block__word_container",
+		getInput: (name) => name === "MORPHEMES" ? {} : null,
+		getInputTargetBlock: (name) => name === "MORPHEMES" ? stem : null,
+	};
+	assert.deepEqual(chainFromTopBlock(word), ["neri", "V_IND"]);
+});
+
+test("chainFromTopBlock: wrap rows are read left to right, then top to bottom", () => {
+	const later = { type: "morpheme_block__enclitic", data: "encl", getInputTargetBlock: () => null, getNextBlock: () => null };
+	const early = { type: "morpheme_block__stem_n", data: "qimmeq", getInputTargetBlock: () => null, getNextBlock: () => null };
+	const row2 = {
+		type: "morpheme_block__word_row",
+		getInputTargetBlock: (name) => name === "CHAIN" ? later : null,
+		getNextBlock: () => null,
+	};
+	const row1 = {
+		type: "morpheme_block__word_row",
+		getInputTargetBlock: (name) => name === "CHAIN" ? early : null,
+		getNextBlock: () => row2,
+	};
+	const word = {
+		type: "morpheme_block__word_container",
+		getInput: (name) => name === "ROWS" ? {} : null,
+		getInputTargetBlock: (name) => name === "ROWS" ? row1 : null,
+	};
+	assert.deepEqual(chainFromTopBlock(word), ["qimmeq", "encl"]);
+});

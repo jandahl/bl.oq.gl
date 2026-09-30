@@ -3,7 +3,7 @@ import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
-	presetMatchesQuery, canvasTree, sameIdTree,
+	presetMatchesQuery, canvasTree, sameIdTree, setViewLayout, getViewLayout,
 } from "./blocks.js";
 import {
 	createSession, clearAnalysisCaches, seqForChain as resolveSeqForChain, planMatchesCanvas,
@@ -112,6 +112,7 @@ let readingOrderCheckbox;
 let langSelect;
 let uiLangSelect;
 let spellingSelect;
+let layoutSelect;
 let readingLine;
 let loadingModal;
 let loadingStatus;
@@ -159,6 +160,7 @@ function bindDom() {
 	langSelect = enhanceSegmented(document.getElementById("opt-lang"));
 	uiLangSelect = enhanceSegmented(document.getElementById("opt-ui-lang"));
 	spellingSelect = enhanceSegmented(document.getElementById("opt-spelling"));
+	layoutSelect = enhanceSegmented(document.getElementById("opt-layout"));
 	readingLine = document.getElementById("reading-line");
 	loadingModal = document.getElementById("loading-modal");
 	loadingStatus = document.getElementById("loading-status");
@@ -186,6 +188,8 @@ const SPELLING_KEY = "bl-oq-ly:spelling-mode";
 const SPELLING_KEY_RENAMED = "bloq:spelling-mode";
 const SHOW_MOOD_KEY = "bl-oq-ly:show-mood";
 const SHOW_MOOD_KEY_RENAMED = "bloq:show-mood";
+const LAYOUT_KEY = "bloq:view-layout";
+const LAYOUTS = ["stack", "horizontal", "wrap"];
 
 
 function stored(primaryKey, legacyKey) {
@@ -291,6 +295,7 @@ function initDisplayOptions() {
 	langSelect.value = ["en", "da", "both"].includes(stored(LANG_KEY_RENAMED, LANG_KEY)) ? stored(LANG_KEY_RENAMED, LANG_KEY) : "en";
 	spellingSelect.value = ["both", "spelling-only", "gloss-only"].includes(stored(SPELLING_KEY_RENAMED, SPELLING_KEY))
 		? stored(SPELLING_KEY_RENAMED, SPELLING_KEY) : "both";
+	layoutSelect.value = LAYOUTS.includes(stored(LAYOUT_KEY, null)) ? stored(LAYOUT_KEY, null) : "stack";
 
 	function onDisplayOptionChange() {
 		if (session.workspace) relabelBlocks(session.workspace, session.presetsById, displayOptions());
@@ -328,6 +333,10 @@ function initDisplayOptions() {
 	spellingSelect.addEventListener("change", () => {
 		storePreference(SPELLING_KEY_RENAMED, SPELLING_KEY, spellingSelect.value);
 		onDisplayOptionChange();
+	});
+	layoutSelect.addEventListener("change", () => {
+		storePreference(LAYOUT_KEY, LAYOUT_KEY, layoutSelect.value);
+		applyLayout({ reveal: true });
 	});
 	readingOrderCheckbox.addEventListener("change", () => {
 		storePreference(READING_ORDER_KEY_RENAMED, READING_ORDER_KEY, String(readingOrderCheckbox.checked));
@@ -502,6 +511,7 @@ function workspaceOptions() {
 }
 
 function injectWorkspace(serializedState = null) {
+	setViewLayout(layoutSelect?.value || "stack");
 	session.workspace = Blockly.inject(blocklyDiv, workspaceOptions());
 	session.workspace.addChangeListener((event) => {
 		if (event?.isUiEvent) return;
@@ -1309,12 +1319,43 @@ async function loadEngine() {
 	defineVerbObjectBlock(verbEndingIndex, resolvePersonLabel);
 }
 
+function snapshotCanvas(workspace) {
+	return canvasTree(workspace).sentences.map((sentence) => ({
+		source: sentence.block?.bloqSource,
+		assembly: sentence.block?.bloqAssembly,
+		words: sentence.words.map((word) => word.held
+			? { surface: word.block?.getFieldValue?.("TITLE") || "…", heldLabel: word.held }
+			: { canvasIds: word.ids.slice() }),
+	}));
+}
+
+function applyLayout(options = {}) {
+	const layout = LAYOUTS.includes(layoutSelect?.value) ? layoutSelect.value : "stack";
+	document.body.dataset.layout = layout;
+	const instruction = document.querySelector(".build-section .section-instruction");
+	if (instruction) instruction.dataset.i18n = layout === "stack" ? "buildInstruction" : "buildInstructionLinear";
+	applyLocale();
+	const changed = getViewLayout() !== layout;
+	if (session.workspace && changed) {
+		const plan = snapshotCanvas(session.workspace);
+		setViewLayout(layout);
+		applyToolbox();
+		renderSentencePlan(session.workspace, plan, session.presetsById, displayOptions());
+		requestAnimationFrame(() => { if (session.workspace) Blockly.svgResize(session.workspace); });
+		applyBuildShare(refreshBuild());
+	} else {
+		setViewLayout(layout);
+	}
+	if (options.reveal) blocklyDiv?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
 function mountWorkspace() {
 	initTheme();
 	initBlocklyTheme();
 	initDisplayOptions();
 	initDisplayChrome();
 	injectWorkspace();
+	applyLayout();
 	bindWindowEvents();
 	bindUiEvents();
 	setStatus(t("loadedMorphemes", { count: session.presets.length }), "");

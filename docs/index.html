@@ -50,6 +50,15 @@
 					<button type="button" role="radio" data-value="both" aria-checked="false" data-i18n="both">Both</button>
 				</div>
 			</div>
+			<div class="option-cluster">
+				<span id="opt-layout-label" data-i18n="viewStyle">Layout</span>
+				<div id="opt-layout" class="segmented" role="radiogroup" aria-labelledby="opt-layout-label">
+					<button type="button" role="radio" data-value="stack" aria-checked="true" data-i18n="layoutStack">Stack</button>
+					<button type="button" role="radio" data-value="horizontal" aria-checked="false" data-i18n="layoutHorizontal">Horizontal</button>
+					<button type="button" role="radio" data-value="wrap" aria-checked="false" data-i18n="layoutWrap">Wrap</button>
+				</div>
+			</div>
+			<p class="view-note" data-i18n="viewStyleNote">Horizontal and wrap are still the Blockly blocks. A word runs left to right instead of as a tall stack.</p>
 		</div>
 		<div class="view-options settings-panel" id="display-panel" aria-labelledby="settings-heading">
 			<h2 id="settings-heading" data-i18n="settingsHeading">Display and language</h2>
