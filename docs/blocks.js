@@ -59,10 +59,17 @@ import { buildVerbEndingIndex, candidatesFor, parsePersonNumber, personNumberLab
 import { buildNounEndingIndex, nounCandidatesFor, parseNominalCoordinate } from "./noun-endings.js";
 import { withInitialCapital } from "./sentence-plan.js";
 
+// Remaining Blockly connection checks (structural only). Join legality —
+// whether this stem may take that affix — stays in buildWord(), never here:
+//   WORD_START     — Word MORPHEMES socket; stem/particle previous (cannot follow)
+//   MORPHEME_CHAIN — ordinary affix previous/next inside a word
+//   WORD_CHAIN     — Word stacking inside a Sentence
+//   VERB_MOOD / VERB_SUBJECT / VERB_OBJECT — picker value sockets
+// Category hasPrevious/hasNext in CATEGORY_ORDER encodes: stem cannot follow,
+// particle is alone, enclitic seals the chain.
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
 const WORD_START_CONNECTION_TYPE = "WORD_START";
 const WORD_CHAIN_CONNECTION_TYPE = "WORD_CHAIN";
-const INPUT_CHAIN_CONNECTION_TYPE = "INPUT_CHAIN";
 const BLOCK_TYPE_PREFIX = "morpheme_block__";
 const VERB_ENDING_PICKER_TYPE = `${BLOCK_TYPE_PREFIX}verb_ending_picker`;
 const WORD_CONTAINER_TYPE = `${BLOCK_TYPE_PREFIX}word_container`;
@@ -215,9 +222,8 @@ export function presetMatchesQuery(preset, query) {
 
 /** Registers one Blockly block type per category, each with that category's own colour and connection shape. */
 export function defineMorphemeBlocks() {
-	// Word is a C-shaped statement wrapper: morphemes snap INTO it, stem-first.
-	// Sentence wraps whole Word blocks and also exposes outer connectors so it
-	// can sit between the optional Input start/end boundary markers.
+	// Word and Sentence are the only canvas roots. Word is a C-shaped statement
+	// wrapper: morphemes snap INTO it, stem-first. Sentence wraps Word blocks.
 	Blockly.Blocks[WORD_CONTAINER_TYPE] = {
 		init() {
 			// Title row carries the translation label so the statement C stays open
@@ -227,8 +233,8 @@ export function defineMorphemeBlocks() {
 				.appendField(new Blockly.FieldLabelSerializable(""), "TRANSLATION");
 			this.appendStatementInput("MORPHEMES")
 				.setCheck(WORD_START_CONNECTION_TYPE);
-			this.setPreviousStatement(true, [WORD_CHAIN_CONNECTION_TYPE, INPUT_CHAIN_CONNECTION_TYPE]);
-			this.setNextStatement(true, [WORD_CHAIN_CONNECTION_TYPE, INPUT_CHAIN_CONNECTION_TYPE]);
+			this.setPreviousStatement(true, WORD_CHAIN_CONNECTION_TYPE);
+			this.setNextStatement(true, WORD_CHAIN_CONNECTION_TYPE);
 			this.setStyle("bloq_word_container_blocks");
 			this.setTooltip("A single word built from a chain of morphemes");
 		},
@@ -242,26 +248,8 @@ export function defineMorphemeBlocks() {
 				.appendField(new Blockly.FieldLabelSerializable(""), "TRANSLATION");
 			this.appendStatementInput("WORDS")
 				.setCheck(WORD_CHAIN_CONNECTION_TYPE);
-			this.setPreviousStatement(true, INPUT_CHAIN_CONNECTION_TYPE);
-			this.setNextStatement(true, INPUT_CHAIN_CONNECTION_TYPE);
 			this.setStyle("bloq_sentence_container_blocks");
 			this.setTooltip("A sentence built from a sequence of words");
-		},
-	};
-	Blockly.Blocks["input_start"] = {
-		init() {
-			this.appendDummyInput().appendField("Input start");
-			this.setNextStatement(true, INPUT_CHAIN_CONNECTION_TYPE);
-			this.setStyle("bloq_input_blocks");
-			this.setTooltip("Marks the beginning of the input being parsed");
-		},
-	};
-	Blockly.Blocks["input_end"] = {
-		init() {
-			this.appendDummyInput().appendField("Input end");
-			this.setPreviousStatement(true, INPUT_CHAIN_CONNECTION_TYPE);
-			this.setStyle("bloq_input_blocks");
-			this.setTooltip("Marks the end of the input being parsed");
 		},
 	};
 	for (const cat of [...CATEGORY_ORDER, FALLBACK_CATEGORY]) {
@@ -289,10 +277,8 @@ function isMorphemeBlockType(type) {
 	// VERB_OBJECT_TYPE shares this module's block-type prefix (it's still a
 	// morpheme-adjacent block) but is never itself a chain link -- it's a
 	// value block that only ever plugs sideways into a picker's OBJECT_SLOT.
-	// Left unplugged and sitting loose on the canvas, it would otherwise
-	// register as its own (empty) top-level "chain" in topLevelChains(),
-	// wrongly tripping refreshBuild()'s "more than one stack" error even
-	// though there's only one real stem-to-ending stack on the workspace.
+	// Left unplugged and sitting loose on the canvas, it must not register as
+	// a word chain in topLevelSentences().
 	return typeof type === "string" && type.startsWith(BLOCK_TYPE_PREFIX)
 		&& ![WORD_CONTAINER_TYPE, SENTENCE_CONTAINER_TYPE, VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE].includes(type);
 }
@@ -622,7 +608,7 @@ export { VERB_ENDING_PICKER_TYPE, VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT
  * ~278 entries carrying a structured `inflection.subject` (paradigm
  * coordinates), as opposed to a case/possession ending or anything else.
  * Shared by buildToolbox() (which excludes these from the flat list) and
- * renderChain() (which needs to know to build a picker instance, not a
+ * renderSentencePlan() (which needs to know to build a picker instance, not a
  * plain block, for one of these) so the two conditions can't drift apart. */
 function isVerbEndingPreset(preset) {
 	return preset.morpheme_type === "inflectional_ending" && Boolean(preset.seq?.[0]?.inflection?.subject);
@@ -764,18 +750,11 @@ export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker =
 		categorystyle: "oq_container_category",
 		contents: [{ kind: "block", type: SENTENCE_CONTAINER_TYPE }],
 	});
-	contents.push({
-		kind: "category",
-		name: "Input boundaries (2)",
-		categorystyle: "bloq_input_category",
-		contents: [{ kind: "block", type: "input_start" }, { kind: "block", type: "input_end" }],
-	});
 	return { kind: "categoryToolbox", contents };
 }
 
 /** Walks a stack of morpheme blocks starting at `block`, returning morpheme ids top to bottom. */
 export function chainFromTopBlock(block) {
-	if (block?.type === "input_start") return chainFromTopBlock(block.getNextBlock());
 	if (block?.type === SENTENCE_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("WORDS"));
 	if (block?.type === WORD_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("MORPHEMES"));
 	const ids = [];
@@ -794,7 +773,6 @@ export function chainFromTopBlock(block) {
  */
 export function wordsFromBlock(block) {
 	if (!block) return [];
-	if (block.type === "input_start") return wordsFromBlock(block.getNextBlock());
 	if (block.type === SENTENCE_CONTAINER_TYPE) {
 		return wordsFromBlock(block.getInputTargetBlock("WORDS"));
 	}
@@ -816,132 +794,93 @@ export function wordsFromBlock(block) {
 
 /** Every top-level sentence currently on the workspace, each as an array of word-chains. */
 export function topLevelSentences(workspace) {
-	const topBlocks = workspace.getTopBlocks(true);
-	const hasInputBoundary = topBlocks.some((b) => b.type === "input_start");
-	return topBlocks
-		.filter((b) => !hasInputBoundary || b.type === "input_start")
-		.filter((b) => b.type === "input_start" || isMorphemeBlockType(b.type) || b.type === WORD_CONTAINER_TYPE || b.type === SENTENCE_CONTAINER_TYPE)
+	return workspace.getTopBlocks(true)
+		.filter((b) => isMorphemeBlockType(b.type) || b.type === WORD_CONTAINER_TYPE || b.type === SENTENCE_CONTAINER_TYPE)
 		.map((b) => wordsFromBlock(b))
 		.filter((words) => words.length > 0);
 }
 
-/** Every top-level (unparented) morpheme-block stack currently on the workspace. */
-export function topLevelChains(workspace) {
-	return topLevelSentences(workspace).flat();
+function clearCanvasBlocks(workspace) {
+	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
+}
+
+function withBlocklyEventsDisabled(fn) {
+	const events = globalThis.Blockly?.Events;
+	events?.disable?.();
+	try {
+		return fn();
+	} finally {
+		events?.enable?.();
+	}
+}
+
+function isSimpleDrawablePlan(sentences) {
+	if (sentences.length !== 1) return false;
+	const item = sentences[0];
+	if (item.source || item.assembly) return false;
+	const words = item.words ?? [];
+	if (!words.length) return false;
+	return words.every((word) => (word.canvasIds ?? []).filter(Boolean).length && !word.heldLabel);
 }
 
 /**
- * Programmatically builds an editable stack of real morpheme blocks for
- * `ids` (stem first) on `workspace`, replacing whatever stack is already
- * there. Used by Deconstruct's "Move to Word Builder" and by a restored
- * shareable-URL chain link (app.js): the learner gets the verified chain as
- * a live, editable stack to keep experimenting with, not a static read-only
- * display. Always lays out stem-first — see app.js's own comment on why
- * "read last-morpheme-first" doesn't flip the physical block stack, only
- * Deconstruct's row order and Build's separate reading-order line.
+ * Sole public canvas renderer (share-link restore and Deconstruct).
+ * Sentence-plan items in → blocks out, including held (non-drawable) words.
+ * A single simple drawable word stays a lone Word container; richer plans
+ * always use Sentence containers. Blockly change events are suppressed for
+ * the duration so callers can own URL / mode sync without a timeout flag.
  *
- * A verb-mood ending gets a real, fully-adjustable picker instance (its
- * fields set to match that exact id, via restoreVerbPickerFields()), not the
- * plain frozen label block every other category uses -- an earlier version
- * of this function always used the plain block even here, on the reasoning
- * that the picker was purely a toolbox authoring convenience; real usage
- * showed that left a restored ending with no way to adjust it at all short
- * of deleting and re-dragging a fresh picker from the toolbox.
- */
-export function renderChain(workspace, ids, presetsById, displayOptions) {
-	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
-	const container = buildWordBlock(workspace, ids, presetsById, displayOptions);
-	container.moveBy(20, 20);
-}
-
-/** Drops multiple words into a Sentence wrapper (or a lone Word if there's only one). */
-export function renderSentence(workspace, words, presetsById, displayOptions) {
-	const list = (words ?? []).filter((ids) => ids?.length);
-	if (list.length <= 1) {
-		renderChain(workspace, list[0] ?? [], presetsById, displayOptions);
-		return;
-	}
-	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
-	const sentence = workspace.newBlock(SENTENCE_CONTAINER_TYPE);
-	sentence.initSvg();
-	sentence.render();
-	sentence.moveBy(20, 20);
-	connectWords(workspace, sentence, list, presetsById, displayOptions);
-}
-
-/**
- * One Blockly sentence per source sentence. A single sentence of one word
- * stays a Word block, matching the original workshop. `assemblies[i]` is
- * the clause gloss; it is kept only while that sentence's morpheme ids
- * still match what was deconstructed.
- */
-export function renderSentences(workspace, sentences, presetsById, displayOptions, assemblies = [], { forceSentence = false } = {}) {
-	const list = (sentences ?? [])
-		.map((words) => (words ?? []).filter((ids) => ids?.length))
-		.filter((words) => words.length);
-	if (list.length === 0) {
-		for (const block of workspace.getTopBlocks(false)) block.dispose(false);
-		return;
-	}
-	if (list.length === 1 && !forceSentence) {
-		renderSentence(workspace, list[0], presetsById, displayOptions);
-		const top = workspace.getTopBlocks(false).find((block) =>
-			block.type === SENTENCE_CONTAINER_TYPE || block.type === WORD_CONTAINER_TYPE);
-		stampAssembly(top, list[0], assemblies[0]);
-		return;
-	}
-	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
-	let y = 20;
-	list.forEach((words, index) => {
-		const sentence = workspace.newBlock(SENTENCE_CONTAINER_TYPE);
-		sentence.initSvg();
-		sentence.render();
-		sentence.moveBy(20, y);
-		connectWords(workspace, sentence, words, presetsById, displayOptions);
-		stampAssembly(sentence, words, assemblies[index]);
-		sentence.render();
-		const height = sentence.getHeightWidth?.().height ?? 160;
-		y += Math.max(height, 140) + 36;
-	});
-}
-
-/**
- * One sentence container per source sentence, including words that must not
- * become morpheme chains (names, attested phrases, missing ids). Those are
- * word shells. `assembly` is the clause gloss and stays only while the
- * drawable chains still match.
  * @param {Array<{ source?: string, assembly?: string, words?: Array<{ surface?: string, raw?: string, canvasIds?: string[], heldLabel?: string }> }>} sentences
+ * @param {{ forceSentence?: boolean }} [options]
  */
-export function renderSentencePlan(workspace, sentences, presetsById, displayOptions) {
+export function renderSentencePlan(workspace, sentences, presetsById, displayOptions, { forceSentence = false } = {}) {
 	const list = Array.isArray(sentences) ? sentences : [];
-	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
-	if (!list.length) return;
-	let y = 20;
-	for (const item of list) {
-		const sentence = workspace.newBlock(SENTENCE_CONTAINER_TYPE);
-		sentence.bloqSource = item.source || "Sentence";
-		sentence.initSvg();
-		sentence.render();
-		sentence.moveBy(20, y);
-		sentence.setFieldValue(sentence.bloqSource, "TITLE");
-		const drawable = [];
-		let prevWord = null;
-		for (const word of item.words ?? []) {
-			const ids = (word.canvasIds ?? []).filter(Boolean);
-			const wordBlock = ids.length
-				? buildWordBlock(workspace, ids, presetsById, displayOptions)
-				: buildHeldWord(workspace, !prevWord ? withInitialCapital(word.surface || word.raw) : (word.surface || word.raw), word.heldLabel || "not drawn");
-			if (ids.length) drawable.push(ids);
-			if (prevWord) prevWord.nextConnection.connect(wordBlock.previousConnection);
-			else sentence.getInput("WORDS").connection.connect(wordBlock.previousConnection);
-			prevWord = wordBlock;
+	withBlocklyEventsDisabled(() => {
+		clearCanvasBlocks(workspace);
+		if (!list.length) return;
+
+		if (!forceSentence && isSimpleDrawablePlan(list)) {
+			const chains = list[0].words.map((word) => word.canvasIds.filter(Boolean));
+			if (chains.length <= 1) {
+				const container = buildWordBlock(workspace, chains[0] ?? [], presetsById, displayOptions);
+				container.moveBy(20, 20);
+				return;
+			}
+			const sentence = workspace.newBlock(SENTENCE_CONTAINER_TYPE);
+			sentence.initSvg();
+			sentence.render();
+			sentence.moveBy(20, 20);
+			connectWords(workspace, sentence, chains, presetsById, displayOptions);
+			return;
 		}
-		stampAssembly(sentence, drawable, item.assembly || "");
-		if (item.assembly) sentence.setFieldValue(item.assembly, "TRANSLATION");
-		sentence.render();
-		const height = sentence.getHeightWidth?.().height ?? 80;
-		y += Math.max(height, 72) + 28;
-	}
+
+		let y = 20;
+		for (const item of list) {
+			const sentence = workspace.newBlock(SENTENCE_CONTAINER_TYPE);
+			sentence.bloqSource = item.source || "Sentence";
+			sentence.initSvg();
+			sentence.render();
+			sentence.moveBy(20, y);
+			sentence.setFieldValue(sentence.bloqSource, "TITLE");
+			const drawable = [];
+			let prevWord = null;
+			for (const word of item.words ?? []) {
+				const ids = (word.canvasIds ?? []).filter(Boolean);
+				const wordBlock = ids.length
+					? buildWordBlock(workspace, ids, presetsById, displayOptions)
+					: buildHeldWord(workspace, !prevWord ? withInitialCapital(word.surface || word.raw) : (word.surface || word.raw), word.heldLabel || "not drawn");
+				if (ids.length) drawable.push(ids);
+				if (prevWord) prevWord.nextConnection.connect(wordBlock.previousConnection);
+				else sentence.getInput("WORDS").connection.connect(wordBlock.previousConnection);
+				prevWord = wordBlock;
+			}
+			stampAssembly(sentence, drawable, item.assembly || "");
+			if (item.assembly) sentence.setFieldValue(item.assembly, "TRANSLATION");
+			sentence.render();
+			const height = sentence.getHeightWidth?.().height ?? 80;
+			y += Math.max(height, 72) + 28;
+		}
+	});
 }
 
 function buildHeldWord(workspace, surface, label) {
@@ -1008,50 +947,50 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 	return container;
 }
 
-/** Paints built surface forms and translations onto Word / Sentence containers. */
+/** Paints built surface forms and translations onto Word / Sentence containers.
+ * Field updates are event-suppressed so a Deconstruct/Build refresh cannot be
+ * mistaken for a user canvas edit by the workspace change listener. */
 export function labelContainers(workspace, builtWords, translations = []) {
-	const wordBlocks = [];
-	for (const top of workspace.getTopBlocks(true)) collectWordContainers(top, wordBlocks);
-	const chainBlocks = wordBlocks.filter((block) => !block.bloqHeld);
-	chainBlocks.forEach((block, i) => {
-		const result = builtWords[i];
-		block.setFieldValue(result?.word || "Word", "TITLE");
-		block.setFieldValue(translations[i] || "", "TRANSLATION");
-		if (block.rendered) block.render();
-	});
-	const indexByBlock = new Map(chainBlocks.map((block, i) => [block, i]));
-	for (const top of workspace.getTopBlocks(true)) {
-		if (top.type !== SENTENCE_CONTAINER_TYPE) continue;
-		const words = [];
-		collectWordContainers(top, words);
-		const first = words[0];
-		if (first) {
-			const title = first.getFieldValue("TITLE");
-			if (title && title !== "Word") first.setFieldValue(withInitialCapital(title), "TITLE");
+	withBlocklyEventsDisabled(() => {
+		const wordBlocks = [];
+		for (const top of workspace.getTopBlocks(true)) collectWordContainers(top, wordBlocks);
+		const chainBlocks = wordBlocks.filter((block) => !block.bloqHeld);
+		chainBlocks.forEach((block, i) => {
+			const result = builtWords[i];
+			block.setFieldValue(result?.word || "Word", "TITLE");
+			block.setFieldValue(translations[i] || "", "TRANSLATION");
+			if (block.rendered) block.render();
+		});
+		const indexByBlock = new Map(chainBlocks.map((block, i) => [block, i]));
+		for (const top of workspace.getTopBlocks(true)) {
+			if (top.type !== SENTENCE_CONTAINER_TYPE) continue;
+			const words = [];
+			collectWordContainers(top, words);
+			const first = words[0];
+			if (first) {
+				const title = first.getFieldValue("TITLE");
+				if (title && title !== "Word") first.setFieldValue(withInitialCapital(title), "TITLE");
+			}
+			const owned = words.map((block) => builtWords[indexByBlock.get(block)]);
+			const builtSurface = owned.map((result) => result?.word).filter(Boolean).join(" ");
+			const assembled = top.bloqAssembly && JSON.stringify(wordsFromBlock(top)) === top.bloqAssemblyKey
+				? top.bloqAssembly
+				: null;
+			const surface = assembled && top.bloqSource ? top.bloqSource : (builtSurface || top.bloqSource || "Sentence");
+			top.setFieldValue(surface === "Sentence" ? surface : withInitialCapital(surface), "TITLE");
+			const translation = assembled ?? words
+				.map((block) => translations[indexByBlock.get(block)])
+				.filter(Boolean)
+				.map((text, i) => i === 0 ? text : text.charAt(0).toLowerCase() + text.slice(1))
+				.join(" ");
+			top.setFieldValue(translation, "TRANSLATION");
+			if (top.rendered) top.render();
 		}
-		const owned = words.map((block) => builtWords[indexByBlock.get(block)]);
-		const builtSurface = owned.map((result) => result?.word).filter(Boolean).join(" ");
-		const assembled = top.bloqAssembly && JSON.stringify(wordsFromBlock(top)) === top.bloqAssemblyKey
-			? top.bloqAssembly
-			: null;
-		const surface = assembled && top.bloqSource ? top.bloqSource : (builtSurface || top.bloqSource || "Sentence");
-		top.setFieldValue(surface === "Sentence" ? surface : withInitialCapital(surface), "TITLE");
-		const translation = assembled ?? words
-			.map((block) => translations[indexByBlock.get(block)])
-			.filter(Boolean)
-			.map((text, i) => i === 0 ? text : text.charAt(0).toLowerCase() + text.slice(1))
-			.join(" ");
-		top.setFieldValue(translation, "TRANSLATION");
-		if (top.rendered) top.render();
-	}
+	});
 }
 
 function collectWordContainers(block, out) {
 	if (!block) return;
-	if (block.type === "input_start") {
-		collectWordContainers(block.getNextBlock(), out);
-		return;
-	}
 	if (block.type === SENTENCE_CONTAINER_TYPE) {
 		collectWordContainers(block.getInputTargetBlock("WORDS"), out);
 		return;
@@ -1074,6 +1013,23 @@ export function relabelBlocks(workspace, presetsById, displayOptions) {
 		const preset = presetsById.get(block.data);
 		if (preset) block.setFieldValue(labelFor(preset, displayOptions), "LABEL");
 	}
+}
+
+/**
+ * Category-level previous/next shapes for unit tests. These are structural
+ * (stem cannot follow, particle is alone, enclitic seals the chain); join
+ * legality stays in buildWord().
+ */
+export function structuralCategoryConnections() {
+	return CATEGORY_ORDER.map((cat) => ({
+		id: cat.id,
+		key: cat.key,
+		wordClass: cat.wordClass ?? null,
+		hasPrevious: cat.hasPrevious !== false,
+		hasNext: cat.hasNext !== false,
+		previousCheck: cat.hasPrevious === false ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE,
+		nextCheck: cat.hasNext === false ? null : CONNECTION_TYPE,
+	}));
 }
 
 export { buildVerbEndingIndex, buildNounEndingIndex, WORD_CONTAINER_TYPE, SENTENCE_CONTAINER_TYPE, NOUN_ENDING_PICKER_TYPE };

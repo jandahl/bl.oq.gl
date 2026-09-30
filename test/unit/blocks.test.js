@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections } from "../../docs/blocks.js";
 
 // These blocks.js exports don't touch the `Blockly` global, so they're
 // unit-testable directly under
-// Node — everything else (defineMorphemeBlocks, renderChain, relabelBlocks,
-// the actual connection-check behaviour) needs a real Blockly runtime and is
-// covered by test/e2e/ instead.
+// Node — everything else (defineMorphemeBlocks, renderSentencePlan, relabelBlocks)
+// needs a real Blockly runtime and is covered by test/e2e/ instead.
+// structuralCategoryConnections() covers stem/particle/enclitic shapes without
+// the live catalog or Blockly.
 
 function preset(overrides) {
 	return {
@@ -173,12 +174,12 @@ test("chainFromTopBlock: ignores a non-morpheme block type (defensive; shouldn't
 	assert.deepEqual(chainFromTopBlock(stray), []);
 });
 
-test("buildToolbox: always includes Word and Sentence container categories", () => {
+test("buildToolbox: always includes Word and Sentence container categories only", () => {
 	const toolbox = buildToolbox([], { showIds: false });
 	const names = toolbox.contents.map((c) => c.name);
 	assert.ok(names.includes("Words (1)"));
 	assert.ok(names.includes("Sentences (1)"));
-	assert.ok(names.includes("Input boundaries (2)"));
+	assert.ok(!names.some((n) => n.startsWith("Input boundaries")));
 	const words = toolbox.contents.find((c) => c.name === "Words (1)");
 	const sentences = toolbox.contents.find((c) => c.name === "Sentences (1)");
 	assert.equal(words.contents[0].type, "morpheme_block__word_container");
@@ -214,7 +215,7 @@ test("wordsFromBlock: a sentence of stacked word containers yields one chain per
 	assert.deepEqual(wordsFromBlock(sentence), [["qimmeq"], ["nerivoq"]]);
 });
 
-test("topLevelSentences: an input boundary scopes parsing and ignores loose experiment blocks", () => {
+test("topLevelSentences: Word and Sentence roots are collected", () => {
 	const stem = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => null };
 	const word = {
 		type: "morpheme_block__word_container",
@@ -225,7 +226,26 @@ test("topLevelSentences: an input boundary scopes parsing and ignores loose expe
 		type: "morpheme_block__sentence_container",
 		getInputTargetBlock: (name) => name === "WORDS" ? word : null,
 	};
-	const start = { type: "input_start", getNextBlock: () => sentence };
-	const loose = { type: "morpheme_block__stem_v", data: "aallarpoq", getNextBlock: () => null };
-	assert.deepEqual(topLevelSentences({ getTopBlocks: () => [start, loose] }), [[['qimmeq']]]);
+	const looseStem = { type: "morpheme_block__stem_v", data: "aallarpoq", getNextBlock: () => null };
+	assert.deepEqual(
+		topLevelSentences({ getTopBlocks: () => [sentence, looseStem] }),
+		[[["qimmeq"]], [["aallarpoq"]]],
+	);
+});
+
+test("structuralCategoryConnections: stem cannot follow, particle is alone, enclitic seals", () => {
+	const rules = structuralCategoryConnections();
+	const byId = Object.fromEntries(rules.map((rule) => [rule.id, rule]));
+	assert.equal(byId.stem_n.hasPrevious, false);
+	assert.equal(byId.stem_n.previousCheck, "WORD_START");
+	assert.equal(byId.stem_v.hasPrevious, false);
+	assert.equal(byId.particle.hasPrevious, false);
+	assert.equal(byId.particle.hasNext, false);
+	assert.equal(byId.particle.nextCheck, null);
+	assert.equal(byId.enclitic.hasNext, false);
+	assert.equal(byId.enclitic.nextCheck, null);
+	assert.equal(byId.enclitic.hasPrevious, true);
+	assert.equal(byId.enclitic.previousCheck, "MORPHEME_CHAIN");
+	assert.equal(byId.deriv_affix.hasPrevious, true);
+	assert.equal(byId.deriv_affix.hasNext, true);
 });
