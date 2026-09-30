@@ -25,3 +25,16 @@ test("i18n falls back safely for unsupported locales and missing keys", () => {
 	assert.equal(t("settingsHeading"), "Display and language");
 	assert.equal(t("missing-key"), "missing-key");
 });
+
+test("i18n covers status and canvas strings in English and Danish", () => {
+	setLocale("en");
+	assert.equal(t("unknownMorpheme"), "Unknown morpheme in stack.");
+	assert.equal(t("noVerifiedBreakdown", { token: "xyz" }), "No verified breakdown found for \"xyz\".");
+	assert.equal(t("canvasLabel"), "Morpheme workshop canvas");
+	assert.equal(t("results"), "Results");
+	setLocale("da");
+	assert.equal(t("unknownMorpheme"), "Ukendt morfem i stakken.");
+	assert.match(t("noVerifiedBreakdown", { token: "xyz" }), /xyz/);
+	assert.equal(t("results"), "Resultater");
+	setLocale("en");
+});

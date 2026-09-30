@@ -171,86 +171,190 @@ export function computeBuild({
 
 	const built = [];
 	const seqs = [];
+	const surfaces = [];
+	const wordOutcomes = [];
+	let firstError = null;
+
 	for (let s = 0; s < sentences.length; s++) {
 		const words = sentences[s];
 		for (let i = 0; i < words.length; i++) {
+			const where = sentences.length > 1
+				? `sentence ${s + 1}, word ${i + 1}`
+				: (words.length > 1 ? `word ${i + 1}` : "");
 			const seq = seqForChain(presetsById, words[i]);
 			if (!seq) {
-				return {
-					empty: false,
-					error: { message: "Unknown morpheme in stack.", kind: "error" },
-					built: [],
-					seqs: [],
-					surfaces: [],
-					kind: "error",
-					meta: "",
-					reading: "none",
-					usePlan: false,
-					share: { mode: null, clearDeconstruct: false },
+				const outcome = {
+					ok: false,
+					kind: "unknown",
+					message: "Unknown morpheme in stack.",
+					meta: where,
+					surface: null,
+					built: null,
+					seq: null,
 				};
+				wordOutcomes.push(outcome);
+				surfaces.push("?");
+				if (!firstError) firstError = { message: outcome.message, kind: "error", meta: where };
+				continue;
 			}
 			const result = buildWord(seq);
 			if (!result.ok) {
-				const where = sentences.length > 1
-					? `sentence ${s + 1}, `
-					: (words.length > 1 ? `word ${i + 1}, ` : "");
-				return {
-					empty: false,
-					error: {
-						message: `✗ ${result.reason || "invalid sequence"}`,
-						kind: "error",
-						meta: `${where}at position ${result.errorAt >= 0 ? result.errorAt + 1 : "?"}`,
-					},
-					built: [],
-					seqs: [],
-					surfaces: [],
-					kind: "error",
-					meta: "",
-					reading: "none",
-					usePlan: false,
-					share: { mode: null, clearDeconstruct: false },
+				const reason = result.reason || "invalid sequence";
+				const meta = `${where ? `${where}, ` : ""}at position ${result.errorAt >= 0 ? result.errorAt + 1 : "?"}`;
+				const outcome = {
+					ok: false,
+					kind: "invalid",
+					message: reason,
+					meta,
+					surface: null,
+					built: result,
+					seq,
 				};
+				wordOutcomes.push(outcome);
+				surfaces.push(`✗ ${reason}`);
+				if (!firstError) firstError = { message: `✗ ${reason}`, kind: "error", meta };
+				continue;
 			}
 			built.push(result);
 			seqs.push(seq);
+			const surface = `${result.approximate ? "≈ " : ""}${result.word}`;
+			surfaces.push(surface);
+			wordOutcomes.push({
+				ok: true,
+				kind: result.approximate ? "approx" : "ok",
+				message: null,
+				meta: where,
+				surface,
+				built: result,
+				seq,
+			});
 		}
 	}
 
 	const wordCount = sentences.reduce((n, words) => n + words.length, 0);
-	const kind = built.some((r) => r.approximate) ? "approx" : "ok";
-	const allClosed = built.every((r) => r.closed);
+	const hasError = wordOutcomes.some((o) => !o.ok);
+	const kind = hasError ? "error" : (built.some((r) => r.approximate) ? "approx" : "ok");
+	const allClosed = built.length > 0 && built.every((r) => r.closed);
 	const meta = sentences.length > 1
 		? `${sentences.length} sentences`
 		: (wordCount > 1
-			? (allClosed ? `${wordCount} words` : "mid-derivation — keep building")
-			: (allClosed ? "complete word" : "mid-derivation — keep building"));
-	const surfaces = built.map((r) => `${r.approximate ? "≈ " : ""}${r.word}`);
+			? (allClosed && !hasError ? `${wordCount} words` : "mid-derivation — keep building")
+			: (allClosed && !hasError ? "complete word" : "mid-derivation — keep building"));
 
-	if (lastSentencePlan && planMatches) {
+	const base = {
+		empty: false,
+		error: firstError,
+		built,
+		seqs,
+		surfaces,
+		wordOutcomes,
+		kind,
+		meta,
+		reading: hasError ? "none" : "seqs",
+		usePlan: false,
+		share: { mode: hasError ? null : "build", clearDeconstruct: !hasError },
+	};
+
+	if (!hasError && lastSentencePlan && planMatches) {
 		return {
-			empty: false,
-			error: null,
-			built,
-			seqs,
-			surfaces,
-			kind,
-			meta,
+			...base,
 			reading: "plan",
 			usePlan: true,
 			share: { mode: "deconstruct", clearDeconstruct: false },
 		};
 	}
 
+	return base;
+}
+
+/**
+ * Pure status contract from a computeBuild / plan result.
+ * UI only renders this — no ad hoc string assembly at call sites.
+ * @param {any} result computeBuild return or { plan, surfaces? }
+ * @param {{ t?: (key: string, vars?: Record<string, string|number>) => string }} [opts]
+ * @returns {{ kind: string, words: string[]|null, detail: string, meta: string, assertive: boolean }}
+ */
+export function formatStatus(result, opts = {}) {
+	const translate = opts.t || ((key, vars = {}) => {
+		const fallback = {
+			unknownMorpheme: "Unknown morpheme in stack.",
+			emptyCanvasHint: "Drag a morpheme in, or try an example above.",
+			noClosedReading: "No closed reading to place on the canvas.",
+			completeWord: "complete word",
+			midDerivation: "mid-derivation — keep building",
+			nWords: "{count} words",
+			nSentences: "{count} sentences",
+		};
+		let text = fallback[key] ?? key;
+		for (const [name, value] of Object.entries(vars)) text = text.replaceAll(`{${name}}`, String(value));
+		return text;
+	});
+
+	if (!result || result.empty) {
+		return { kind: "", words: null, detail: translate("emptyCanvasHint"), meta: "", assertive: false };
+	}
+
+	if (result.plan) {
+		const plan = result.plan;
+		const words = plan.sentences.flatMap((sentence) => sentence.words);
+		const missing = words.filter((word) => word.status === "missing" || word.status === "invalid");
+		const meta = result.meta || "";
+		if (missing.length) {
+			return {
+				kind: "error",
+				words: null,
+				detail: missing.map((word) => `${word.raw}: ${word.note}`).join(" · "),
+				meta,
+				assertive: true,
+			};
+		}
+		const surfaces = result.surfaces || [];
+		if (!surfaces.length) {
+			const text = plan.assembly?.text || translate("noClosedReading");
+			return {
+				kind: plan.assembly?.text ? "approx" : "error",
+				words: null,
+				detail: text,
+				meta,
+				assertive: !plan.assembly?.text,
+			};
+		}
+		const cautious = words.some((word) => word.status !== "verified");
+		return { kind: cautious ? "approx" : "ok", words: surfaces, detail: "", meta, assertive: false };
+	}
+
+	if (result.wordOutcomes?.length) {
+		const failed = result.wordOutcomes.filter((o) => !o.ok);
+		if (failed.length) {
+			const detail = result.wordOutcomes.map((o) => {
+				if (o.ok) return o.surface;
+				return o.kind === "unknown" ? translate("unknownMorpheme") : `✗ ${o.message}`;
+			}).join(" · ");
+			return {
+				kind: "error",
+				words: null,
+				detail,
+				meta: result.meta || failed.map((o) => o.meta).filter(Boolean).join(" · "),
+				assertive: true,
+			};
+		}
+	}
+
+	if (result.error && !result.wordOutcomes?.length) {
+		return {
+			kind: result.error.kind || "error",
+			words: null,
+			detail: result.error.message,
+			meta: result.error.meta || "",
+			assertive: true,
+		};
+	}
+
 	return {
-		empty: false,
-		error: null,
-		built,
-		seqs,
-		surfaces,
-		kind,
-		meta,
-		reading: "seqs",
-		usePlan: false,
-		share: { mode: "build", clearDeconstruct: true },
+		kind: result.kind || "ok",
+		words: result.surfaces || null,
+		detail: "",
+		meta: result.meta || "",
+		assertive: false,
 	};
 }

@@ -58,6 +58,7 @@
 import { buildVerbEndingIndex, candidatesFor, parsePersonNumber, personNumberLabel, moodDisplayLabel } from "./verb-endings.js";
 import { buildNounEndingIndex, nounCandidatesFor, parseNominalCoordinate } from "./noun-endings.js";
 import { withInitialCapital } from "./sentence-plan.js";
+import { t } from "./i18n.js";
 
 // Remaining Blockly connection checks (structural only). Join legality —
 // whether this stem may take that affix — stays in buildWord(), never here:
@@ -168,7 +169,7 @@ export function labelFor(preset, opts = {}) {
 	// rollout is ongoing) — fall back to English rather than show nothing.
 	const rawGloss = plainStringGloss(preset.plainGloss?.[`${glossLang}_short`])
 		?? (glossLang === "da" ? plainStringGloss(preset.plainGloss?.da) : null)
-		?? preset.glossShort ?? preset.gloss ?? "(no gloss)";
+		?? preset.glossShort ?? preset.gloss ?? t("noGloss");
 	const gloss = moodLabel && rawGloss.startsWith(`${moodLabel} — `) ? rawGloss.slice(moodLabel.length + 3) : rawGloss;
 	const otherGloss = lang === "both"
 		? plainStringGloss(preset.plainGloss?.da_short) ?? plainStringGloss(preset.plainGloss?.da)
@@ -300,7 +301,7 @@ export function defineNounEndingPickerBlock(nounEndingIndex, presetsById, getDis
 		const currentVariant = block.getFieldValue("VARIANT");
 		const id = candidates.some((c) => c.id === currentVariant) ? currentVariant : candidates[0]?.id ?? null;
 		block.data = id;
-		block.getField("RESOLVED")?.setValue(id && presetsById.get(id) ? labelFor(presetsById.get(id), getDisplayOptions()) : "(no such ending in the catalog)");
+		block.getField("RESOLVED")?.setValue(id && presetsById.get(id) ? labelFor(presetsById.get(id), getDisplayOptions()) : t("noSuchEnding"));
 		if (block.rendered) block.render();
 		return id;
 	};
@@ -442,7 +443,7 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
 	const resolvedField = block.getField("RESOLVED");
 	if (resolvedField) {
 		const preset = resolvedId ? presetsById.get(resolvedId) : null;
-		const missing = !mood && !moodBlock ? "choose a mood" : !subjectValue ? "choose a subject" : "no such ending in the catalog";
+		const missing = !mood && !moodBlock ? "choose a mood" : !subjectValue ? "choose a subject" : t("noSuchEnding");
 		resolvedField.setValue(preset ? labelFor(preset, getDisplayOptions()) : `(${missing})`);
 	}
 	// init()'s own initial call runs before initSvg()/render() ever have --
@@ -1056,7 +1057,12 @@ export function labelContainers(workspace, builtWords, translations = []) {
 export function relabelBlocks(workspace, presetsById, displayOptions) {
 	for (const block of workspace.getAllBlocks(false)) {
 		if (block.type === VERB_ENDING_PICKER_TYPE) {
-			Blockly.Blocks[VERB_ENDING_PICKER_TYPE].__resolve(block);
+			block.verbEndingPickerState?.resolve?.()
+				?? Blockly.Blocks[VERB_ENDING_PICKER_TYPE].__resolve?.(block);
+			continue;
+		}
+		if (block.type === NOUN_ENDING_PICKER_TYPE) {
+			block.nounEndingPickerState?.resolve?.();
 			continue;
 		}
 		if (!isMorphemeBlockType(block.type) || !block.data) continue;

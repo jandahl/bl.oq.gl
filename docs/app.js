@@ -1,4 +1,4 @@
-import { buildWord, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel } from "./oq-api.js";
+import { buildWord, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, setActiveLocale } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
@@ -7,13 +7,13 @@ import {
 } from "./blocks.js";
 import {
 	createSession, clearAnalysisCaches, seqForChain as resolveSeqForChain, planMatchesCanvas,
-	deconstructIdsMatchSentences, computeBuild,
+	deconstructIdsMatchSentences, computeBuild, formatStatus,
 } from "./session.js";
 import { renderBreakdown, renderAlternativeBreakdowns, renderTonedPhrases, wordTone } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
 import { readState, writeState, routeForState } from "./router.js";
-import { isSentenceInput, planFromLattice, canvasSentences, withInitialCapital, assemblyReading } from "./sentence-plan.js";
+import { isSentenceInput, planFromLattice, withInitialCapital, assemblyReading } from "./sentence-plan.js";
 import { loadWorkedExamples, loadStandardExamples } from "./worked-examples.js";
 import { setLocale, applyLocale, t } from "./i18n.js";
 
@@ -213,12 +213,34 @@ function syncDocumentTitle() {
 	document.title = word ? `${word} - ${APP_TITLE}` : APP_TITLE;
 }
 
+/** Single display-options value consumed by labelFor, breakdown, and analysis. */
 function displayOptions() {
-	return { showIds: showIdsCheckbox.checked, lang: langSelect.value, spellingMode: spellingSelect.value };
+	const lang = langSelect.value;
+	return {
+		showIds: showIdsCheckbox.checked,
+		lang,
+		showOther: lang === "both",
+		spellingMode: spellingSelect.value,
+		showMood: showMoodCheckbox.checked,
+		readLastFirst: readingOrderCheckbox.checked,
+	};
+}
+
+function glossOptions(opts = displayOptions()) {
+	return {
+		lang: opts.lang === "both" ? "en" : opts.lang,
+		showOther: opts.lang === "both" || opts.showOther,
+	};
+}
+
+function sentenceLang(opts = displayOptions()) {
+	// "both" analyzes the lattice in English (primary) and may request DA
+	// alongside — same meaning as glossOptions().lang for the primary pass.
+	return opts.lang === "da" ? "da" : "en";
 }
 
 function showMoodLabels() {
-	return showMoodCheckbox.checked;
+	return displayOptions().showMood;
 }
 
 function visibleAssembly(assembly) {
@@ -238,8 +260,6 @@ function syncMoodLabels() {
 	updateSentenceReading(session.lastSentencePlan);
 	renderSentenceBreakdown(session.lastSentencePlan);
 }
-
-function glossOptions() { const lang = displayOptions().lang; return { lang: lang === "both" ? "en" : lang, showOther: lang === "both" }; }
 
 function selectExample(word) {
 	preservePageScroll(() => {
@@ -277,7 +297,7 @@ function renderWorkedExamples() {
 	const query = workedExamplesFilter.value.trim().toLowerCase();
 	const matches = workedExamples.filter((example) =>
 		!query || `${example.surface} ${example.gloss ?? ""}`.toLowerCase().includes(query));
-	workedExamplesStatus.textContent = `${matches.length} of ${workedExamples.length} examples`;
+	workedExamplesStatus.textContent = t("workedExamplesCount", { shown: matches.length, total: workedExamples.length });
 	workedExamplesList.replaceChildren(...matches.map((example) => {
 		const button = document.createElement("button");
 		button.type = "button";
@@ -291,17 +311,13 @@ function renderWorkedExamples() {
 async function openWorkedExamples() {
 	workedExamplesModal.showModal();
 	if (workedExamples.length) return;
-	workedExamplesStatus.textContent = "Loading examples…";
+	workedExamplesStatus.textContent = t("workedExamplesLoading");
 	try {
 		workedExamples = await loadWorkedExamples();
 		renderWorkedExamples();
 	} catch (err) {
-		workedExamplesStatus.textContent = `Could not load the CI example set: ${err.message}`;
+		workedExamplesStatus.textContent = t("workedExamplesFailed", { message: err.message });
 	}
-}
-
-function readLastFirst() {
-	return readingOrderCheckbox.checked;
 }
 
 function initDisplayOptions() {
@@ -322,9 +338,12 @@ function initDisplayOptions() {
 	uiLangSelect.addEventListener("change", () => {
 		storePreference("bloq:ui-lang", "bl-oq-ly:ui-lang", uiLangSelect.value);
 		setLocale(uiLangSelect.value);
+		setActiveLocale(uiLangSelect.value);
 		applyLocale();
 		syncDocumentTitle();
 		applyTheme(document.documentElement.dataset.theme || "auto");
+		if (session.lastDeconstructIds) rerenderBreakdown();
+		applyBuildShare(refreshBuild());
 	});
 	showIdsCheckbox.addEventListener("change", () => {
 		storePreference(SHOW_IDS_KEY_RENAMED, SHOW_IDS_KEY, String(showIdsCheckbox.checked));
@@ -563,6 +582,7 @@ function initTheme() {
 function setStatus(text, kind, meta) {
 	statusEl.hidden = false;
 	statusEl.className = kind ?? "";
+	statusEl.setAttribute("aria-live", kind === "error" ? "assertive" : "polite");
 	statusLine.textContent = text;
 	const oldMeta = statusEl.querySelector(".meta");
 	if (oldMeta) oldMeta.remove();
@@ -579,6 +599,15 @@ function setStatusWords(words, kind, meta) {
 	renderTonedPhrases(statusLine, words, "status-word");
 }
 
+/** Render a formatStatus contract onto the status live region. */
+function applyStatus(status) {
+	if (status.words?.length) {
+		setStatusWords(status.words, status.kind, status.meta);
+		return;
+	}
+	setStatus(status.detail, status.kind, status.meta);
+}
+
 function formatBytes(n) {
 	if (!n) return "";
 	return `${(n / 1048576).toFixed(1)} MB`;
@@ -587,12 +616,18 @@ function formatBytes(n) {
 function showLoadingModal() {
 	if (document.documentElement.dataset.bloqReady === "1") return;
 	if (!loadingModal) return;
-	loadingModal.hidden = false;
+	if (typeof loadingModal.showModal === "function") {
+		if (!loadingModal.open) loadingModal.showModal();
+	} else {
+		loadingModal.hidden = false;
+	}
 }
 
 function hideLoadingModal() {
 	document.documentElement.dataset.bloqReady = "1";
-	if (loadingModal) loadingModal.hidden = true;
+	if (!loadingModal) return;
+	if (typeof loadingModal.close === "function" && loadingModal.open) loadingModal.close();
+	loadingModal.hidden = true;
 }
 
 function preservePageScroll(fn) {
@@ -686,7 +721,10 @@ async function copyShareLink() {
 		ok = document.execCommand("copy");
 		ta.remove();
 	}
-	if (!ok) return;
+	if (!ok) {
+		applyStatus({ kind: "error", words: null, detail: t("copyFailed"), meta: "", assertive: true });
+		return;
+	}
 	copyLinkBtn.textContent = t("linkCopied");
 	window.setTimeout(() => {
 		copyLinkBtn.textContent = t("copyLink");
@@ -766,20 +804,12 @@ function canvasMatchesPlan(plan) {
 }
 
 function showPlanStatus(plan) {
-	const words = plan.sentences.flatMap((sentence) => sentence.words);
-	const missing = words.filter((word) => word.status === "missing" || word.status === "invalid");
-	if (missing.length) {
-		setStatus(missing.map((word) => `${word.raw}: ${word.note}`).join(" · "), "error", planStatusMeta(plan));
-		return;
-	}
-	const chains = canvasSentences(plan);
-	const surfaces = sentenceInitialWords(plan);
-	if (!surfaces.length) {
-		setStatus(plan.assembly?.text || "No closed reading to place on the canvas.", plan.assembly?.text ? "approx" : "error", planStatusMeta(plan));
-		return;
-	}
-	const cautious = words.some((word) => word.status !== "verified") || chains.length === 0;
-	setStatusWords(surfaces, cautious ? "approx" : "ok", planStatusMeta(plan));
+	applyStatus(formatStatus({
+		plan,
+		surfaces: sentenceInitialWords(plan),
+		meta: planStatusMeta(plan),
+		empty: false,
+	}, { t }));
 }
 
 function sentenceInitialWords(plan) {
@@ -799,6 +829,22 @@ function seqForChain(ids) {
  * applyBuildShare(result).
  * @returns {ReturnType<typeof computeBuild>|null}
  */
+
+function announceCanvasChains() {
+	const live = document.getElementById("canvas-chains");
+	if (!live || !session.workspace) return;
+	const tree = canvasTree(session.workspace);
+	const lines = [];
+	tree.sentences.forEach((sentence, s) => {
+		const words = sentence.words.map((word) => {
+			if (word.held) return word.block?.getFieldValue?.("TITLE") || word.held;
+			return word.ids.join(" + ") || "…";
+		});
+		lines.push(words.join(" · ") || `Sentence ${s + 1}`);
+	});
+	live.textContent = lines.length ? lines.join(" | ") : "";
+}
+
 function refreshBuild() {
 	if (!session.workspace) return null;
 	const sentences = topLevelSentences(session.workspace);
@@ -810,12 +856,7 @@ function refreshBuild() {
 		lastSentencePlan: session.lastSentencePlan,
 		planMatches,
 	});
-
-	if (result.error) {
-		setStatus(result.error.message, result.error.kind, result.error.meta);
-		updateReadingLine(null);
-		return result;
-	}
+	announceCanvasChains();
 
 	if (result.usePlan) {
 		labelContainers(session.workspace, result.built, result.seqs.map((seq) =>
@@ -826,7 +867,7 @@ function refreshBuild() {
 	}
 
 	if (result.empty) {
-		setStatus(t("emptyCanvasHint"), "");
+		applyStatus(formatStatus(result, { t }));
 		updateReadingLine(null);
 		labelContainers(session.workspace, []);
 		return result;
@@ -835,8 +876,8 @@ function refreshBuild() {
 	const translations = result.seqs.map((seq) =>
 		composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions()));
 	labelContainers(session.workspace, result.built, translations);
-	setStatusWords(result.surfaces, result.kind, result.meta);
-	updateReadingLine(result.seqs);
+	applyStatus(formatStatus(result, { t }));
+	updateReadingLine(result.error ? null : result.seqs);
 	return result;
 }
 
@@ -891,7 +932,7 @@ function rerenderBreakdown() {
 		article.dataset.wordTone = wordTone(i);
 		if (parts.length > 1) article.classList.add("sentence-word-breakdown");
 		renderBreakdown(article, part.word, part.seq, part.built, glossSummaryItems, {
-			reverseOrder: readLastFirst(),
+			reverseOrder: displayOptions().readLastFirst,
 			...glossOptions(),
 			headlineGloss,
 		});
@@ -899,7 +940,7 @@ function rerenderBreakdown() {
 		if (part.alternatives?.length) {
 			renderAlternativeBreakdowns(breakdownDiv, part.alternatives, glossSummaryItems, {
 				word: part.word,
-				reverseOrder: readLastFirst(),
+				reverseOrder: displayOptions().readLastFirst,
 				...glossOptions(),
 				headlineGloss,
 				builderHref: (seq) => `${location.pathname}${writeState({ chain: seq.map((item) => item.id).filter(Boolean) })}`,
@@ -924,32 +965,37 @@ const READING_BAND_LABEL = {
 	none: "unparsed",
 };
 
-function sentenceLang() {
-	return displayOptions().lang === "da" ? "da" : "en";
-}
-
 function materializePlan(plan) {
-	for (const sentence of plan.sentences) {
-		for (const word of sentence.words) {
-			if (!word.canvasIds.length) continue;
-			const seq = seqForChain(word.canvasIds);
-			if (!seq) {
-				word.status = "missing";
-				word.canvasIds = [];
-				word.note = "Catalog entry has no builder sequence.";
-				continue;
-			}
-			const built = buildWord(seq);
-			word.seq = seq;
-			word.built = built;
-			if (!built.ok) {
-				word.status = "invalid";
-				word.canvasIds = [];
-				word.note = built.reason || "This closed reading does not build.";
-			}
-		}
-	}
-	return plan;
+	return {
+		...plan,
+		sentences: plan.sentences.map((sentence) => ({
+			...sentence,
+			words: sentence.words.map((word) => {
+				if (!word.canvasIds?.length) return { ...word };
+				const seq = seqForChain(word.canvasIds);
+				if (!seq) {
+					return {
+						...word,
+						status: "missing",
+						canvasIds: [],
+						note: "Catalog entry has no builder sequence.",
+					};
+				}
+				const built = buildWord(seq);
+				if (!built.ok) {
+					return {
+						...word,
+						seq,
+						built,
+						status: "invalid",
+						canvasIds: [],
+						note: built.reason || "This closed reading does not build.",
+					};
+				}
+				return { ...word, seq, built };
+			}),
+		})),
+	};
 }
 
 function planStatusMeta(plan) {
@@ -1007,7 +1053,7 @@ function renderSentenceBreakdown(plan) {
 			article.appendChild(band);
 			if (word.seq && word.built?.ok) {
 				renderBreakdown(article, word.surface, word.seq, word.built, glossSummaryItems, {
-					reverseOrder: readLastFirst(),
+					reverseOrder: displayOptions().readLastFirst,
 					...glossOptions(),
 					headlineGloss,
 				});
@@ -1025,12 +1071,12 @@ function renderSentenceBreakdown(plan) {
 				if (word.compositional && word.compositional !== word.headline) {
 					const unused = document.createElement("p");
 					unused.className = "breakdown-note";
-					unused.textContent = `Closed chain not used: ${word.compositional}`;
+					unused.textContent = t("closedChainUnused", { text: word.compositional });
 					article.appendChild(unused);
 				}
 				const note = document.createElement("p");
 				note.className = "breakdown-note";
-				note.textContent = word.note || "Not placed on the canvas.";
+				note.textContent = word.note || t("notOnCanvas");
 				article.appendChild(note);
 			}
 			if (word.alternatives?.length) {
@@ -1056,7 +1102,7 @@ function renderSentenceBreakdown(plan) {
 async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 	const tokens = tokenizeSentence(surface);
 	breakdownDiv.innerHTML = "";
-	setStatus(`Analyzing ${tokens.length} words as a sentence…`, "");
+	setStatus(t("analyzingSentence", { count: tokens.length }), "");
 	session.lastDeconstructIds = null;
 	session.lastDeconstructSeq = null;
 	session.lastDeconstructAlternatives = null;
@@ -1109,24 +1155,16 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 			})), session.presetsById, displayOptions(), { forceSentence: true });
 			session.workspace.scrollCenter();
 			requestAnimationFrame(() => Blockly.svgResize(session.workspace));
+			// refreshBuild paints labels; plan status must win over any build flash.
 			refreshBuild();
 		}
-		const words = plan.sentences.flatMap((sentence) => sentence.words);
-		const missing = words.filter((word) => word.status === "missing" || word.status === "invalid");
-		if (missing.length) {
-			setStatus(missing.map((word) => `${word.raw}: ${word.note}`).join(" · "), "error", planStatusMeta(plan));
-		} else if (!plan.sentences.some((sentence) => sentence.assembly?.text) && canvasSentences(plan).length === 0) {
-			setStatus("No closed reading to place on the canvas.", "error", planStatusMeta(plan));
-		} else {
-			const cautious = words.some((word) => word.status !== "verified");
-			setStatusWords(sentenceInitialWords(plan), cautious ? "approx" : "ok", planStatusMeta(plan));
-			updateSentenceReading(plan);
-		}
+		showPlanStatus(plan);
+		updateSentenceReading(plan);
 		// Caller owns share URL: push a Deconstruct history entry after canvas paint.
 		syncURL({ push: true });
 	} catch (err) {
 		if (err?.name === "AbortError" || run !== session.deconstructRun) return;
-		setStatus(`Analysis failed: ${err.message}`, "error");
+		setStatus(t("analysisFailed", { message: err.message }), "error");
 	}
 }
 
@@ -1143,23 +1181,28 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 	}
 	const tokens = surface.split(/\s+/).filter(Boolean);
 	breakdownDiv.innerHTML = "";
-	setStatus(tokens.length === 1 ? `Analyzing "${tokens[0]}"…` : `Analyzing ${tokens.length} words…`, "");
+	setStatus(tokens.length === 1 ? t("analyzingWord", { token: tokens[0] }) : t("analyzingWords", { count: tokens.length }), "");
 	session.lastDeconstructIds = null;
 	session.lastDeconstructSeq = null;
 	session.lastDeconstructAlternatives = null;
 	session.lastDeconstructParts = null;
 	try {
 		const parts = [];
+		const failures = [];
 		for (const token of tokens) {
 			const result = await analyzeWordAsync(token, session.presets, {}, { signal: session.deconstructAbort.signal });
 			if (run !== session.deconstructRun) return;
 			if (!result.matches || result.matches.length === 0) {
-				session.lastDeconstructWord = surface;
-				syncDocumentTitle();
-				breakdownSummaryMeta.textContent = "No verified breakdown";
-				breakdownDetails.hidden = false;
-				setStatus(`No verified breakdown found for "${token}".`, "error", `${result.evalCount} candidates checked`);
-				return;
+				failures.push({ token, evalCount: result.evalCount });
+				parts.push({
+					word: token,
+					seq: null,
+					built: null,
+					alternatives: [],
+					ids: [],
+					missing: true,
+				});
+				continue;
 			}
 			const analyzed = result.matches.map((match) => ({ seq: match.seq, built: buildWord(match.seq) }));
 			const best = analyzed[0];
@@ -1172,16 +1215,21 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 			});
 		}
 		session.lastDeconstructWord = surface;
-		session.lastDeconstructParts = parts;
-		session.lastDeconstructSeq = parts[0].seq;
-		session.lastDeconstructBuilt = parts[0].built;
-		session.lastDeconstructAlternatives = parts[0].alternatives;
-		session.lastDeconstructIds = parts.length === 1 ? parts[0].ids : parts.map((p) => p.ids);
+		const okParts = parts.filter((p) => !p.missing && p.seq);
+		session.lastDeconstructParts = okParts.length ? okParts : parts;
+		session.lastDeconstructSeq = okParts[0]?.seq ?? null;
+		session.lastDeconstructBuilt = okParts[0]?.built ?? null;
+		session.lastDeconstructAlternatives = okParts[0]?.alternatives ?? null;
+		session.lastDeconstructIds = okParts.length === 1 ? okParts[0].ids : okParts.map((p) => p.ids);
 		session.mode = "deconstruct";
 		syncDocumentTitle();
-		rerenderBreakdown();
+		if (okParts.length) rerenderBreakdown();
+		else {
+			breakdownSummaryMeta.textContent = t("noVerifiedBreakdown", { token: failures[0]?.token || surface });
+			breakdownDetails.hidden = false;
+		}
 		if (!skipCanvas && session.workspace) {
-			const chains = parts.map((p) => p.ids).filter((ids) => ids.length);
+			const chains = okParts.map((p) => p.ids).filter((ids) => ids.length);
 			if (chains.length) {
 				renderSentencePlan(session.workspace, [{
 					words: chains.map((ids) => ({ canvasIds: ids })),
@@ -1191,11 +1239,23 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 				refreshBuild();
 			}
 		}
+		if (failures.length) {
+			const detail = failures.map((f) => t("noVerifiedBreakdown", { token: f.token })).join(" · ");
+			const meta = failures.map((f) => `${f.evalCount} candidates`).join(" · ");
+			const okSurfaces = okParts.map((p) => p.built?.word || p.word);
+			applyStatus({
+				kind: "error",
+				words: null,
+				detail: okSurfaces.length ? `${okSurfaces.join(" · ")} · ${detail}` : detail,
+				meta,
+				assertive: true,
+			});
+		}
 		// Caller owns share URL after programmatic render (events disabled in renderer).
 		syncURL({ push: true });
 	} catch (err) {
 		if (err?.name === "AbortError" || run !== session.deconstructRun) return;
-		setStatus(`Analysis failed: ${err.message}`, "error");
+		setStatus(t("analysisFailed", { message: err.message }), "error");
 	}
 }
 
@@ -1265,6 +1325,7 @@ function bindUiEvents() {
 	paletteToggleBtn.addEventListener("click", () => {
 		paletteVisible = !paletteVisible;
 		paletteToggleBtn.textContent = t(paletteVisible ? "paletteHide" : "paletteShow");
+		paletteToggleBtn.setAttribute("aria-expanded", paletteVisible ? "true" : "false");
 		filterWrap.hidden = !paletteVisible;
 		applyToolbox();
 		requestAnimationFrame(() => Blockly.svgResize(session.workspace));
@@ -1274,7 +1335,7 @@ function bindUiEvents() {
 
 async function loadEngine() {
 	blocklyThemes = buildBlocklyThemes();
-	setStatus("Loading morpheme catalog…", "");
+	setStatus(t("loading"), "");
 	const catalog = await loadCatalog({
 		onProgress: setLoadingProgress,
 		onUpdated: (next) => {
@@ -1303,7 +1364,9 @@ function mountWorkspace() {
 	injectWorkspace();
 	bindWindowEvents();
 	bindUiEvents();
-	setStatus(`Loaded ${session.presets.length} morphemes.`, "");
+	setStatus(t("loadedMorphemes", { count: session.presets.length }), "");
+	paletteToggleBtn.setAttribute("aria-expanded", paletteVisible ? "true" : "false");
+	paletteToggleBtn.setAttribute("aria-controls", "blockly-div");
 	if (!paletteVisible) {
 		paletteToggleBtn.textContent = t("paletteShow");
 		filterWrap.hidden = true;
@@ -1358,7 +1421,7 @@ export async function start() {
 		} catch (err) {
 			console.error(err);
 			hideLoadingModal();
-			setStatus(`Failed to start: ${err.message}`, "error");
+			setStatus(t("failedToStart", { message: err.message }), "error");
 		} finally {
 			startInflight = null;
 		}
