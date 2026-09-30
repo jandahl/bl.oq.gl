@@ -220,11 +220,13 @@ export function defineMorphemeBlocks() {
 	// can sit between the optional Input start/end boundary markers.
 	Blockly.Blocks[WORD_CONTAINER_TYPE] = {
 		init() {
-			this.appendStatementInput("MORPHEMES")
-				.setCheck(WORD_START_CONNECTION_TYPE)
-				.appendField(new Blockly.FieldLabelSerializable("Word"), "TITLE");
-			this.appendDummyInput("END")
+			// Title row carries the translation label so the statement C stays open
+			// at the bottom (no sealing END dummy after MORPHEMES).
+			this.appendDummyInput("TITLE_ROW")
+				.appendField(new Blockly.FieldLabelSerializable("Word"), "TITLE")
 				.appendField(new Blockly.FieldLabelSerializable(""), "TRANSLATION");
+			this.appendStatementInput("MORPHEMES")
+				.setCheck(WORD_START_CONNECTION_TYPE);
 			this.setPreviousStatement(true, [WORD_CHAIN_CONNECTION_TYPE, INPUT_CHAIN_CONNECTION_TYPE]);
 			this.setNextStatement(true, [WORD_CHAIN_CONNECTION_TYPE, INPUT_CHAIN_CONNECTION_TYPE]);
 			this.setStyle("bloq_word_container_blocks");
@@ -233,11 +235,13 @@ export function defineMorphemeBlocks() {
 	};
 	Blockly.Blocks[SENTENCE_CONTAINER_TYPE] = {
 		init() {
-			this.appendStatementInput("WORDS")
-				.setCheck(WORD_CHAIN_CONNECTION_TYPE)
-				.appendField(new Blockly.FieldLabelSerializable("Sentence"), "TITLE");
-			this.appendDummyInput("END")
+			// Title row carries the translation label so the statement C stays open
+			// at the bottom (no sealing END dummy after WORDS).
+			this.appendDummyInput("TITLE_ROW")
+				.appendField(new Blockly.FieldLabelSerializable("Sentence"), "TITLE")
 				.appendField(new Blockly.FieldLabelSerializable(""), "TRANSLATION");
+			this.appendStatementInput("WORDS")
+				.setCheck(WORD_CHAIN_CONNECTION_TYPE);
 			this.setPreviousStatement(true, INPUT_CHAIN_CONNECTION_TYPE);
 			this.setNextStatement(true, INPUT_CHAIN_CONNECTION_TYPE);
 			this.setStyle("bloq_sentence_container_blocks");
