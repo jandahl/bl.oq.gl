@@ -44,8 +44,8 @@ npm run test:e2e:live
 - `docs/catalog.js` — runtime catalog loading with Cache Storage
 - `docs/catalog-cache.js` — catalog cache helpers
 - `docs/oq-api.js` — oq-api pin + `loadEngine` port
-- `docs/examples.js` — examples catalog loader (remote-ready) + Misiliineq-style browse panel
-- `docs/examples-schema.js` — shared `{ worked, sentences }` normalize/gloss helpers
+- `docs/examples.js` — examples catalog loader (shared upstream) + Misiliineq-style browse panel
+- `docs/examples-schema.js` — `standard-examples/v1` normalize / `glossText` helpers
 - `docs/modal.js` — shared `<dialog>` a11y helpers (focus restore, trap, backdrop)
 - `docs/fixtures/` — offline engine stub + mini catalog for fixture e2e
 - `test/unit/` — fast unit tests (no network)
@@ -61,17 +61,19 @@ npm run test:e2e:live
 
 ## Examples catalog
 
-`docs/examples.js` loads `{ worked, sentences }` examples for the browse modal.
+`docs/examples.js` loads shared `standard-examples/v1` (`{ worked, sentences }`)
+owned by oq-api. Organic single-word deconstructs only; `sentences` may be empty.
+Do not invent attested multi-word sentence examples in this repo.
 
-1. If `globalThis.__BLOQ_EXAMPLES_URL__` is set, fetch that JSON (shared upstream).
-2. Otherwise fall back to the pinned oq-api `getStandardExamples()` — a thin
-   local fallback only, not a permanent BLOQ examples API.
+Load order:
 
-Schema (shared with Misiliineq / future oq-api upstream):
+1. `globalThis.__BLOQ_EXAMPLES_URL__` — fixture/e2e override (e.g. `fixtures/standard-examples.json`)
+2. Pinned oq-api `getStandardExamples()` when the pin already ships v1 (`STANDARD_EXAMPLES_SCHEMA` / `glossText`)
+3. Rolling CDN `https://jandahl.github.io/api.oq.gl/examples/standard-examples.json`
+4. Versioned pin JSON next to `public-api.js` (`/api/v{X.Y.Z}/standard-examples.json`)
+5. Transitional fallback: `getStandardExamples()` with legacy attested `sentences` stripped
 
-```json
-{
-  "worked": [{ "id": "…", "surface": "nerivoq", "gloss": "…", "gloss_en": "…", "gloss_da": "…" }],
-  "sentences": [{ "id": "…", "words": ["Piitap", "inaaniippoq"], "gloss": "…" }]
-}
-```
+Gloss display uses oq-api `glossText` when exported; otherwise the local helper
+in `examples-schema.js` (string or `{ en, da, kl? }`).
+
+v1 worked surfaces: nerivoq, ajorpoq, anivoq, takuaa, nerivunga, nerivugut.

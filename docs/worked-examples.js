@@ -7,8 +7,12 @@ export {
 	loadStandardExamples,
 	loadWorkedExamples,
 	normalizeExamplesCatalog,
+	adaptLegacyExamplesCatalog,
 	mountExamplesPanel,
 	glossForExample,
+	glossText,
 	examplesRemoteUrl,
+	examplesVersionedUrl,
+	EXAMPLES_CDN_URL,
 	EXAMPLES_REMOTE_URL,
 } from "./examples.js";

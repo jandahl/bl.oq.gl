@@ -11,6 +11,7 @@ test("i18n exposes the main page's English and Danish UI labels", () => {
 	assert.equal(t("exampleSentencesLabel"), "Sentences");
 	assert.equal(t("examplesOpen"), "Browse…");
 	assert.equal(t("examplesHeading"), "Examples");
+	assert.equal(t("workedExamplesEmpty"), "No examples in this list yet.");
 	assert.equal(t("loadingTitle"), "Loading");
 	assert.equal(t("showMood"), "Show mood labels");
 	setLocale("da");
