@@ -2,24 +2,34 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
 	normalizeExamplesCatalog,
+	adaptLegacyExamplesCatalog,
 	glossForExample,
+	glossText,
+	glossLocales,
+	STANDARD_EXAMPLES_SCHEMA,
+	EXAMPLES_CDN_URL,
+	examplesVersionedUrl,
 } from "../../docs/examples-schema.js";
 
-test("normalizeExamplesCatalog maps worked and sentences, including gloss_en/da", () => {
+test("normalizeExamplesCatalog maps worked and sentences, including gloss_en/da and object gloss", () => {
 	const catalog = normalizeExamplesCatalog({
+		schema_version: STANDARD_EXAMPLES_SCHEMA,
 		worked: [
 			{ id: "neri", surface: "nerivoq", gloss_en: "He eats.", gloss_da: "Han spiser." },
-			{ surface: "ajorpoq", gloss: "It is bad." },
+			{ surface: "ajorpoq", gloss: { en: "It is bad.", da: "Det er dårligt." } },
 		],
 		sentences: [
 			{ id: "s1", words: ["Piitap", "inaaniippoq"], gloss: "in Peter's room" },
 			{ surface: "a b", gloss_da: "da only" },
 		],
 	});
+	assert.equal(catalog.schema_version, STANDARD_EXAMPLES_SCHEMA);
 	assert.equal(catalog.worked.length, 2);
 	assert.equal(catalog.worked[0].surface, "nerivoq");
 	assert.equal(catalog.worked[0].gloss_en, "He eats.");
 	assert.equal(catalog.worked[0].kind, "words");
+	assert.equal(catalog.worked[1].gloss_en, "It is bad.");
+	assert.equal(catalog.worked[1].gloss_da, "Det er dårligt.");
 	assert.equal(catalog.sentences[0].surface, "Piitap inaaniippoq");
 	assert.deepEqual(catalog.sentences[0].words, ["Piitap", "inaaniippoq"]);
 	assert.equal(catalog.sentences[1].surface, "a b");
@@ -31,11 +41,40 @@ test("normalizeExamplesCatalog tolerates empty or unknown input", () => {
 	assert.deepEqual(normalizeExamplesCatalog({}), { worked: [], sentences: [] });
 });
 
-test("glossForExample prefers locale-specific fields", () => {
+test("adaptLegacyExamplesCatalog drops pre-v1 attested sentences", () => {
+	const adapted = adaptLegacyExamplesCatalog({
+		worked: [{ surface: "nerivoq", gloss: "He eats." }],
+		sentences: [{ words: ["Piitap", "inaaniippoq"], gloss: "attested phrase" }],
+	});
+	assert.equal(adapted.worked.length, 1);
+	assert.equal(adapted.worked[0].surface, "nerivoq");
+	assert.deepEqual(adapted.sentences, []);
+});
+
+test("adaptLegacyExamplesCatalog trusts standard-examples/v1 including empty sentences", () => {
+	const adapted = adaptLegacyExamplesCatalog({
+		schema_version: STANDARD_EXAMPLES_SCHEMA,
+		worked: [{ id: "nerivoq", surface: "nerivoq", gloss: "He eats." }],
+		sentences: [],
+	});
+	assert.equal(adapted.schema_version, STANDARD_EXAMPLES_SCHEMA);
+	assert.equal(adapted.worked[0].surface, "nerivoq");
+	assert.deepEqual(adapted.sentences, []);
+});
+
+test("glossText handles string and locale object glosses", () => {
+	assert.equal(glossText("He eats."), "He eats.");
+	assert.equal(glossText({ en: "English", da: "Dansk" }, "en"), "English");
+	assert.equal(glossText({ en: "English", da: "Dansk" }, "da"), "Dansk");
+	assert.equal(glossText({ da: "Kun dansk" }, "en"), "Kun dansk");
+	assert.deepEqual(glossLocales("plain"), { en: "plain", da: "", kl: "" });
+});
+
+test("glossForExample prefers locale-specific fields and object gloss", () => {
 	const item = {
 		id: "x",
 		surface: "x",
-		gloss: "fallback",
+		gloss: { en: "English", da: "Dansk" },
 		gloss_en: "English",
 		gloss_da: "Dansk",
 		kind: "words",
@@ -43,4 +82,16 @@ test("glossForExample prefers locale-specific fields", () => {
 	assert.equal(glossForExample(item, "en"), "English");
 	assert.equal(glossForExample(item, "da"), "Dansk");
 	assert.equal(glossForExample({ id: "y", surface: "y", gloss: "only", kind: "words" }, "da"), "only");
+});
+
+test("EXAMPLES_CDN_URL and versioned URL match oq-api#337 docs", () => {
+	assert.equal(
+		EXAMPLES_CDN_URL,
+		"https://jandahl.github.io/api.oq.gl/examples/standard-examples.json",
+	);
+	assert.equal(
+		examplesVersionedUrl("https://jandahl.github.io/api.oq.gl/api/v0.3.61/public-api.js"),
+		"https://jandahl.github.io/api.oq.gl/api/v0.3.61/standard-examples.json",
+	);
+	assert.equal(examplesVersionedUrl("not-a-url"), null);
 });

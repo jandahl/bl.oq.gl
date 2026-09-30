@@ -1,0 +1,21 @@
+{
+  "schema_version": "standard-examples/v1",
+  "id": "bloq/fixture-standard-examples",
+  "worked": [
+    {
+      "id": "nerivoq",
+      "surface": "nerivoq",
+      "gloss": "he/she eats",
+      "chain": ["neri", "V_IND_INTR_3SG"],
+      "tags": ["featured"]
+    },
+    {
+      "id": "ajorpoq",
+      "surface": "ajorpoq",
+      "gloss": { "en": "it is bad", "da": "det er dårligt" },
+      "chain": ["ajoq", "V_IND_INTR_3SG"],
+      "tags": ["featured"]
+    }
+  ],
+  "sentences": []
+}

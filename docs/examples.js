@@ -1,29 +1,82 @@
 /**
  * Examples catalog loader + Misiliineq-style browse modal.
  *
- * Prefer a remote/shared JSON when available (`globalThis.__BLOQ_EXAMPLES_URL__`);
- * otherwise fall back to the pinned oq-api `getStandardExamples()`. See
- * `examples-schema.js` and AGENTS.md for the shared schema. Do not invent a
- * permanent local examples API here — keep the fallback thin.
+ * Shared upstream: oq-api `standard-examples/v1` (`{ worked, sentences }`).
+ * Load order:
+ *   1. `globalThis.__BLOQ_EXAMPLES_URL__` (tests / local fixture override)
+ *   2. pinned oq-api `getStandardExamples()` when the pin already ships v1
+ *   3. rolling CDN `EXAMPLES_CDN_URL`, then versioned pin JSON
+ *   4. transitional `getStandardExamples()` with legacy sentences stripped
+ *
+ * Do not invent attested multi-word sentence examples here.
  */
 
-import { getStandardExamples } from "./oq-api.js";
+import {
+	getStandardExamples,
+	glossText as oqGlossText,
+	STANDARD_EXAMPLES_SCHEMA as oqSchema,
+	OQ_API_URL,
+} from "./oq-api.js";
 import { bindModal } from "./modal.js";
 import { t, getLocale } from "./i18n.js";
 import {
 	normalizeExamplesCatalog,
+	adaptLegacyExamplesCatalog,
 	glossForExample,
+	glossText as localGlossText,
+	STANDARD_EXAMPLES_SCHEMA,
+	EXAMPLES_CDN_URL,
+	examplesVersionedUrl as versionedUrlFromPin,
 } from "./examples-schema.js";
 
-export { normalizeExamplesCatalog, glossForExample } from "./examples-schema.js";
+export {
+	normalizeExamplesCatalog,
+	adaptLegacyExamplesCatalog,
+	glossForExample,
+	glossText,
+	glossLocales,
+	STANDARD_EXAMPLES_SCHEMA,
+	EXAMPLES_CDN_URL,
+} from "./examples-schema.js";
 
-/** @type {string | null} Override via globalThis.__BLOQ_EXAMPLES_URL__ for tests / future CDN. */
+/** @param {string} [apiUrl] */
+export function examplesVersionedUrl(apiUrl = OQ_API_URL) {
+	return versionedUrlFromPin(apiUrl);
+}
+
+/**
+ * Override via `globalThis.__BLOQ_EXAMPLES_URL__` for fixture e2e / tests.
+ * When unset, callers should follow the full load cascade (not this alone).
+ * @returns {string | null}
+ */
 export function examplesRemoteUrl() {
 	return (typeof globalThis !== "undefined" && globalThis.__BLOQ_EXAMPLES_URL__) || null;
 }
 
-/** @deprecated use examplesRemoteUrl() — kept for call sites that want a constant-like name. */
+/** @deprecated Prefer examplesRemoteUrl() / EXAMPLES_CDN_URL. */
 export const EXAMPLES_REMOTE_URL = null;
+
+/** Prefer oq-api `glossText` when the pin exports it. */
+const resolveGlossText = typeof oqGlossText === "function" ? oqGlossText : localGlossText;
+
+function pinShipsStandardExamplesV1() {
+	return oqSchema === STANDARD_EXAMPLES_SCHEMA || typeof oqGlossText === "function";
+}
+
+/**
+ * @param {string} url
+ * @returns {Promise<import('./examples-schema.js').ExamplesCatalog | null>}
+ */
+async function fetchExamplesCatalog(url) {
+	try {
+		const res = await fetch(url, { credentials: "omit" });
+		if (!res.ok) return null;
+		const raw = await res.json();
+		return normalizeExamplesCatalog(raw);
+	} catch {
+		return null;
+	}
+}
 
 /**
  * Prefer a remote shared catalog when configured; otherwise the pinned
@@ -31,20 +84,28 @@ export const EXAMPLES_REMOTE_URL = null;
  * @returns {Promise<{ catalog: import('./examples-schema.js').ExamplesCatalog, source: 'remote' | 'oq-api' }>}
  */
 export async function loadExamplesCatalog() {
-	const remoteUrl = examplesRemoteUrl();
-	if (remoteUrl) {
+	const override = examplesRemoteUrl();
+	if (override) {
+		const catalog = await fetchExamplesCatalog(override);
+		if (catalog) return { catalog, source: "remote" };
+	}
+
+	if (pinShipsStandardExamplesV1()) {
 		try {
-			const res = await fetch(remoteUrl, { credentials: "omit" });
-			if (res.ok) {
-				const raw = await res.json();
-				return { catalog: normalizeExamplesCatalog(raw), source: "remote" };
-			}
+			const local = await getStandardExamples();
+			return { catalog: normalizeExamplesCatalog(local), source: "oq-api" };
 		} catch {
-			/* fall through to oq-api pin */
+			/* fall through to CDN / versioned JSON */
 		}
 	}
+
+	for (const url of [EXAMPLES_CDN_URL, examplesVersionedUrl()].filter(Boolean)) {
+		const catalog = await fetchExamplesCatalog(/** @type {string} */ (url));
+		if (catalog) return { catalog, source: "remote" };
+	}
+
 	const local = await getStandardExamples();
-	return { catalog: normalizeExamplesCatalog(local), source: "oq-api" };
+	return { catalog: adaptLegacyExamplesCatalog(local), source: "oq-api" };
 }
 
 /** @deprecated Prefer loadExamplesCatalog(); kept for existing call sites. */
@@ -91,6 +152,7 @@ export function mountExamplesPanel({ frameRoot, dialog, tFn = t, onPick, initial
 	/** @type {import('./examples-schema.js').ExamplesCatalog} */
 	let catalog = initialCatalog || { worked: [], sentences: [] };
 	let loadError = "";
+	let catalogReady = Boolean(initialCatalog);
 
 	const modal = bindModal(dialog, {
 		openButton: openBtn instanceof HTMLElement ? openBtn : null,
@@ -102,6 +164,10 @@ export function mountExamplesPanel({ frameRoot, dialog, tFn = t, onPick, initial
 
 	function batchItems() {
 		return activeBatch === "sentences" ? catalog.sentences : catalog.worked;
+	}
+
+	function itemGloss(item) {
+		return glossForExample(item, getLocale(), resolveGlossText);
 	}
 
 	function applyChrome() {
@@ -140,14 +206,16 @@ export function mountExamplesPanel({ frameRoot, dialog, tFn = t, onPick, initial
 		const items = batchItems();
 		const matches = items.filter((item) => {
 			if (!query) return true;
-			const gloss = glossForExample(item, getLocale());
+			const gloss = itemGloss(item);
 			return `${item.surface} ${gloss}`.toLowerCase().includes(query);
 		});
 		if (statusEl) {
 			if (loadError) {
 				statusEl.textContent = tFn("workedExamplesFailed", { message: loadError });
-			} else if (!items.length) {
+			} else if (!catalogReady) {
 				statusEl.textContent = tFn("workedExamplesLoading");
+			} else if (!items.length) {
+				statusEl.textContent = tFn("workedExamplesEmpty");
 			} else {
 				statusEl.textContent = tFn("workedExamplesCount", {
 					shown: matches.length,
@@ -167,10 +235,10 @@ export function mountExamplesPanel({ frameRoot, dialog, tFn = t, onPick, initial
 			surface.textContent = item.surface;
 			const gloss = document.createElement("span");
 			gloss.className = "examples-item-gloss";
-			const glossText = glossForExample(item, getLocale());
-			gloss.textContent = glossText;
+			const glossStr = itemGloss(item);
+			gloss.textContent = glossStr;
 			btn.append(surface, gloss);
-			if (glossText) btn.title = glossText;
+			if (glossStr) btn.title = glossStr;
 			btn.addEventListener("click", () => {
 				onPick(item.surface, item);
 				modal.close();
@@ -206,11 +274,13 @@ export function mountExamplesPanel({ frameRoot, dialog, tFn = t, onPick, initial
 		setCatalog(next) {
 			catalog = next;
 			loadError = "";
+			catalogReady = true;
 			if (modal.isOpen()) renderList();
 		},
 		/** @param {string} message */
 		setLoadError(message) {
 			loadError = message || "";
+			catalogReady = true;
 			if (modal.isOpen()) renderList();
 		},
 		/** @param {'words' | 'sentences'} [batch] */

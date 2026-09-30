@@ -51,3 +51,13 @@ test("fixture boot: examples browse modal lists surface+gloss and filters", asyn
 	await modal.locator("#worked-examples-close").click();
 	await expect(modal).toBeHidden();
 });
+
+test("fixture boot: sentences tab tolerates empty standard-examples list", async ({ page }) => {
+	await page.locator('#example-words [data-examples-tab="sentences"]').click();
+	const modal = page.locator("#worked-examples-modal");
+	await expect(modal).toBeVisible();
+	await expect(modal.locator("#worked-examples-list button")).toHaveCount(0);
+	await expect(modal.locator("#worked-examples-status")).toContainText(/No examples|Ingen eksempler/i);
+	await modal.locator("#worked-examples-close").click();
+	await expect(modal).toBeHidden();
+});

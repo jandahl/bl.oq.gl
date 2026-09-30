@@ -45,6 +45,9 @@ test.beforeEach(async ({ page }) => {
 		// successfully, so this is not a failed resource load.
 		if (response.status() === 304) return;
 		if (new URL(response.url()).hostname === "blockly-demo.appspot.com") return;
+		// Rolling / versioned standard-examples.json 404 until oq-api#337 publishes;
+		// examples.js falls through to getStandardExamples() (+ legacy adapt).
+		if (response.url().includes("/standard-examples.json")) return;
 		throw new Error(`Unexpected failed request: ${response.status()} ${response.url()}`);
 	});
 	await page.goto("/");
@@ -104,17 +107,30 @@ test("Deconstruct: example words load into the analyzer", async ({ page }) => {
 	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("nerivugut", { timeout: 20_000 });
 });
 
-test("Deconstruct: examples are polymorphemic attested words across several phenomena", async ({ page }) => {
+test("Deconstruct: examples are standard-examples/v1 organic single-word deconstructs", async ({ page }) => {
 	await page.locator('#example-words [data-examples-tab="words"]').click();
 	const modal = page.locator("#worked-examples-modal");
 	await expect(modal).toBeVisible();
 	const examples = modal.locator("#worked-examples-list [data-example-word]");
 	await expect(examples).toHaveCount(6);
 	const words = await examples.evaluateAll((nodes) => nodes.map((node) => node.dataset.exampleWord));
-	expect(new Set(words).size).toBe(words.length);
-	// Bare single-stem demos (e.g. qimmeq) are not useful as Deconstruct examples.
-	expect(words).not.toContain("qimmeq");
-	for (const word of words) expect(word.length).toBeGreaterThan(3);
+	expect(words).toEqual([
+		"nerivoq",
+		"ajorpoq",
+		"anivoq",
+		"takuaa",
+		"nerivunga",
+		"nerivugut",
+	]);
+	await modal.locator("#worked-examples-close").click();
+});
+
+test("Deconstruct: sentences tab is empty under standard-examples/v1 (no invented phrases)", async ({ page }) => {
+	await page.locator('#example-words [data-examples-tab="sentences"]').click();
+	const modal = page.locator("#worked-examples-modal");
+	await expect(modal).toBeVisible();
+	await expect(modal.locator("#worked-examples-list button")).toHaveCount(0);
+	await expect(modal.locator("#worked-examples-status")).toContainText(/No examples|Ingen eksempler/i);
 	await modal.locator("#worked-examples-close").click();
 });
 

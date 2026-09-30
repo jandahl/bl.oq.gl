@@ -112,20 +112,45 @@ export function getWordClassColors() {
 	return {};
 }
 
+/** Tiny fixture catalog — not a parallel product list. Mirrors standard-examples/v1 shape. */
+export const STANDARD_EXAMPLES_SCHEMA = "standard-examples/v1";
+export const STANDARD_EXAMPLES_ID = "oq-api/standard-examples-fixture";
+
 export const STANDARD_EXAMPLES = {
+	schema_version: STANDARD_EXAMPLES_SCHEMA,
+	id: STANDARD_EXAMPLES_ID,
 	worked: [
-		{ surface: "qimmeq", gloss: "dog" },
-		{ surface: "nerivoq", gloss: "he/she eats" },
+		{ id: "nerivoq", surface: "nerivoq", gloss: "he/she eats", chain: ["neri", "V_IND_INTR_3SG"], tags: ["featured"] },
+		{ id: "ajorpoq", surface: "ajorpoq", gloss: { en: "it is bad", da: "det er dårligt" }, chain: ["ajoq", "V_IND_INTR_3SG"], tags: ["featured"] },
 	],
-	sentences: [
-		{ words: ["qimmeq", "nerivoq"], gloss: "the dog eats" },
-	],
+	sentences: [],
 };
+
+export function glossLocales(gloss) {
+	if (gloss && typeof gloss === "object") {
+		return {
+			en: typeof gloss.en === "string" ? gloss.en : "",
+			da: typeof gloss.da === "string" ? gloss.da : "",
+			kl: typeof gloss.kl === "string" ? gloss.kl : "",
+		};
+	}
+	const text = typeof gloss === "string" ? gloss : "";
+	return { en: text, da: "", kl: "" };
+}
+
+export function glossText(gloss, locale = "en") {
+	const parts = glossLocales(gloss);
+	if (locale === "da") return parts.da || parts.en || parts.kl;
+	if (locale === "kl") return parts.kl || parts.en || parts.da;
+	return parts.en || parts.da || parts.kl;
+}
 
 export function getStandardExamples() {
 	return {
-		worked: STANDARD_EXAMPLES.worked.map((item) => ({ ...item })),
-		sentences: STANDARD_EXAMPLES.sentences.map((item) => ({ ...item, words: [...item.words] })),
+		schema_version: STANDARD_EXAMPLES.schema_version,
+		id: STANDARD_EXAMPLES.id,
+		worked: STANDARD_EXAMPLES.worked.map((item) => ({ ...item, chain: item.chain ? [...item.chain] : undefined, tags: item.tags ? [...item.tags] : [] })),
+		sentences: STANDARD_EXAMPLES.sentences.map((item) => ({ ...item, words: [...(item.words || [])] })),
 	};
 }
 
