@@ -14,7 +14,7 @@ import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
 import { readState, writeState, routeForState } from "./router.js";
 import { isSentenceInput, planFromLattice, withInitialCapital, assemblyReading } from "./sentence-plan.js";
-import { loadWorkedExamples, loadStandardExamples } from "./worked-examples.js";
+import { loadExamplesCatalog, mountExamplesPanel } from "./examples.js";
 import { setLocale, applyLocale, t } from "./i18n.js";
 
 /** Radiogroup of [role=radio][data-value] buttons that behaves like a <select>
@@ -102,13 +102,10 @@ let clearCanvasBtn;
 let filterWrap;
 let filterInput;
 let blocklyThemeSelect;
-let exampleWordButtons;
-let workedExamplesBtn;
+let examplesFrame;
 let workedExamplesModal;
-let workedExamplesClose;
-let workedExamplesFilter;
-let workedExamplesStatus;
-let workedExamplesList;
+/** @type {ReturnType<typeof mountExamplesPanel> | null} */
+let examplesPanel = null;
 let showIdsCheckbox;
 let showMoodCheckbox;
 let readingOrderCheckbox;
@@ -127,7 +124,6 @@ const session = createSession();
 let paletteVisible = true;
 let blocklyThemes = null;
 let selectedBlocklyTheme = "classic";
-let workedExamples = [];
 let windowBound = false;
 let startInflight = null;
 
@@ -155,12 +151,8 @@ function bindDom() {
 		document.getElementById("morpheme-filter-clear"),
 	);
 	blocklyThemeSelect = enhanceSegmented(document.getElementById("blockly-theme-select"));
-	workedExamplesBtn = document.getElementById("worked-examples-btn");
+	examplesFrame = document.getElementById("example-words");
 	workedExamplesModal = document.getElementById("worked-examples-modal");
-	workedExamplesClose = document.getElementById("worked-examples-close");
-	workedExamplesFilter = document.getElementById("worked-examples-filter");
-	workedExamplesStatus = document.getElementById("worked-examples-status");
-	workedExamplesList = document.getElementById("worked-examples-list");
 	showIdsCheckbox = document.getElementById("opt-show-ids");
 	showMoodCheckbox = document.getElementById("opt-show-mood");
 	readingOrderCheckbox = document.getElementById("opt-reading-order");
@@ -268,56 +260,27 @@ function selectExample(word) {
 	});
 }
 
-let standardExamples = { worked: [], sentences: [] };
-
-function renderStandardExamples() {
-	const words = document.querySelector(".example-word-list");
-	const sentences = document.querySelector(".example-sentence-list");
-	words.replaceChildren(...standardExamples.worked.map((example) => {
-		const button = document.createElement("button");
-		button.type = "button";
-		button.className = "example-pill";
-		button.dataset.exampleWord = example.surface;
-		button.textContent = example.surface;
-		button.title = example.gloss;
-		return button;
-	}));
-	sentences.replaceChildren(...standardExamples.sentences.map((example) => {
-		const button = document.createElement("button");
-		button.type = "button";
-		button.className = "example-pill";
-		button.dataset.exampleWord = example.words.join(" ");
-		button.textContent = example.words.join(" ");
-		button.title = example.gloss;
-		return button;
-	}));
+function ensureExamplesPanel() {
+	if (examplesPanel || !examplesFrame || !workedExamplesModal) return examplesPanel;
+	examplesPanel = mountExamplesPanel({
+		frameRoot: examplesFrame,
+		dialog: workedExamplesModal,
+		tFn: t,
+		onPick: (surface) => selectExample(surface),
+	});
+	return examplesPanel;
 }
 
-function renderWorkedExamples() {
-	const query = workedExamplesFilter.value.trim().toLowerCase();
-	const matches = workedExamples.filter((example) =>
-		!query || `${example.surface} ${example.gloss ?? ""}`.toLowerCase().includes(query));
-	workedExamplesStatus.textContent = t("workedExamplesCount", { shown: matches.length, total: workedExamples.length });
-	workedExamplesList.replaceChildren(...matches.map((example) => {
-		const button = document.createElement("button");
-		button.type = "button";
-		button.dataset.exampleWord = example.surface;
-		button.textContent = example.gloss ? `${example.surface} — ${example.gloss}` : example.surface;
-		if (example.gloss) button.title = example.gloss;
-		return button;
-	}));
-}
-
-async function openWorkedExamples() {
-	workedExamplesModal.showModal();
-	if (workedExamples.length) return;
-	workedExamplesStatus.textContent = t("workedExamplesLoading");
+async function loadAndMountExamples() {
+	const panel = ensureExamplesPanel();
+	if (!panel) return;
 	try {
-		workedExamples = await loadWorkedExamples();
-		renderWorkedExamples();
+		const { catalog } = await loadExamplesCatalog();
+		panel.setCatalog(catalog);
 	} catch (err) {
-		workedExamplesStatus.textContent = t("workedExamplesFailed", { message: err.message });
+		panel.setLoadError(err?.message || String(err));
 	}
+	panel.refreshChrome();
 }
 
 function initDisplayOptions() {
@@ -340,6 +303,7 @@ function initDisplayOptions() {
 		setLocale(uiLangSelect.value);
 		setActiveLocale(uiLangSelect.value);
 		applyLocale();
+		examplesPanel?.refreshChrome();
 		syncDocumentTitle();
 		applyTheme(document.documentElement.dataset.theme || "auto");
 		if (session.lastDeconstructIds) rerenderBreakdown();
@@ -1308,18 +1272,7 @@ function bindUiEvents() {
 		e.preventDefault();
 		runDeconstruct();
 	});
-	for (const button of exampleWordButtons) {
-		button.addEventListener("click", () => selectExample(button.dataset.exampleWord));
-	}
-	workedExamplesBtn.addEventListener("click", openWorkedExamples);
-	workedExamplesClose.addEventListener("click", () => workedExamplesModal.close());
-	workedExamplesFilter.addEventListener("input", renderWorkedExamples);
-	workedExamplesList.addEventListener("click", (event) => {
-		const button = event.target.closest("button[data-example-word]");
-		if (!button) return;
-		workedExamplesModal.close();
-		selectExample(button.dataset.exampleWord);
-	});
+	ensureExamplesPanel();
 	copyLinkBtn.addEventListener("click", () => { copyShareLink(); });
 	clearCanvasBtn.addEventListener("click", () => { clearCanvas(); });
 	paletteToggleBtn.addEventListener("click", () => {
@@ -1401,10 +1354,8 @@ async function startInner() {
 			setLoadingProgress({});
 			await loadEngine();
 		}
-		if (!standardExamples.worked.length) {
-			standardExamples = await loadStandardExamples();
-			renderStandardExamples();
-			exampleWordButtons = document.querySelectorAll("[data-example-word]");
+		if (!examplesPanel) {
+			await loadAndMountExamples();
 		}
 		mountWorkspace();
 	} finally {

@@ -394,24 +394,53 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 	border-radius: 6px;
 	background: var(--panel-bg);
 }
-.build-examples-head {
+.examples-frame-head {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	justify-content: space-between;
-	gap: 0.4rem 0.75rem;
+	gap: 0.45rem 0.65rem;
 }
-.build-examples-head h3 { margin: 0; font-size: 0.95rem; }
-.build-examples .section-instruction { margin: 0.25rem 0 0.45rem; }
+.examples-frame-title { margin: 0; font-size: 0.95rem; font-weight: 700; flex: 0 1 auto; }
+.build-examples .section-instruction { margin: 0.35rem 0 0; }
+.examples-tabs.segmented { flex: 0 1 auto; }
+.examples-tabs.segmented button {
+	min-height: 2.35rem;
+	padding: 0.3rem 0.65rem;
+	border: 0;
+	border-right: 1px solid var(--border);
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.8rem;
+	font-weight: 600;
+}
+.examples-tabs.segmented button:last-child { border-right: 0; }
+.examples-tabs.segmented button[aria-pressed="true"] {
+	background: color-mix(in srgb, var(--accent) 18%, var(--panel-bg));
+	color: var(--fg);
+}
+.examples-browse,
 #worked-examples-btn {
-	padding: 0.35rem 0.65rem;
+	margin-left: auto;
+	padding: 0.35rem 0.7rem;
 	border: 1px solid var(--border);
 	background: var(--bg);
 	color: var(--fg);
 	border-radius: 4px;
 	cursor: pointer;
 	font-size: 0.8rem;
+	font-weight: 600;
+	min-height: 2.35rem;
 	touch-action: manipulation;
+}
+.examples-browse:hover,
+.examples-browse:focus-visible,
+#worked-examples-btn:hover,
+#worked-examples-btn:focus-visible {
+	border-color: var(--accent);
+	outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+	outline-offset: 1px;
 }
 
 /* bl-oq-ly#20: on a phone-width viewport, Blockly's own toolbox tree sizes
@@ -488,7 +517,7 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 	}
 	.theme-toggle { min-height: 2.5rem; }
 	footer { overflow-wrap: anywhere; }
-	.worked-examples-list { grid-template-columns: 1fr; max-height: min(50dvh, 20rem); }
+	.examples-list, .worked-examples-list { max-height: min(50dvh, 20rem); }
 }
 
 @media (max-width: 480px) {
@@ -796,27 +825,10 @@ button.example-pill:focus-visible {
 	.example-sentence { transition: none; }
 }
 
-#example-words {
-	margin-top: 1.25rem;
-	padding: 0.8rem 0.9rem;
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	background: var(--panel-bg);
+#example-words.examples-frame {
+	margin-top: 0;
 }
-#example-words h2 { margin: 0; font-size: 1rem; }
-#example-words p { margin: 0.2rem 0 0.6rem; font-size: 0.85rem; }
-#worked-examples-btn {
-	margin-top: 0.7rem;
-	padding: 0.35rem 0.8rem;
-	border: 1px solid var(--accent);
-	border-radius: 999px;
-	background: transparent;
-	color: var(--accent);
-	cursor: pointer;
-	font-size: 0.8rem;
-	font-weight: 600;
-	touch-action: manipulation;
-}
+#example-words p.section-instruction { margin: 0.35rem 0 0; font-size: 0.85rem; }
 
 dialog {
 	width: min(42rem, calc(100vw - 2rem));
@@ -904,15 +916,68 @@ html[data-bloq-ready] .loading-overlay { display: none; }
 	}
 }
 
-.modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.modal-header h2 { margin: 0; font-size: 1.15rem; }
-.modal-header button { font-size: 1.4rem; line-height: 1; padding: 0.1rem 0.45rem; }
-.modal-description { margin: 0.4rem 0 0.8rem; font-size: 0.85rem; }
+.examples-dialog { width: min(36rem, calc(100vw - 2rem)); max-height: min(90vh, 40rem); padding: 0; }
+.lab-dialog-inner { padding: 1rem; overflow: auto; max-height: min(90vh, 40rem); }
+.modal-header,
+.lab-dialog-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.35rem; }
+.modal-header h2 { margin: 0; font-size: 1.05rem; }
+.modal-header button,
+#worked-examples-close {
+	font-size: 0.85rem;
+	font-weight: 600;
+	line-height: 1.2;
+	padding: 0.35rem 0.65rem;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--bg);
+	color: var(--fg);
+	cursor: pointer;
+	min-height: 2.35rem;
+}
+.modal-description { margin: 0.25rem 0 0.7rem; font-size: 0.82rem; color: color-mix(in srgb, var(--fg) 72%, transparent); }
 .modal-filter { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; }
 .modal-filter input { width: 100%; box-sizing: border-box; }
 .modal-status { margin: 0.65rem 0 0.4rem; font-size: 0.8rem; color: color-mix(in srgb, var(--fg) 65%, transparent); }
-.worked-examples-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.4rem; max-height: 25rem; overflow-y: auto; }
-.worked-examples-list button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.examples-list,
+.worked-examples-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	max-height: min(50dvh, 22rem);
+	overflow-y: auto;
+}
+.examples-item {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.12rem;
+	width: 100%;
+	min-height: 2.35rem;
+	padding: 0.4rem 0.55rem;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: var(--bg);
+	color: var(--fg);
+	text-align: left;
+	cursor: pointer;
+	font: inherit;
+}
+.examples-item:hover,
+.examples-item:focus-visible {
+	border-color: var(--accent);
+	outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+	outline-offset: 1px;
+}
+.examples-item-surface {
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 0.92rem;
+	font-weight: 600;
+}
+.examples-item-gloss {
+	font-size: 0.78rem;
+	font-weight: 500;
+	color: color-mix(in srgb, var(--fg) 62%, transparent);
+}
 
 footer {
 	padding: 0.4rem 1rem calc(var(--results-footer-height) + 0.75rem);

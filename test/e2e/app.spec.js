@@ -90,28 +90,42 @@ test("footer stays learner-facing and does not expose repository implementation 
 	await expect(page.locator("footer a")).toHaveCount(0);
 });
 
+async function pickExample(page, surface, batch = "words") {
+	await page.locator(`#example-words [data-examples-tab="${batch}"]`).click();
+	const modal = page.locator("#worked-examples-modal");
+	await expect(modal).toBeVisible();
+	await modal.locator(`button[data-example-word="${surface}"]`).click();
+	await expect(modal).toBeHidden();
+}
+
 test("Deconstruct: example words load into the analyzer", async ({ page }) => {
-	await page.getByRole("button", { name: "nerivugut", exact: true }).click();
+	await pickExample(page, "nerivugut");
 	await expect(page.locator("#word-input")).toHaveValue("nerivugut");
 	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("nerivugut", { timeout: 20_000 });
 });
 
 test("Deconstruct: examples are polymorphemic attested words across several phenomena", async ({ page }) => {
-	const examples = page.locator("#example-words .example-word-list [data-example-word]");
+	await page.locator('#example-words [data-examples-tab="words"]').click();
+	const modal = page.locator("#worked-examples-modal");
+	await expect(modal).toBeVisible();
+	const examples = modal.locator("#worked-examples-list [data-example-word]");
 	await expect(examples).toHaveCount(6);
 	const words = await examples.evaluateAll((nodes) => nodes.map((node) => node.dataset.exampleWord));
 	expect(new Set(words).size).toBe(words.length);
 	// Bare single-stem demos (e.g. qimmeq) are not useful as Deconstruct examples.
 	expect(words).not.toContain("qimmeq");
 	for (const word of words) expect(word.length).toBeGreaterThan(3);
+	await modal.locator("#worked-examples-close").click();
 });
 
-test("Deconstruct: oq CI worked examples open in a filterable modal", async ({ page }) => {
-	await page.getByRole("button", { name: "Extended examples" }).click();
-	const modal = page.getByRole("dialog", { name: "oq CI worked examples" });
+test("Deconstruct: examples browse modal is filterable with Misiliineq-style items", async ({ page }) => {
+	await page.getByRole("button", { name: "Browse…" }).click();
+	const modal = page.locator("#worked-examples-modal");
 	await expect(modal).toBeVisible();
+	await expect(modal.locator("#worked-examples-heading")).toContainText("Examples");
 	await expect(modal.locator("#worked-examples-status")).toContainText("examples", { timeout: 20_000 });
 	await expect.poll(() => modal.locator("#worked-examples-list button").count(), { timeout: 20_000 }).toBe(6);
+	await expect(modal.locator(".examples-item-surface").first()).toBeVisible();
 	await modal.locator("#worked-examples-filter").fill("nerivugut");
 	await expect(modal.locator("#worked-examples-list button")).toHaveCount(1);
 	await expect(modal.locator("#worked-examples-list button")).toContainText("nerivugut");

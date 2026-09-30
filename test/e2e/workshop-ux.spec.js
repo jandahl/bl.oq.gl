@@ -10,9 +10,18 @@ test.beforeEach(async ({ page }) => {
 	await waitForCatalog(page);
 });
 
+async function pickExample(page, surface, batch = "words") {
+	await page.locator(`#example-words [data-examples-tab="${batch}"]`).click();
+	const modal = page.locator("#worked-examples-modal");
+	await expect(modal).toBeVisible();
+	await modal.locator(`button[data-example-word="${surface}"]`).click();
+	await expect(modal).toBeHidden();
+}
+
+
 test("Copy link writes the current share URL to the clipboard", async ({ page, context }) => {
 	await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-	await page.locator("#example-words [data-example-word=\"nerivugut\"]").click();
+	await pickExample(page, "nerivugut");
 	await expect(page.locator("#status-line")).not.toContainText("Analyzing", { timeout: 30_000 });
 	await page.getByRole("button", { name: "Copy link" }).click();
 	await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
@@ -21,7 +30,7 @@ test("Copy link writes the current share URL to the clipboard", async ({ page, c
 });
 
 test("Clear canvas empties the workspace back to the empty hint", async ({ page }) => {
-	await page.locator("#example-words [data-example-word=\"nerivugut\"]").click();
+	await pickExample(page, "nerivugut");
 	await expect(page.locator("#status-line")).not.toContainText("Analyzing", { timeout: 30_000 });
 	await page.getByRole("button", { name: "Clear canvas" }).click();
 	await expect(page.locator("#status-line")).toContainText(/example|morpheme/i);
@@ -79,7 +88,7 @@ test("desktop Blockly uses a tall canvas, not a short 480px strip", async ({ pag
 });
 
 test("Clear canvas clears share state so reload stays empty", async ({ page }) => {
-	await page.locator("#example-words [data-example-word=\"nerivugut\"]").click();
+	await pickExample(page, "nerivugut");
 	await expect(page.locator("#status-line")).not.toContainText("Analyzing", { timeout: 30_000 });
 	await expect(page).toHaveURL(/[?&](w=nerivugut|chain=)/);
 	await page.getByRole("button", { name: "Clear canvas" }).click();

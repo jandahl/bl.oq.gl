@@ -44,6 +44,9 @@ npm run test:e2e:live
 - `docs/catalog.js` — runtime catalog loading with Cache Storage
 - `docs/catalog-cache.js` — catalog cache helpers
 - `docs/oq-api.js` — oq-api pin + `loadEngine` port
+- `docs/examples.js` — examples catalog loader (remote-ready) + Misiliineq-style browse panel
+- `docs/examples-schema.js` — shared `{ worked, sentences }` normalize/gloss helpers
+- `docs/modal.js` — shared `<dialog>` a11y helpers (focus restore, trap, backdrop)
 - `docs/fixtures/` — offline engine stub + mini catalog for fixture e2e
 - `test/unit/` — fast unit tests (no network)
 - `test/e2e/` — browser tests (fixture by default; live via `BLOQ_LIVE=1`)
@@ -55,3 +58,20 @@ npm run test:e2e:live
 - Run `git diff --check` before committing.
 - Use a concise conventional commit and open a PR; do not push directly to
   `master`.
+
+## Examples catalog
+
+`docs/examples.js` loads `{ worked, sentences }` examples for the browse modal.
+
+1. If `globalThis.__BLOQ_EXAMPLES_URL__` is set, fetch that JSON (shared upstream).
+2. Otherwise fall back to the pinned oq-api `getStandardExamples()` — a thin
+   local fallback only, not a permanent BLOQ examples API.
+
+Schema (shared with Misiliineq / future oq-api upstream):
+
+```json
+{
+  "worked": [{ "id": "…", "surface": "nerivoq", "gloss": "…", "gloss_en": "…", "gloss_da": "…" }],
+  "sentences": [{ "id": "…", "words": ["Piitap", "inaaniippoq"], "gloss": "…" }]
+}
+```
