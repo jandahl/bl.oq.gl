@@ -753,10 +753,50 @@ export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker =
 	return { kind: "categoryToolbox", contents };
 }
 
-/** Walks a stack of morpheme blocks starting at `block`, returning morpheme ids top to bottom. */
-export function chainFromTopBlock(block) {
-	if (block?.type === SENTENCE_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("WORDS"));
-	if (block?.type === WORD_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("MORPHEMES"));
+/**
+ * Single canvas walker. Workspace → tree of sentences/words with ids, held
+ * flags, and owning blocks. chainFromTopBlock / wordsFromBlock /
+ * topLevelSentences / labelContainers are views over this tree.
+ *
+ * @param {any} workspace
+ * @returns {{ sentences: Array<{ block: any, words: Array<{ ids: string[], held: string|null, block: any }> }> }}
+ */
+export function canvasTree(workspace) {
+	const sentences = [];
+	for (const top of workspace.getTopBlocks(true)) {
+		if (top.type === SENTENCE_CONTAINER_TYPE) {
+			const words = [];
+			let cur = top.getInputTargetBlock("WORDS");
+			while (cur) {
+				if (cur.type === WORD_CONTAINER_TYPE) {
+					const held = cur.bloqHeld || null;
+					const ids = held ? [] : morphemeIdsFrom(cur.getInputTargetBlock("MORPHEMES"));
+					if (held || ids.length) words.push({ ids, held, block: cur });
+				} else if (isMorphemeBlockType(cur.type)) {
+					const ids = morphemeIdsFrom(cur);
+					if (ids.length) words.push({ ids, held: null, block: cur });
+					break;
+				}
+				cur = cur.getNextBlock();
+			}
+			if (words.length) sentences.push({ block: top, words });
+			continue;
+		}
+		if (top.type === WORD_CONTAINER_TYPE) {
+			const held = top.bloqHeld || null;
+			const ids = held ? [] : morphemeIdsFrom(top.getInputTargetBlock("MORPHEMES"));
+			if (held || ids.length) sentences.push({ block: null, words: [{ ids, held, block: top }] });
+			continue;
+		}
+		if (isMorphemeBlockType(top.type)) {
+			const ids = morphemeIdsFrom(top);
+			if (ids.length) sentences.push({ block: null, words: [{ ids, held: null, block: top }] });
+		}
+	}
+	return { sentences };
+}
+
+function morphemeIdsFrom(block) {
 	const ids = [];
 	let cur = block;
 	while (cur) {
@@ -766,6 +806,38 @@ export function chainFromTopBlock(block) {
 	return ids;
 }
 
+/** Id-only view of a canvas tree (share URL / plan compare shape). */
+export function canvasIdTree(tree) {
+	return (tree?.sentences ?? []).map((sentence) =>
+		sentence.words.filter((word) => !word.held).map((word) => word.ids));
+}
+
+/** Deep equality for string[][][] id trees — no JSON.stringify. */
+export function sameIdTree(a, b) {
+	if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+	for (let s = 0; s < a.length; s++) {
+		const wa = a[s];
+		const wb = b[s];
+		if (!Array.isArray(wa) || !Array.isArray(wb) || wa.length !== wb.length) return false;
+		for (let i = 0; i < wa.length; i++) {
+			const ca = wa[i];
+			const cb = wb[i];
+			if (!Array.isArray(ca) || !Array.isArray(cb) || ca.length !== cb.length) return false;
+			for (let j = 0; j < ca.length; j++) {
+				if (ca[j] !== cb[j]) return false;
+			}
+		}
+	}
+	return true;
+}
+
+/** Walks a stack of morpheme blocks starting at `block`, returning morpheme ids top to bottom. */
+export function chainFromTopBlock(block) {
+	if (block?.type === SENTENCE_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("WORDS"));
+	if (block?.type === WORD_CONTAINER_TYPE) return morphemeIdsFrom(block.getInputTargetBlock("MORPHEMES"));
+	return morphemeIdsFrom(block);
+}
+
 /**
  * Collects each word (array of morpheme ids) under `block`. A Sentence
  * unwraps to its contained Word stack; stacked Word containers each yield
@@ -773,31 +845,16 @@ export function chainFromTopBlock(block) {
  */
 export function wordsFromBlock(block) {
 	if (!block) return [];
-	if (block.type === SENTENCE_CONTAINER_TYPE) {
-		return wordsFromBlock(block.getInputTargetBlock("WORDS"));
+	if (block.type === SENTENCE_CONTAINER_TYPE || block.type === WORD_CONTAINER_TYPE || isMorphemeBlockType(block.type)) {
+		const tree = canvasTree({ getTopBlocks: () => [block] });
+		return tree.sentences[0]?.words.filter((w) => !w.held).map((w) => w.ids) ?? [];
 	}
-	const words = [];
-	let cur = block;
-	while (cur) {
-		if (cur.type === WORD_CONTAINER_TYPE) {
-			const ids = chainFromTopBlock(cur.getInputTargetBlock("MORPHEMES"));
-			if (ids.length) words.push(ids);
-		} else if (isMorphemeBlockType(cur.type)) {
-			const ids = chainFromTopBlock(cur);
-			if (ids.length) words.push(ids);
-			break;
-		}
-		cur = cur.getNextBlock();
-	}
-	return words;
+	return [];
 }
 
 /** Every top-level sentence currently on the workspace, each as an array of word-chains. */
 export function topLevelSentences(workspace) {
-	return workspace.getTopBlocks(true)
-		.filter((b) => isMorphemeBlockType(b.type) || b.type === WORD_CONTAINER_TYPE || b.type === SENTENCE_CONTAINER_TYPE)
-		.map((b) => wordsFromBlock(b))
-		.filter((words) => words.length > 0);
+	return canvasIdTree(canvasTree(workspace)).filter((words) => words.length > 0);
 }
 
 function clearCanvasBlocks(workspace) {
@@ -907,7 +964,13 @@ function connectWords(workspace, sentence, words, presetsById, displayOptions) {
 function stampAssembly(block, words, assembly) {
 	if (!block || !assembly) return;
 	block.bloqAssembly = assembly;
-	block.bloqAssemblyKey = JSON.stringify(words ?? []);
+	block.bloqAssemblyKey = (words ?? []).map((ids) => ids.slice());
+}
+
+function assemblyKeyMatches(block, words) {
+	const key = block?.bloqAssemblyKey;
+	if (!block?.bloqAssembly || !Array.isArray(key)) return false;
+	return sameIdTree([key], [words ?? []]);
 }
 
 function buildWordBlock(workspace, ids, presetsById, displayOptions) {
@@ -952,20 +1015,21 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
  * mistaken for a user canvas edit by the workspace change listener. */
 export function labelContainers(workspace, builtWords, translations = []) {
 	withBlocklyEventsDisabled(() => {
-		const wordBlocks = [];
-		for (const top of workspace.getTopBlocks(true)) collectWordContainers(top, wordBlocks);
-		const chainBlocks = wordBlocks.filter((block) => !block.bloqHeld);
-		chainBlocks.forEach((block, i) => {
+		const tree = canvasTree(workspace);
+		const chainWords = tree.sentences.flatMap((sentence) => sentence.words.filter((word) => !word.held));
+		chainWords.forEach((word, i) => {
+			const block = word.block;
+			if (block?.type !== WORD_CONTAINER_TYPE) return;
 			const result = builtWords[i];
 			block.setFieldValue(result?.word || "Word", "TITLE");
 			block.setFieldValue(translations[i] || "", "TRANSLATION");
 			if (block.rendered) block.render();
 		});
-		const indexByBlock = new Map(chainBlocks.map((block, i) => [block, i]));
-		for (const top of workspace.getTopBlocks(true)) {
-			if (top.type !== SENTENCE_CONTAINER_TYPE) continue;
-			const words = [];
-			collectWordContainers(top, words);
+		const indexByBlock = new Map(chainWords.map((word, i) => [word.block, i]));
+		for (const sentence of tree.sentences) {
+			const top = sentence.block;
+			if (!top || top.type !== SENTENCE_CONTAINER_TYPE) continue;
+			const words = sentence.words.map((word) => word.block).filter((block) => block?.type === WORD_CONTAINER_TYPE);
 			const first = words[0];
 			if (first) {
 				const title = first.getFieldValue("TITLE");
@@ -973,9 +1037,8 @@ export function labelContainers(workspace, builtWords, translations = []) {
 			}
 			const owned = words.map((block) => builtWords[indexByBlock.get(block)]);
 			const builtSurface = owned.map((result) => result?.word).filter(Boolean).join(" ");
-			const assembled = top.bloqAssembly && JSON.stringify(wordsFromBlock(top)) === top.bloqAssemblyKey
-				? top.bloqAssembly
-				: null;
+			const drawableIds = sentence.words.filter((word) => !word.held).map((word) => word.ids);
+			const assembled = assemblyKeyMatches(top, drawableIds) ? top.bloqAssembly : null;
 			const surface = assembled && top.bloqSource ? top.bloqSource : (builtSurface || top.bloqSource || "Sentence");
 			top.setFieldValue(surface === "Sentence" ? surface : withInitialCapital(surface), "TITLE");
 			const translation = assembled ?? words
@@ -987,19 +1050,6 @@ export function labelContainers(workspace, builtWords, translations = []) {
 			if (top.rendered) top.render();
 		}
 	});
-}
-
-function collectWordContainers(block, out) {
-	if (!block) return;
-	if (block.type === SENTENCE_CONTAINER_TYPE) {
-		collectWordContainers(block.getInputTargetBlock("WORDS"), out);
-		return;
-	}
-	let cur = block;
-	while (cur) {
-		if (cur.type === WORD_CONTAINER_TYPE) out.push(cur);
-		cur = cur.getNextBlock();
-	}
 }
 
 /** Re-labels every morpheme block already on the canvas — used when a display option changes mid-session. */

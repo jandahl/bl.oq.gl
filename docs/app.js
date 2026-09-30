@@ -3,7 +3,7 @@ import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
-	presetMatchesQuery,
+	presetMatchesQuery, canvasTree, sameIdTree,
 } from "./blocks.js";
 import {
 	createSession, clearAnalysisCaches, seqForChain as resolveSeqForChain, planMatchesCanvas,
@@ -428,7 +428,27 @@ function updateSentenceReading(plan) {
 }
 
 function nounPresentationPreferences() {
-	const noun = session.workspace?.getAllBlocks(false).find((block) => block.type === "morpheme_block__stem_n");
+	// Prefer the stem that owns the first drawable word on the canvas tree,
+	// not an arbitrary first stem from getAllBlocks (order is not semantic).
+	let noun = null;
+	if (session.workspace) {
+		const tree = canvasTree(session.workspace);
+		outer: for (const sentence of tree.sentences) {
+			for (const word of sentence.words) {
+				if (word.held || !word.ids.length) continue;
+				let cur = word.block?.type === "morpheme_block__word_container"
+					? word.block.getInputTargetBlock("MORPHEMES")
+					: word.block;
+				while (cur) {
+					if (cur.type === "morpheme_block__stem_n") {
+						noun = cur;
+						break outer;
+					}
+					cur = cur.getNextBlock();
+				}
+			}
+		}
+	}
 	const [numberPreference, determinationPreference] = (noun?.getFieldValue("PRESENTATION") ?? "singular|indefinite").split("|");
 	return { numberPreference, determinationPreference };
 }
@@ -718,9 +738,7 @@ function applyShareState(state) {
 		: ((state.words && state.words.length) ? [state.words] : (state.chain.length ? [state.chain] : []));
 	if (sentences.length > 0 && session.workspace) {
 		const current = topLevelSentences(session.workspace);
-		const same = current.length === sentences.length
-			&& current.every((words, s) => words.length === sentences[s].length
-				&& words.every((ids, i) => ids.length === sentences[s][i].length && ids.every((id, j) => id === sentences[s][i][j])));
+		const same = sameIdTree(current, sentences);
 		if (!same) {
 			renderSentencePlan(session.workspace, sentences.map((words) => ({
 				words: words.map((ids) => ({ canvasIds: ids })),
