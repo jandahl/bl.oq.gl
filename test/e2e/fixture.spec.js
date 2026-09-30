@@ -17,8 +17,9 @@ test("fixture catalog loads without hitting live hosts", async ({ page }) => {
 	expect(count).toBeLessThan(100);
 });
 
-test("fixture boot: example pills and empty canvas hint render", async ({ page }) => {
-	await expect(page.locator(".example-word-list .example-pill").first()).toBeVisible();
+test("fixture boot: examples frame and empty canvas hint render", async ({ page }) => {
+	await expect(page.locator("#example-words [data-examples-open]")).toBeVisible();
+	await expect(page.locator('#example-words [data-examples-tab="words"]')).toBeVisible();
 	await expect(page.locator("#status-line")).toContainText("Loaded");
 	await page.locator("#clear-canvas-btn").click();
 	await expect(page.locator("#status-line")).toContainText(/Drag a morpheme|Træk et morfem/i);
@@ -36,4 +37,17 @@ test("fixture boot: filter and clear-canvas controls are present", async ({ page
 	await expect(page.locator("#morpheme-filter")).toBeVisible();
 	await expect(page.locator("#blockly-div")).toBeVisible();
 	await expect(page.locator("#copy-link-btn")).toBeVisible();
+});
+
+test("fixture boot: examples browse modal lists surface+gloss and filters", async ({ page }) => {
+	await page.locator('#example-words [data-examples-tab="words"]').click();
+	const modal = page.locator("#worked-examples-modal");
+	await expect(modal).toBeVisible();
+	await expect(modal.locator(".examples-item-surface").first()).toBeVisible();
+	await expect(modal.locator("#worked-examples-list button")).toHaveCount(2);
+	await modal.locator("#worked-examples-filter").fill("neri");
+	await expect(modal.locator("#worked-examples-list button")).toHaveCount(1);
+	await expect(modal.locator("#worked-examples-list button")).toContainText("nerivoq");
+	await modal.locator("#worked-examples-close").click();
+	await expect(modal).toBeHidden();
 });

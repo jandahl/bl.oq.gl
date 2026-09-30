@@ -23,6 +23,9 @@ const browserGlobals = {
 	Headers: "readonly",
 	TextDecoder: "readonly",
 	TextEncoder: "readonly",
+	HTMLElement: "readonly",
+	HTMLInputElement: "readonly",
+	HTMLDialogElement: "readonly",
 	queueMicrotask: "readonly",
 	// Loaded globally via <script> tags in index.html (blockly_compressed.js
 	// etc.), never imported — see docs/blocks.js's/theme.js's own comments on
