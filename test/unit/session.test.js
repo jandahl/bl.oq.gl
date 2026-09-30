@@ -8,6 +8,7 @@ import {
 	normalizeDeconstructIds,
 	deconstructIdsMatchSentences,
 	computeBuild,
+	formatStatus,
 } from "../../docs/session.js";
 
 function preset(id, text = id) {
@@ -91,6 +92,7 @@ test("computeBuild: unknown id and join failure return error results", () => {
 		buildWord: fakeBuildWord,
 	});
 	assert.equal(missing.error.message, "Unknown morpheme in stack.");
+	assert.equal(missing.kind, "error");
 
 	const bad = computeBuild({
 		sentences: [[["neri", "BAD"]]],
@@ -99,6 +101,39 @@ test("computeBuild: unknown id and join failure return error results", () => {
 	});
 	assert.match(bad.error.message, /bad join/);
 	assert.match(bad.error.meta, /position 2/);
+});
+
+test("computeBuild: three-word stack reports every outcome when the middle id is unknown", () => {
+	const presetsById = new Map([
+		["a", preset("a")],
+		["c", preset("c")],
+	]);
+	const result = computeBuild({
+		sentences: [[["a"], ["missing"], ["c"]]],
+		presetsById,
+		buildWord: fakeBuildWord,
+	});
+	assert.equal(result.wordOutcomes.length, 3);
+	assert.equal(result.wordOutcomes[0].ok, true);
+	assert.equal(result.wordOutcomes[1].ok, false);
+	assert.equal(result.wordOutcomes[1].kind, "unknown");
+	assert.equal(result.wordOutcomes[2].ok, true);
+	assert.equal(result.kind, "error");
+	assert.deepEqual(result.surfaces, ["a", "?", "c"]);
+});
+
+test("formatStatus: partial build outcomes become one assertive status line", () => {
+	const result = computeBuild({
+		sentences: [[["a"], ["nope"], ["c"]]],
+		presetsById: new Map([["a", preset("a")], ["c", preset("c")]]),
+		buildWord: fakeBuildWord,
+	});
+	const status = formatStatus(result);
+	assert.equal(status.kind, "error");
+	assert.equal(status.assertive, true);
+	assert.match(status.detail, /Unknown morpheme/);
+	assert.match(status.detail, /a/);
+	assert.match(status.detail, /c/);
 });
 
 test("computeBuild: matching sentence plan keeps deconstruct share", () => {
