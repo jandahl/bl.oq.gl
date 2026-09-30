@@ -616,12 +616,18 @@ function formatBytes(n) {
 function showLoadingModal() {
 	if (document.documentElement.dataset.bloqReady === "1") return;
 	if (!loadingModal) return;
-	loadingModal.hidden = false;
+	if (typeof loadingModal.showModal === "function") {
+		if (!loadingModal.open) loadingModal.showModal();
+	} else {
+		loadingModal.hidden = false;
+	}
 }
 
 function hideLoadingModal() {
 	document.documentElement.dataset.bloqReady = "1";
-	if (loadingModal) loadingModal.hidden = true;
+	if (!loadingModal) return;
+	if (typeof loadingModal.close === "function" && loadingModal.open) loadingModal.close();
+	loadingModal.hidden = true;
 }
 
 function preservePageScroll(fn) {
@@ -823,6 +829,22 @@ function seqForChain(ids) {
  * applyBuildShare(result).
  * @returns {ReturnType<typeof computeBuild>|null}
  */
+
+function announceCanvasChains() {
+	const live = document.getElementById("canvas-chains");
+	if (!live || !session.workspace) return;
+	const tree = canvasTree(session.workspace);
+	const lines = [];
+	tree.sentences.forEach((sentence, s) => {
+		const words = sentence.words.map((word) => {
+			if (word.held) return word.block?.getFieldValue?.("TITLE") || word.held;
+			return word.ids.join(" + ") || "…";
+		});
+		lines.push(words.join(" · ") || `Sentence ${s + 1}`);
+	});
+	live.textContent = lines.length ? lines.join(" | ") : "";
+}
+
 function refreshBuild() {
 	if (!session.workspace) return null;
 	const sentences = topLevelSentences(session.workspace);
@@ -834,6 +856,7 @@ function refreshBuild() {
 		lastSentencePlan: session.lastSentencePlan,
 		planMatches,
 	});
+	announceCanvasChains();
 
 	if (result.usePlan) {
 		labelContainers(session.workspace, result.built, result.seqs.map((seq) =>
@@ -1302,6 +1325,7 @@ function bindUiEvents() {
 	paletteToggleBtn.addEventListener("click", () => {
 		paletteVisible = !paletteVisible;
 		paletteToggleBtn.textContent = t(paletteVisible ? "paletteHide" : "paletteShow");
+		paletteToggleBtn.setAttribute("aria-expanded", paletteVisible ? "true" : "false");
 		filterWrap.hidden = !paletteVisible;
 		applyToolbox();
 		requestAnimationFrame(() => Blockly.svgResize(session.workspace));
@@ -1341,6 +1365,8 @@ function mountWorkspace() {
 	bindWindowEvents();
 	bindUiEvents();
 	setStatus(t("loadedMorphemes", { count: session.presets.length }), "");
+	paletteToggleBtn.setAttribute("aria-expanded", paletteVisible ? "true" : "false");
+	paletteToggleBtn.setAttribute("aria-controls", "blockly-div");
 	if (!paletteVisible) {
 		paletteToggleBtn.textContent = t("paletteShow");
 		filterWrap.hidden = true;

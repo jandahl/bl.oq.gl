@@ -24,7 +24,7 @@ export default defineConfig({
 	},
 	projects: live
 		? [{ name: "live", use: { ...devices["Desktop Chrome"] } }]
-		: [{ name: "fixture", use: { ...devices["Desktop Chrome"] }, testMatch: /fixture\.spec\.js/ }],
+		: [{ name: "fixture", use: { ...devices["Desktop Chrome"] }, testMatch: /fixture.*\.spec\.js/ }],
 	webServer: {
 		command: "npm run serve",
 		url: "http://127.0.0.1:8000",
