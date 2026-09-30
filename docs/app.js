@@ -1,10 +1,13 @@
 import { buildWord, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, STANDARD_EXAMPLES } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
 import {
-	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentence, renderSentences, renderSentencePlan, relabelBlocks, labelContainers,
+	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
 	presetMatchesQuery,
 } from "./blocks.js";
+import {
+	createSession, clearAnalysisCaches, seqForChain as resolveSeqForChain, planMatchesCanvas, computeBuild,
+} from "./session.js";
 import { renderBreakdown, renderAlternativeBreakdowns, renderTonedPhrases, wordTone } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
@@ -119,26 +122,13 @@ let loadingProgressFill;
 let prefersDarkQuery;
 let DISPLAY_MQ;
 
-let mode = "build";
-let presets = [];
-let presetsById = new Map();
-let workspace = null;
-let deconstructAbort = null;
-let deconstructRun = 0;
+const session = createSession();
 let paletteVisible = true;
-let lastDeconstructIds = null;
 let blocklyThemes = null;
-let lastDeconstructWord = "";
-let lastDeconstructSeq = null;
-let lastDeconstructBuilt = null;
-let lastDeconstructAlternatives = null;
-let lastDeconstructParts = null;
-let lastSentencePlan = null;
 let selectedBlocklyTheme = "classic";
 let workedExamples = [];
 let windowBound = false;
 let startInflight = null;
-let suppressBuildUrlSync = false;
 
 function bindDom() {
 	statusEl = document.getElementById("status");
@@ -190,7 +180,7 @@ function bindDom() {
 
 // --- Display options (bl-oq-ly#10, #11, #17), persisted like the theme.
 // `displayOptions()` is the single source of truth passed into every
-// labelFor()-consuming call (blocks.js's buildToolbox/renderChain/
+// labelFor()-consuming call (blocks.js's buildToolbox/renderSentencePlan/
 // relabelBlocks, breakdown.js/gloss.js's glossSummaryItems lang) so all of
 // them stay in sync with each other -- the earlier "hiding ids also hid the
 // spelling" bug (bl-oq-ly#14) came from exactly this kind of state living in
@@ -220,7 +210,7 @@ const APP_TITLE = "BLOQ";
 
 /** Tab title is `$word - BLOQ` only after a submitted deconstruct, never while typing. */
 function syncDocumentTitle() {
-	const word = (lastDeconstructWord || "").trim();
+	const word = (session.lastDeconstructWord || "").trim();
 	document.title = word ? `${word} - ${APP_TITLE}` : APP_TITLE;
 }
 
@@ -237,17 +227,17 @@ function visibleAssembly(assembly) {
 }
 
 function syncMoodLabels() {
-	if (!lastSentencePlan || !workspace) return;
-	const blocks = workspace.getTopBlocks(true).filter((block) => block.type === "morpheme_block__sentence_container");
-	lastSentencePlan.sentences.forEach((sentence, index) => {
+	if (!session.lastSentencePlan || !session.workspace) return;
+	const blocks = session.workspace.getTopBlocks(true).filter((block) => block.type === "morpheme_block__sentence_container");
+	session.lastSentencePlan.sentences.forEach((sentence, index) => {
 		const block = blocks[index];
 		if (!block || !sentence.assembly?.text) return;
 		const text = visibleAssembly(sentence.assembly);
 		block.bloqAssembly = text;
 		block.setFieldValue(text, "TRANSLATION");
 	});
-	updateSentenceReading(lastSentencePlan);
-	renderSentenceBreakdown(lastSentencePlan);
+	updateSentenceReading(session.lastSentencePlan);
+	renderSentenceBreakdown(session.lastSentencePlan);
 }
 
 function glossOptions() { const lang = displayOptions().lang; return { lang: lang === "both" ? "en" : lang, showOther: lang === "both" }; }
@@ -323,10 +313,10 @@ function initDisplayOptions() {
 		? stored(SPELLING_KEY, SPELLING_KEY_RENAMED) : "both";
 
 	function onDisplayOptionChange() {
-		if (workspace) relabelBlocks(workspace, presetsById, displayOptions());
+		if (session.workspace) relabelBlocks(session.workspace, session.presetsById, displayOptions());
 		applyToolbox();
 		refreshBuild();
-		if (lastDeconstructIds) rerenderBreakdown();
+		if (session.lastDeconstructIds) rerenderBreakdown();
 	}
 	uiLangSelect.addEventListener("change", () => {
 		storePreference("bl-oq-ly:ui-lang", "bloq:ui-lang", uiLangSelect.value);
@@ -345,7 +335,7 @@ function initDisplayOptions() {
 	});
 	langSelect.addEventListener("change", () => {
 		storePreference(LANG_KEY, LANG_KEY_RENAMED, langSelect.value);
-		if (lastSentencePlan && wordInput.value.trim()) {
+		if (session.lastSentencePlan && wordInput.value.trim()) {
 			runDeconstruct();
 			return;
 		}
@@ -359,7 +349,7 @@ function initDisplayOptions() {
 		storePreference(READING_ORDER_KEY, READING_ORDER_KEY_RENAMED, String(readingOrderCheckbox.checked));
 		// Only Deconstruct's per-morpheme rows are reversible -- Build's
 		// reading line is a composed sentence, unaffected (see gloss.js).
-		if (lastDeconstructIds) rerenderBreakdown();
+		if (session.lastDeconstructIds) rerenderBreakdown();
 	});
 }
 
@@ -437,7 +427,7 @@ function updateSentenceReading(plan) {
 }
 
 function nounPresentationPreferences() {
-	const noun = workspace?.getAllBlocks(false).find((block) => block.type === "morpheme_block__stem_n");
+	const noun = session.workspace?.getAllBlocks(false).find((block) => block.type === "morpheme_block__stem_n");
 	const [numberPreference, determinationPreference] = (noun?.getFieldValue("PRESENTATION") ?? "singular|indefinite").split("|");
 	return { numberPreference, determinationPreference };
 }
@@ -445,8 +435,8 @@ function nounPresentationPreferences() {
 // --- Theme (bl-oq-ly#7): a real toggle, not just following the OS. Cycles
 // auto -> light -> dark -> auto. "auto" clears the override so style.css's
 // prefers-color-scheme media query decides, matching the OS as before.
-// Blockly's own toolbox/flyout/workspace chrome is themed separately via
-// theme.js + workspace.setTheme(), since it doesn't read CSS custom
+// Blockly's own toolbox/flyout/session.workspace chrome is themed separately via
+// theme.js + session.workspace.setTheme(), since it doesn't read CSS custom
 // properties at all — see that file's comment.
 const THEME_KEY = "bl-oq-ly:theme";
 const THEME_KEY_RENAMED = "bloq:theme";
@@ -459,9 +449,9 @@ function isEffectivelyDark() {
 }
 
 function syncBlocklyTheme() {
-	if (workspace && blocklyThemes) {
+	if (session.workspace && blocklyThemes) {
 		const themeSet = blocklyThemes[selectedBlocklyTheme] || blocklyThemes.classic;
-		workspace.setTheme(isEffectivelyDark() ? themeSet.dark : themeSet.light);
+		session.workspace.setTheme(isEffectivelyDark() ? themeSet.dark : themeSet.light);
 	}
 }
 
@@ -495,10 +485,10 @@ function initDisplayChrome() {
 function workspaceOptions() {
 	const themeSet = blocklyThemes[selectedBlocklyTheme] || blocklyThemes.classic;
 	return {
-		toolbox: buildToolbox(presets, displayOptions()),
+		toolbox: buildToolbox(session.presets, displayOptions()),
 		theme: isEffectivelyDark() ? themeSet.dark : themeSet.light,
 		// Classic uses Blockly's default renderer (Geras); Zelos is a renderer,
-		// not just a Theme. Changing it requires rebuilding the workspace.
+		// not just a Theme. Changing it requires rebuilding the session.workspace.
 		renderer: selectedBlocklyTheme === "zelos" ? "zelos" : "geras",
 		trashcan: true,
 		zoom: { controls: true, wheel: true, pinch: true },
@@ -508,23 +498,23 @@ function workspaceOptions() {
 }
 
 function injectWorkspace(serializedState = null) {
-	workspace = Blockly.inject(blocklyDiv, workspaceOptions());
-	workspace.addChangeListener((event) => {
+	session.workspace = Blockly.inject(blocklyDiv, workspaceOptions());
+	session.workspace.addChangeListener((event) => {
 		if (event?.isUiEvent) return;
-		refreshBuild();
+		applyBuildShare(refreshBuild());
 	});
-	if (serializedState) Blockly.serialization.workspaces.load(serializedState, workspace);
-	registerVerbPickerReactivity(workspace);
+	if (serializedState) Blockly.serialization.workspaces.load(serializedState, session.workspace);
+	registerVerbPickerReactivity(session.workspace);
 }
 
 function rebuildWorkspace() {
-	if (!workspace) return;
-	const serializedState = Blockly.serialization.workspaces.save(workspace);
-	workspace.dispose();
+	if (!session.workspace) return;
+	const serializedState = Blockly.serialization.workspaces.save(session.workspace);
+	session.workspace.dispose();
 	injectWorkspace(serializedState);
 	applyToolbox();
-	requestAnimationFrame(() => Blockly.svgResize(workspace));
-	refreshBuild();
+	requestAnimationFrame(() => Blockly.svgResize(session.workspace));
+	applyBuildShare(refreshBuild());
 }
 
 function applyTheme(theme) {
@@ -644,11 +634,11 @@ function setLoadingProgress(event = {}) {
 // replaceState-syncs on every canvas change; a successful Deconstruct pushes
 // a real history entry. Legacy mode/word links remain readable.
 function currentShareState() {
-	const sentences = workspace ? topLevelSentences(workspace) : [];
+	const sentences = session.workspace ? topLevelSentences(session.workspace) : [];
 	const words = sentences.length === 1 ? sentences[0] : [];
-	const word = lastDeconstructWord || wordInput.value.trim();
+	const word = session.lastDeconstructWord || wordInput.value.trim();
 	return {
-		mode,
+		mode: session.mode,
 		word,
 		chain: words.length === 1 ? words[0] : [],
 		words,
@@ -683,27 +673,21 @@ async function copyShareLink() {
 }
 
 function clearCanvas() {
-	if (!workspace) return;
-	workspace.clear();
+	if (!session.workspace) return;
+	session.workspace.clear();
 	// Clearing the canvas must also invalidate share state: otherwise
-	// lastDeconstructWord / the word input keep w= in the URL, and a reload
+	// session.lastDeconstructWord / the word input keep w= in the URL, and a reload
 	// or copied link re-runs Deconstruct and repopulates the canvas.
-	lastDeconstructWord = "";
-	lastDeconstructSeq = null;
-	lastDeconstructBuilt = null;
-	lastDeconstructAlternatives = null;
-	lastDeconstructIds = null;
-	lastDeconstructParts = null;
-	lastSentencePlan = null;
-	mode = "build";
+	clearAnalysisCaches(session);
+	session.mode = "build";
 	setFieldValue(wordInput, "");
 	breakdownDiv.innerHTML = "";
 	breakdownSummaryMeta.textContent = "";
 	breakdownDetails.hidden = true;
 	updateReadingLine(null);
 	syncDocumentTitle();
-	refreshBuild();
-	requestAnimationFrame(() => Blockly.svgResize(workspace));
+	applyBuildShare(refreshBuild());
+	requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 }
 
 function syncURL({ push = false } = {}) {
@@ -726,24 +710,26 @@ function syncURL({ push = false } = {}) {
 function applyShareState(state) {
 	if (state.word) {
 		setFieldValue(wordInput, state.word);
-		if (!lastDeconstructWord) lastDeconstructWord = state.word;
+		if (!session.lastDeconstructWord) session.lastDeconstructWord = state.word;
 	}
 	const sentences = state.sentences?.length
 		? state.sentences
 		: ((state.words && state.words.length) ? [state.words] : (state.chain.length ? [state.chain] : []));
-	if (sentences.length > 0 && workspace) {
-		const current = topLevelSentences(workspace);
+	if (sentences.length > 0 && session.workspace) {
+		const current = topLevelSentences(session.workspace);
 		const same = current.length === sentences.length
 			&& current.every((words, s) => words.length === sentences[s].length
 				&& words.every((ids, i) => ids.length === sentences[s][i].length && ids.every((id, j) => id === sentences[s][i][j])));
 		if (!same) {
-			renderSentences(workspace, sentences, presetsById, displayOptions());
-			workspace.scrollCenter();
+			renderSentencePlan(session.workspace, sentences.map((words) => ({
+				words: words.map((ids) => ({ canvasIds: ids })),
+			})), session.presetsById, displayOptions());
+			session.workspace.scrollCenter();
 		}
-		refreshBuild();
+		applyBuildShare(refreshBuild());
 	}
 	if (state.word) {
-		if (lastDeconstructWord !== state.word || !lastDeconstructSeq) {
+		if (session.lastDeconstructWord !== state.word || !session.lastDeconstructSeq) {
 			runDeconstruct({ skipCanvas: sentences.length > 0 });
 		} else {
 			rerenderBreakdown();
@@ -753,10 +739,11 @@ function applyShareState(state) {
 }
 
 function canvasMatchesPlan(plan) {
-	if (!plan || !workspace) return false;
-	const containers = workspace.getTopBlocks(false).filter((block) => block.type === "morpheme_block__sentence_container");
-	if (containers.length !== (plan.sentences?.length ?? 0)) return false;
-	return JSON.stringify(topLevelSentences(workspace)) === JSON.stringify(canvasSentences(plan));
+	if (!plan || !session.workspace) return false;
+	const containers = session.workspace.getTopBlocks(false).filter((block) => block.type === "morpheme_block__sentence_container");
+	return planMatchesCanvas(topLevelSentences(session.workspace), plan, {
+		sentenceContainerCount: containers.length,
+	});
 }
 
 function showPlanStatus(plan) {
@@ -784,100 +771,85 @@ function sentenceInitialWords(plan) {
 }
 
 function seqForChain(ids) {
-	const seq = [];
-	for (const id of ids) {
-		const preset = presetsById.get(id);
-		if (!preset) return null;
-		seq.push(preset.seq[0]);
-	}
-	return seq;
+	return resolveSeqForChain(session.presetsById, ids);
 }
 
+/**
+ * Run the pure Build pass and paint status / labels / reading.
+ * Does not write history or session.mode — callers own share sync via
+ * applyBuildShare(result).
+ * @returns {ReturnType<typeof computeBuild>|null}
+ */
 function refreshBuild() {
-	if (!workspace) return;
-	const sentences = topLevelSentences(workspace);
-	if (sentences.length === 0) {
-		if (lastSentencePlan && canvasMatchesPlan(lastSentencePlan)) {
-			labelContainers(workspace, []);
-			showPlanStatus(lastSentencePlan);
-			updateSentenceReading(lastSentencePlan);
-			if (!suppressBuildUrlSync) {
-				mode = "deconstruct";
-				syncURL({ push: false });
-			}
-			return;
-		}
+	if (!session.workspace) return null;
+	const sentences = topLevelSentences(session.workspace);
+	const planMatches = Boolean(session.lastSentencePlan && canvasMatchesPlan(session.lastSentencePlan));
+	const result = computeBuild({
+		sentences,
+		presetsById: session.presetsById,
+		buildWord,
+		lastSentencePlan: session.lastSentencePlan,
+		planMatches,
+	});
+
+	if (result.error) {
+		setStatus(result.error.message, result.error.kind, result.error.meta);
+		updateReadingLine(null);
+		return result;
+	}
+
+	if (result.usePlan) {
+		labelContainers(session.workspace, result.built, result.seqs.map((seq) =>
+			composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions())));
+		showPlanStatus(session.lastSentencePlan);
+		updateSentenceReading(session.lastSentencePlan);
+		return result;
+	}
+
+	if (result.empty) {
 		setStatus(t("emptyCanvasHint"), "");
 		updateReadingLine(null);
-		labelContainers(workspace, []);
+		labelContainers(session.workspace, []);
+		return result;
+	}
+
+	const translations = result.seqs.map((seq) =>
+		composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions()));
+	labelContainers(session.workspace, result.built, translations);
+	setStatusWords(result.surfaces, result.kind, result.meta);
+	updateReadingLine(result.seqs);
+	return result;
+}
+
+/** Apply share-mode / URL updates decided by a computeBuild result. */
+function applyBuildShare(result) {
+	if (!result) return;
+	if (result.share.mode === "deconstruct") {
+		session.mode = "deconstruct";
 		syncURL({ push: false });
 		return;
 	}
-	const built = [];
-	const seqs = [];
-	for (let s = 0; s < sentences.length; s++) {
-		const words = sentences[s];
-		for (let i = 0; i < words.length; i++) {
-			const seq = seqForChain(words[i]);
-			if (!seq) {
-				setStatus("Unknown morpheme in stack.", "error");
-				updateReadingLine(null);
-				return;
-			}
-			const result = buildWord(seq);
-			if (!result.ok) {
-				const where = sentences.length > 1 ? `sentence ${s + 1}, ` : (words.length > 1 ? `word ${i + 1}, ` : "");
-				setStatus(`✗ ${result.reason || "invalid sequence"}`, "error", `${where}at position ${result.errorAt >= 0 ? result.errorAt + 1 : "?"}`);
-				updateReadingLine(null);
-				return;
-			}
-			built.push(result);
-			seqs.push(seq);
-		}
-	}
-	const wordCount = sentences.reduce((n, words) => n + words.length, 0);
-	const translations = seqs.map((seq) => composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions()));
-	labelContainers(workspace, built, translations);
-	const kind = built.some((r) => r.approximate) ? "approx" : "ok";
-	const allClosed = built.every((r) => r.closed);
-	const meta = sentences.length > 1
-		? `${sentences.length} sentences`
-		: (wordCount > 1
-			? (allClosed ? `${wordCount} words` : "mid-derivation — keep building")
-			: (allClosed ? "complete word" : "mid-derivation — keep building"));
-	setStatusWords(built.map((r) => `${r.approximate ? "≈ " : ""}${r.word}`), kind, meta);
-	// A sentence deconstruct stays a sentence while the blocks are still the
-	// lattice's chains. Blockly replays create-events after the render, and
-	// those must not collapse the clause gloss back into a single-word build.
-	if (lastSentencePlan && canvasMatchesPlan(lastSentencePlan)) {
-		showPlanStatus(lastSentencePlan);
-		updateSentenceReading(lastSentencePlan);
-		if (!suppressBuildUrlSync) {
-			mode = "deconstruct";
-			syncURL({ push: false });
-		}
+	if (result.empty) {
+		syncURL({ push: false });
 		return;
 	}
-	updateReadingLine(seqs);
-	// A valid edit to the Build canvas is now the shareable state. Do not let
-	// the previous Deconstruct query survive after the parser turns green.
-	if (!suppressBuildUrlSync) {
-		mode = "build";
-		lastDeconstructWord = "";
-		lastSentencePlan = null;
+	if (result.share.clearDeconstruct) {
+		session.mode = "build";
+		session.lastDeconstructWord = "";
+		session.lastSentencePlan = null;
 		syncURL({ push: false });
 	}
 }
 
 function rerenderBreakdown() {
-	if (lastSentencePlan) {
-		renderSentenceBreakdown(lastSentencePlan);
+	if (session.lastSentencePlan) {
+		renderSentenceBreakdown(session.lastSentencePlan);
 		return;
 	}
-	const parts = lastDeconstructParts?.length
-		? lastDeconstructParts
-		: (lastDeconstructSeq
-			? [{ word: lastDeconstructWord, seq: lastDeconstructSeq, built: lastDeconstructBuilt, alternatives: lastDeconstructAlternatives }]
+	const parts = session.lastDeconstructParts?.length
+		? session.lastDeconstructParts
+		: (session.lastDeconstructSeq
+			? [{ word: session.lastDeconstructWord, seq: session.lastDeconstructSeq, built: session.lastDeconstructBuilt, alternatives: session.lastDeconstructAlternatives }]
 			: []);
 	if (!parts.length) return;
 	breakdownDiv.innerHTML = "";
@@ -954,8 +926,8 @@ function materializePlan(plan) {
 function planStatusMeta(plan) {
 	const count = plan.sentences.length;
 	const modes = [...new Set(plan.sentences.map((sentence) => sentence.assembly?.mode).filter(Boolean))];
-	const mode = modes.join(" + ") || "sentence";
-	return count > 1 ? `${count} sentences · ${mode}` : mode;
+	const modeLabel = modes.join(" + ") || "sentence";
+	return count > 1 ? `${count} sentences · ${modeLabel}` : modeLabel;
 }
 
 function renderSentenceBreakdown(plan) {
@@ -1056,48 +1028,47 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 	const tokens = tokenizeSentence(surface);
 	breakdownDiv.innerHTML = "";
 	setStatus(`Analyzing ${tokens.length} words as a sentence…`, "");
-	lastDeconstructIds = null;
-	lastDeconstructSeq = null;
-	lastDeconstructAlternatives = null;
-	lastDeconstructParts = null;
+	session.lastDeconstructIds = null;
+	session.lastDeconstructSeq = null;
+	session.lastDeconstructAlternatives = null;
+	session.lastDeconstructParts = null;
 	try {
 		const analyses = new Map();
 		for (const token of tokens) {
 			const key = token.surface.trim().toLowerCase();
 			if (analyses.has(key)) continue;
-			const result = await analyzeWordAsync(token.surface, presets, {}, { signal: deconstructAbort.signal });
-			if (run !== deconstructRun) return;
+			const result = await analyzeWordAsync(token.surface, session.presets, {}, { signal: session.deconstructAbort.signal });
+			if (run !== session.deconstructRun) return;
 			analyses.set(key, result);
 		}
 		const lang = sentenceLang();
-		const lattice = analyzeSentence(surface, presets, {
+		const lattice = analyzeSentence(surface, session.presets, {
 			lang,
 			maxReadings: 3,
 			analysisResultsByWord: analyses,
 		});
-		if (run !== deconstructRun) return;
+		if (run !== session.deconstructRun) return;
 		const daLattice = displayOptions().lang === "both"
-			? analyzeSentence(surface, presets, { lang: "da", maxReadings: 3, analysisResultsByWord: analyses })
+			? analyzeSentence(surface, session.presets, { lang: "da", maxReadings: 3, analysisResultsByWord: analyses })
 			: null;
 		const plan = materializePlan(planFromLattice(lattice, {
-			presetsById,
+			presetsById: session.presetsById,
 			assembleClause,
 			lang,
 			analysesByWord: analyses,
 			daLattice,
 		}));
-		lastDeconstructWord = surface;
-		lastSentencePlan = plan;
+		session.lastDeconstructWord = surface;
+		session.lastSentencePlan = plan;
 		const placed = plan.sentences.flatMap((sentence) => sentence.words.filter((word) => word.seq && word.built?.ok));
-		lastDeconstructSeq = placed[0]?.seq ?? null;
-		lastDeconstructBuilt = placed[0]?.built ?? null;
-		lastDeconstructIds = placed.map((word) => word.canvasIds);
-		mode = "deconstruct";
+		session.lastDeconstructSeq = placed[0]?.seq ?? null;
+		session.lastDeconstructBuilt = placed[0]?.built ?? null;
+		session.lastDeconstructIds = placed.map((word) => word.canvasIds);
+		session.mode = "deconstruct";
 		syncDocumentTitle();
 		rerenderBreakdown();
-		if (!skipCanvas && workspace && plan.sentences.length) {
-			suppressBuildUrlSync = true;
-			renderSentencePlan(workspace, plan.sentences.map((sentence) => ({
+		if (!skipCanvas && session.workspace && plan.sentences.length) {
+			renderSentencePlan(session.workspace, plan.sentences.map((sentence) => ({
 				source: sentence.source,
 				assembly: visibleAssembly(sentence.assembly),
 				words: sentence.words.map((word) => ({
@@ -1106,9 +1077,9 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 					canvasIds: word.canvasIds,
 					heldLabel: word.heldLabel,
 				})),
-			})), presetsById, displayOptions());
-			workspace.scrollCenter();
-			requestAnimationFrame(() => Blockly.svgResize(workspace));
+			})), session.presetsById, displayOptions(), { forceSentence: true });
+			session.workspace.scrollCenter();
+			requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 			refreshBuild();
 		}
 		const words = plan.sentences.flatMap((sentence) => sentence.words);
@@ -1122,22 +1093,21 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 			setStatusWords(sentenceInitialWords(plan), cautious ? "approx" : "ok", planStatusMeta(plan));
 			updateSentenceReading(plan);
 		}
+		// Caller owns share URL: push a Deconstruct history entry after canvas paint.
 		syncURL({ push: true });
-		window.setTimeout(() => { suppressBuildUrlSync = false; }, 250);
 	} catch (err) {
-		suppressBuildUrlSync = false;
-		if (err?.name === "AbortError" || run !== deconstructRun) return;
+		if (err?.name === "AbortError" || run !== session.deconstructRun) return;
 		setStatus(`Analysis failed: ${err.message}`, "error");
 	}
 }
 
 async function runDeconstruct({ skipCanvas = false } = {}) {
 	const surface = wordInput.value.trim();
-	if (deconstructAbort) deconstructAbort.abort();
-	const run = ++deconstructRun;
+	if (session.deconstructAbort) session.deconstructAbort.abort();
+	const run = ++session.deconstructRun;
 	if (!surface) return;
-	deconstructAbort = new AbortController();
-	lastSentencePlan = null;
+	session.deconstructAbort = new AbortController();
+	session.lastSentencePlan = null;
 	if (isSentenceInput(surface)) {
 		await runSentenceDeconstruct(surface, { skipCanvas, run });
 		return;
@@ -1145,17 +1115,17 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 	const tokens = surface.split(/\s+/).filter(Boolean);
 	breakdownDiv.innerHTML = "";
 	setStatus(tokens.length === 1 ? `Analyzing "${tokens[0]}"…` : `Analyzing ${tokens.length} words…`, "");
-	lastDeconstructIds = null;
-	lastDeconstructSeq = null;
-	lastDeconstructAlternatives = null;
-	lastDeconstructParts = null;
+	session.lastDeconstructIds = null;
+	session.lastDeconstructSeq = null;
+	session.lastDeconstructAlternatives = null;
+	session.lastDeconstructParts = null;
 	try {
 		const parts = [];
 		for (const token of tokens) {
-			const result = await analyzeWordAsync(token, presets, {}, { signal: deconstructAbort.signal });
-			if (run !== deconstructRun) return;
+			const result = await analyzeWordAsync(token, session.presets, {}, { signal: session.deconstructAbort.signal });
+			if (run !== session.deconstructRun) return;
 			if (!result.matches || result.matches.length === 0) {
-				lastDeconstructWord = surface;
+				session.lastDeconstructWord = surface;
 				syncDocumentTitle();
 				breakdownSummaryMeta.textContent = "No verified breakdown";
 				breakdownDetails.hidden = false;
@@ -1172,32 +1142,30 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 				ids: best.seq.map((item) => item.id).filter(Boolean),
 			});
 		}
-		lastDeconstructWord = surface;
-		lastDeconstructParts = parts;
-		lastDeconstructSeq = parts[0].seq;
-		lastDeconstructBuilt = parts[0].built;
-		lastDeconstructAlternatives = parts[0].alternatives;
-		lastDeconstructIds = parts.length === 1 ? parts[0].ids : parts.map((p) => p.ids);
-		mode = "deconstruct";
+		session.lastDeconstructWord = surface;
+		session.lastDeconstructParts = parts;
+		session.lastDeconstructSeq = parts[0].seq;
+		session.lastDeconstructBuilt = parts[0].built;
+		session.lastDeconstructAlternatives = parts[0].alternatives;
+		session.lastDeconstructIds = parts.length === 1 ? parts[0].ids : parts.map((p) => p.ids);
+		session.mode = "deconstruct";
 		syncDocumentTitle();
 		rerenderBreakdown();
-		if (!skipCanvas && workspace) {
+		if (!skipCanvas && session.workspace) {
 			const chains = parts.map((p) => p.ids).filter((ids) => ids.length);
 			if (chains.length) {
-				suppressBuildUrlSync = true;
-				renderSentence(workspace, chains, presetsById, displayOptions());
-				workspace.scrollCenter();
-				requestAnimationFrame(() => Blockly.svgResize(workspace));
+				renderSentencePlan(session.workspace, [{
+					words: chains.map((ids) => ({ canvasIds: ids })),
+				}], session.presetsById, displayOptions());
+				session.workspace.scrollCenter();
+				requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 				refreshBuild();
 			}
 		}
+		// Caller owns share URL after programmatic render (events disabled in renderer).
 		syncURL({ push: true });
-		// Blockly may deliver the programmatic render event on the next frame;
-		// keep it from replacing the just-pushed Deconstruct URL with a Build URL.
-		window.setTimeout(() => { suppressBuildUrlSync = false; }, 250);
 	} catch (err) {
-		suppressBuildUrlSync = false;
-		if (err?.name === "AbortError" || run !== deconstructRun) return;
+		if (err?.name === "AbortError" || run !== session.deconstructRun) return;
 		setStatus(`Analysis failed: ${err.message}`, "error");
 	}
 }
@@ -1207,45 +1175,45 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 // per-block, so a category with no matches disappears entirely (see
 // blocks.js's buildToolbox) instead of leaving an empty, confusing category
 // behind. Hiding the palette uses Toolbox.setVisible(), Blockly's own public
-// API for this -- NOT workspace.updateToolbox(null), which throws ("Can't
+// API for this -- NOT session.workspace.updateToolbox(null), which throws ("Can't
 // nullify an existing toolbox"): updateToolbox only supports swapping a
 // toolbox's *content*, never removing one already injected with a toolbox.
 function closeOpenFlyout() {
-	workspace?.getToolbox()?.getFlyout()?.hide();
+	session.workspace?.getToolbox()?.getFlyout()?.hide();
 }
 
 function applyToolbox() {
-	if (!workspace) return;
-	workspace.getToolbox()?.setVisible(paletteVisible);
+	if (!session.workspace) return;
+	session.workspace.getToolbox()?.setVisible(paletteVisible);
 	closeOpenFlyout();
 	if (!paletteVisible) return;
 
 	const q = filterInput.value.trim().toLowerCase();
 	const filtered = q
-		? presets.filter((preset) => presetMatchesQuery(preset, q))
-		: presets;
+		? session.presets.filter((preset) => presetMatchesQuery(preset, q))
+		: session.presets;
 	// Rebuilt every time from scratch (no cached "full" toolbox), since
 	// display options can change independently of the filter and both need
 	// to be reflected together. The verb ending picker has no id/gloss text
 	// to match a query, so it's excluded from a filtered view entirely
 	// (bl-oq-ly#18) rather than left showing as an always-present,
 	// unrelated "Inflectional endings (1)" category.
-	workspace.updateToolbox(buildToolbox(filtered, displayOptions(), { includeVerbPicker: !q }));
+	session.workspace.updateToolbox(buildToolbox(filtered, displayOptions(), { includeVerbPicker: !q }));
 	closeOpenFlyout();
 }
 
 function bindWindowEvents() {
 	if (windowBound) return;
 	windowBound = true;
-	window.addEventListener("resize", () => { if (workspace) Blockly.svgResize(workspace); });
-	window.addEventListener("orientationchange", () => { if (workspace) Blockly.svgResize(workspace); });
+	window.addEventListener("resize", () => { if (session.workspace) Blockly.svgResize(session.workspace); });
+	window.addEventListener("orientationchange", () => { if (session.workspace) Blockly.svgResize(session.workspace); });
 	window.addEventListener("popstate", () => applyShareState(readState(location.search)));
 }
 
 function bindUiEvents() {
 	const resultsDetails = document.getElementById("results-details");
 	resultsDetails?.addEventListener("toggle", () => {
-		requestAnimationFrame(() => { if (workspace) Blockly.svgResize(workspace); });
+		requestAnimationFrame(() => { if (session.workspace) Blockly.svgResize(session.workspace); });
 	});
 	deconstructForm.addEventListener("submit", (e) => {
 		e.preventDefault();
@@ -1270,7 +1238,7 @@ function bindUiEvents() {
 		paletteToggleBtn.textContent = t(paletteVisible ? "paletteHide" : "paletteShow");
 		filterWrap.hidden = !paletteVisible;
 		applyToolbox();
-		requestAnimationFrame(() => Blockly.svgResize(workspace));
+		requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 	});
 	filterInput.addEventListener("input", applyToolbox);
 }
@@ -1281,20 +1249,20 @@ async function loadEngine() {
 	const catalog = await loadCatalog({
 		onProgress: setLoadingProgress,
 		onUpdated: (next) => {
-			presets = next.presets;
-			presetsById = new Map(presets.map((p) => [p.id, p]));
-			if (workspace?.getToolbox()?.getFlyout()?.isVisible()) return;
+			session.presets = next.presets;
+			session.presetsById = new Map(session.presets.map((p) => [p.id, p]));
+			if (session.workspace?.getToolbox()?.getFlyout()?.isVisible()) return;
 			applyToolbox();
 		},
 	});
-	presets = catalog.presets;
-	presetsById = new Map(presets.map((p) => [p.id, p]));
+	session.presets = catalog.presets;
+	session.presetsById = new Map(session.presets.map((p) => [p.id, p]));
 
 	defineMorphemeBlocks();
-	const verbEndingIndex = buildVerbEndingIndex(presets);
-	const nounEndingIndex = buildNounEndingIndex(presets);
-	defineVerbEndingPickerBlock(verbEndingIndex, presetsById, displayOptions, resolveMoodLabel, resolvePersonLabel);
-	defineNounEndingPickerBlock(nounEndingIndex, presetsById, displayOptions);
+	const verbEndingIndex = buildVerbEndingIndex(session.presets);
+	const nounEndingIndex = buildNounEndingIndex(session.presets);
+	defineVerbEndingPickerBlock(verbEndingIndex, session.presetsById, displayOptions, resolveMoodLabel, resolvePersonLabel);
+	defineNounEndingPickerBlock(nounEndingIndex, session.presetsById, displayOptions);
 	defineVerbObjectBlock(verbEndingIndex, resolvePersonLabel);
 }
 
@@ -1306,7 +1274,7 @@ function mountWorkspace() {
 	injectWorkspace();
 	bindWindowEvents();
 	bindUiEvents();
-	setStatus(`Loaded ${presets.length} morphemes.`, "");
+	setStatus(`Loaded ${session.presets.length} morphemes.`, "");
 	if (!paletteVisible) {
 		paletteToggleBtn.textContent = t("paletteShow");
 		filterWrap.hidden = true;
@@ -1314,7 +1282,7 @@ function mountWorkspace() {
 	}
 	const initialState = readState(location.search);
 	if (initialState.word || initialState.chain.length > 0 || initialState.words?.length) applyShareState(initialState);
-	requestAnimationFrame(() => { if (workspace) Blockly.svgResize(workspace); });
+	requestAnimationFrame(() => { if (session.workspace) Blockly.svgResize(session.workspace); });
 }
 
 async function startInner() {
@@ -1323,20 +1291,20 @@ async function startInner() {
 		hideLoadingModal();
 		return;
 	}
-	if (workspace && blocklyDiv.querySelector(".injectionDiv")) {
+	if (session.workspace && blocklyDiv.querySelector(".injectionDiv")) {
 		hideLoadingModal();
-		requestAnimationFrame(() => Blockly.svgResize(workspace));
+		requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 		return;
 	}
-	if (workspace) {
-		try { workspace.dispose(); } catch { /* DOM was replaced (React remount / HMR) */ }
-		workspace = null;
+	if (session.workspace) {
+		try { session.workspace.dispose(); } catch { /* DOM was replaced (React remount / HMR) */ }
+		session.workspace = null;
 	}
 	setLocale(stored("bl-oq-ly:ui-lang", "bloq:ui-lang") || "en");
 	applyLocale();
 	syncDocumentTitle();
 	try {
-		if (!presets.length) {
+		if (!session.presets.length) {
 			showLoadingModal();
 			setLoadingProgress({});
 			await loadEngine();
@@ -1344,7 +1312,7 @@ async function startInner() {
 		mountWorkspace();
 	} finally {
 		hideLoadingModal();
-		requestAnimationFrame(() => { if (workspace) Blockly.svgResize(workspace); });
+		requestAnimationFrame(() => { if (session.workspace) Blockly.svgResize(session.workspace); });
 	}
 }
 
