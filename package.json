@@ -1,22 +1,24 @@
 {
-  "name": "bl-oq-ly",
-  "private": true,
-  "type": "module",
-  "description": "Build and test tooling for the docs/ static site. Browser dependencies are pinned here and bundled into docs/vendor/.",
-  "scripts": {
-    "build:vendor": "node tools/build-vendor.mjs",
-    "lint": "eslint docs test",
-    "test:unit": "node --test test/unit/**/*.test.js",
-    "test:e2e": "playwright test",
-    "test:prepush": "npm run lint && npm run test:unit",
-    "test": "npm run test:unit && npm run test:e2e",
-    "serve": "python3 -m http.server 8000 --bind 127.0.0.1 --directory docs"
-  },
-  "devDependencies": {
-    "@blockly/field-dependent-dropdown": "5.0.10",
-    "@playwright/test": "^1.48.0",
-    "blockly": "12.5.1",
-    "esbuild": "0.28.2",
-    "eslint": "^9.13.0"
-  }
+	"name": "bl.oq.gl",
+	"private": true,
+	"type": "module",
+	"description": "Build and test tooling for the docs/ static site. Browser dependencies are pinned here and bundled into docs/vendor/.",
+	"scripts": {
+		"build:vendor": "node tools/build-vendor.mjs",
+		"lint": "eslint docs test",
+		"test:unit": "node --test test/unit/**/*.test.js",
+		"test:e2e": "playwright test --project=fixture",
+		"test:prepush": "npm run lint && npm run test:unit",
+		"test": "npm run test:unit && npm run test:e2e",
+		"serve": "python3 -m http.server 8000 --bind 127.0.0.1 --directory docs",
+		"test:e2e:live": "BLOQ_LIVE=1 playwright test --project=live",
+		"test:live-smoke": "BLOQ_LIVE=1 playwright test --project=live test/e2e/app.spec.js -g \"catalog loads\""
+	},
+	"devDependencies": {
+		"@blockly/field-dependent-dropdown": "5.0.10",
+		"@playwright/test": "^1.48.0",
+		"blockly": "12.5.1",
+		"esbuild": "0.28.2",
+		"eslint": "^9.13.0"
+	}
 }

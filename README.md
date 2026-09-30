@@ -117,9 +117,16 @@ npm run test:e2e
 npm test
 ```
 
-The E2E suite serves `docs/` and uses the live oq-api and grammarian catalog,
-so failures may reflect an upstream API/catalog change as well as a local
-regression.
+Default `test:e2e` is the **fixture** project (`docs/fixtures/` engine stub +
+mini catalog). It does not need the live oq-api or grammarian hosts.
+
+Live upstream checks (pinned `jandahl.github.io/api.oq.gl` public-api +
+grammarian GitHub Pages mirror):
+
+```bash
+npm run test:live-smoke
+npm run test:e2e:live
+```
 
 ## Scope
 

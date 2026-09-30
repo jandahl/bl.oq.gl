@@ -1,13 +1,18 @@
-import { STANDARD_EXAMPLES, getStandardExamples } from "./oq-api.js";
+import { getStandardExamples } from "./oq-api.js";
 
-// Standard examples are part of the pinned oq-api release. Keep the public
-// constant available for consumers that need the immutable catalog, and use a
-// defensive copy when the UI filters or enriches entries.
-export { STANDARD_EXAMPLES, getStandardExamples };
+/**
+ * Sole reader of the pinned STANDARD_EXAMPLES catalog. Returns a defensive
+ * copy so UI filtering cannot mutate the release constant.
+ * @returns {Promise<{ worked: Array<{ surface: string, gloss?: string, chain?: string[] }>, sentences: Array<{ words: string[], gloss?: string }> }>}
+ */
+export async function loadStandardExamples() {
+	return getStandardExamples();
+}
 
 /**
  * @returns {Promise<Array<{ surface: string, gloss?: string, chain?: string[] }>>}
  */
 export async function loadWorkedExamples() {
-	return getStandardExamples().worked;
+	const examples = await loadStandardExamples();
+	return examples.worked;
 }

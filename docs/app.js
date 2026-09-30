@@ -1,4 +1,4 @@
-import { buildWord, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, STANDARD_EXAMPLES } from "./oq-api.js";
+import { buildWord, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
@@ -14,7 +14,7 @@ import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
 import { readState, writeState, routeForState } from "./router.js";
 import { isSentenceInput, planFromLattice, canvasSentences, withInitialCapital, assemblyReading } from "./sentence-plan.js";
-import { loadWorkedExamples } from "./worked-examples.js";
+import { loadWorkedExamples, loadStandardExamples } from "./worked-examples.js";
 import { setLocale, applyLocale, t } from "./i18n.js";
 
 /** Radiogroup of [role=radio][data-value] buttons that behaves like a <select>
@@ -155,8 +155,6 @@ function bindDom() {
 		document.getElementById("morpheme-filter-clear"),
 	);
 	blocklyThemeSelect = enhanceSegmented(document.getElementById("blockly-theme-select"));
-	renderStandardExamples();
-	exampleWordButtons = document.querySelectorAll("[data-example-word]");
 	workedExamplesBtn = document.getElementById("worked-examples-btn");
 	workedExamplesModal = document.getElementById("worked-examples-modal");
 	workedExamplesClose = document.getElementById("worked-examples-close");
@@ -198,13 +196,13 @@ const SHOW_MOOD_KEY = "bl-oq-ly:show-mood";
 const SHOW_MOOD_KEY_RENAMED = "bloq:show-mood";
 
 
-function stored(key, legacyKey) {
-	return localStorage.getItem(key) ?? (legacyKey ? localStorage.getItem(legacyKey) : null);
+function stored(primaryKey, legacyKey) {
+	// Prefer bloq:*; fall back to bl-oq-ly:* for one release.
+	return localStorage.getItem(primaryKey) ?? (legacyKey ? localStorage.getItem(legacyKey) : null);
 }
 
-function storePreference(key, renamedKey, value) {
-	localStorage.setItem(key, value);
-	localStorage.setItem(renamedKey, value);
+function storePreference(primaryKey, _legacyKey, value) {
+	localStorage.setItem(primaryKey, value);
 }
 
 const APP_TITLE = "BLOQ";
@@ -250,10 +248,12 @@ function selectExample(word) {
 	});
 }
 
+let standardExamples = { worked: [], sentences: [] };
+
 function renderStandardExamples() {
 	const words = document.querySelector(".example-word-list");
 	const sentences = document.querySelector(".example-sentence-list");
-	words.replaceChildren(...STANDARD_EXAMPLES.worked.map((example) => {
+	words.replaceChildren(...standardExamples.worked.map((example) => {
 		const button = document.createElement("button");
 		button.type = "button";
 		button.className = "example-pill";
@@ -262,7 +262,7 @@ function renderStandardExamples() {
 		button.title = example.gloss;
 		return button;
 	}));
-	sentences.replaceChildren(...STANDARD_EXAMPLES.sentences.map((example) => {
+	sentences.replaceChildren(...standardExamples.sentences.map((example) => {
 		const button = document.createElement("button");
 		button.type = "button";
 		button.className = "example-pill";
@@ -305,13 +305,13 @@ function readLastFirst() {
 }
 
 function initDisplayOptions() {
-	uiLangSelect.value = stored("bl-oq-ly:ui-lang", "bloq:ui-lang") === "da" ? "da" : "en";
-	showIdsCheckbox.checked = stored(SHOW_IDS_KEY, SHOW_IDS_KEY_RENAMED) === "true";
-	showMoodCheckbox.checked = stored(SHOW_MOOD_KEY, SHOW_MOOD_KEY_RENAMED) === "true"; // default off
-	readingOrderCheckbox.checked = stored(READING_ORDER_KEY, READING_ORDER_KEY_RENAMED) !== "false"; // default on
-	langSelect.value = ["en", "da", "both"].includes(stored(LANG_KEY, LANG_KEY_RENAMED)) ? stored(LANG_KEY, LANG_KEY_RENAMED) : "en";
-	spellingSelect.value = ["both", "spelling-only", "gloss-only"].includes(stored(SPELLING_KEY, SPELLING_KEY_RENAMED))
-		? stored(SPELLING_KEY, SPELLING_KEY_RENAMED) : "both";
+	uiLangSelect.value = stored("bloq:ui-lang", "bl-oq-ly:ui-lang") === "da" ? "da" : "en";
+	showIdsCheckbox.checked = stored(SHOW_IDS_KEY_RENAMED, SHOW_IDS_KEY) === "true";
+	showMoodCheckbox.checked = stored(SHOW_MOOD_KEY_RENAMED, SHOW_MOOD_KEY) === "true"; // default off
+	readingOrderCheckbox.checked = stored(READING_ORDER_KEY_RENAMED, READING_ORDER_KEY) !== "false"; // default on
+	langSelect.value = ["en", "da", "both"].includes(stored(LANG_KEY_RENAMED, LANG_KEY)) ? stored(LANG_KEY_RENAMED, LANG_KEY) : "en";
+	spellingSelect.value = ["both", "spelling-only", "gloss-only"].includes(stored(SPELLING_KEY_RENAMED, SPELLING_KEY))
+		? stored(SPELLING_KEY_RENAMED, SPELLING_KEY) : "both";
 
 	function onDisplayOptionChange() {
 		if (session.workspace) relabelBlocks(session.workspace, session.presetsById, displayOptions());
@@ -320,22 +320,22 @@ function initDisplayOptions() {
 		if (session.lastDeconstructIds) rerenderBreakdown();
 	}
 	uiLangSelect.addEventListener("change", () => {
-		storePreference("bl-oq-ly:ui-lang", "bloq:ui-lang", uiLangSelect.value);
+		storePreference("bloq:ui-lang", "bl-oq-ly:ui-lang", uiLangSelect.value);
 		setLocale(uiLangSelect.value);
 		applyLocale();
 		syncDocumentTitle();
 		applyTheme(document.documentElement.dataset.theme || "auto");
 	});
 	showIdsCheckbox.addEventListener("change", () => {
-		storePreference(SHOW_IDS_KEY, SHOW_IDS_KEY_RENAMED, String(showIdsCheckbox.checked));
+		storePreference(SHOW_IDS_KEY_RENAMED, SHOW_IDS_KEY, String(showIdsCheckbox.checked));
 		onDisplayOptionChange();
 	});
 	showMoodCheckbox.addEventListener("change", () => {
-		storePreference(SHOW_MOOD_KEY, SHOW_MOOD_KEY_RENAMED, String(showMoodCheckbox.checked));
+		storePreference(SHOW_MOOD_KEY_RENAMED, SHOW_MOOD_KEY, String(showMoodCheckbox.checked));
 		syncMoodLabels();
 	});
 	langSelect.addEventListener("change", () => {
-		storePreference(LANG_KEY, LANG_KEY_RENAMED, langSelect.value);
+		storePreference(LANG_KEY_RENAMED, LANG_KEY, langSelect.value);
 		if (session.lastSentencePlan && wordInput.value.trim()) {
 			runDeconstruct();
 			return;
@@ -343,11 +343,11 @@ function initDisplayOptions() {
 		onDisplayOptionChange();
 	});
 	spellingSelect.addEventListener("change", () => {
-		storePreference(SPELLING_KEY, SPELLING_KEY_RENAMED, spellingSelect.value);
+		storePreference(SPELLING_KEY_RENAMED, SPELLING_KEY, spellingSelect.value);
 		onDisplayOptionChange();
 	});
 	readingOrderCheckbox.addEventListener("change", () => {
-		storePreference(READING_ORDER_KEY, READING_ORDER_KEY_RENAMED, String(readingOrderCheckbox.checked));
+		storePreference(READING_ORDER_KEY_RENAMED, READING_ORDER_KEY, String(readingOrderCheckbox.checked));
 		// Only Deconstruct's per-morpheme rows are reversible -- Build's
 		// reading line is a composed sentence, unaffected (see gloss.js).
 		if (session.lastDeconstructIds) rerenderBreakdown();
@@ -457,12 +457,12 @@ function syncBlocklyTheme() {
 }
 
 function initBlocklyTheme() {
-	const saved = stored("bl-oq-ly:blockly-theme", "bloq:blockly-theme");
+	const saved = stored("bloq:blockly-theme", "bl-oq-ly:blockly-theme");
 	selectedBlocklyTheme = ["classic", "zelos"].includes(saved) ? saved : "classic";
 	blocklyThemeSelect.value = selectedBlocklyTheme;
 	blocklyThemeSelect.addEventListener("change", () => {
 		selectedBlocklyTheme = blocklyThemeSelect.value;
-		storePreference("bl-oq-ly:blockly-theme", "bloq:blockly-theme", selectedBlocklyTheme);
+		storePreference("bloq:blockly-theme", "bl-oq-ly:blockly-theme", selectedBlocklyTheme);
 		rebuildWorkspace();
 	});
 }
@@ -526,12 +526,12 @@ function applyTheme(theme) {
 }
 
 function initTheme() {
-	const saved = stored(THEME_KEY, THEME_KEY_RENAMED);
+	const saved = stored(THEME_KEY_RENAMED, THEME_KEY);
 	applyTheme(THEME_CYCLE.includes(saved) ? saved : "auto");
 	themeToggleBtn.addEventListener("click", () => {
 		const current = document.documentElement.dataset.theme || "auto";
 		const next = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length];
-		storePreference(THEME_KEY, THEME_KEY_RENAMED, next);
+		storePreference(THEME_KEY_RENAMED, THEME_KEY, next);
 		applyTheme(next);
 	});
 	// Keep "auto" reactive to a live OS theme change, not just at load time.
@@ -1311,7 +1311,7 @@ async function startInner() {
 		try { session.workspace.dispose(); } catch { /* DOM was replaced (React remount / HMR) */ }
 		session.workspace = null;
 	}
-	setLocale(stored("bl-oq-ly:ui-lang", "bloq:ui-lang") || "en");
+	setLocale(stored("bloq:ui-lang", "bl-oq-ly:ui-lang") || "en");
 	applyLocale();
 	syncDocumentTitle();
 	try {
@@ -1319,6 +1319,11 @@ async function startInner() {
 			showLoadingModal();
 			setLoadingProgress({});
 			await loadEngine();
+		}
+		if (!standardExamples.worked.length) {
+			standardExamples = await loadStandardExamples();
+			renderStandardExamples();
+			exampleWordButtons = document.querySelectorAll("[data-example-word]");
 		}
 		mountWorkspace();
 	} finally {
