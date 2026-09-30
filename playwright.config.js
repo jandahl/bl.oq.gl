@@ -13,6 +13,7 @@ import { defineConfig, devices } from "@playwright/test";
 // deliberately, not overlooked.
 export default defineConfig({
 	testDir: "./test/e2e",
+	globalSetup: "./test/e2e/global-setup.js",
 	// Every test context loads the live ~9 MB grammarian catalog. Parallel
 	// downloads make the upstream endpoint intermittently miss the startup
 	// timeout and turn one transient fetch failure into a cascade of failures.
@@ -20,9 +21,11 @@ export default defineConfig({
 	fullyParallel: false,
 	workers: 1,
 	forbidOnly: !!process.env.CI,
-	// Keep one retry for transient live-endpoint failures without allowing a
-	// failing suite to consume three full browser runs.
-	retries: 1,
+	// The live upstreams are outside this repo's control. Retrying every test
+	// after a shared startup failure multiplies the wait across the whole suite.
+	// Fail on the first affected test so an upstream outage is reported quickly.
+	retries: 0,
+	maxFailures: 1,
 	// Slightly generous: catalog fetch + Blockly injection is the app's own
 	// natural startup cost, not something to race against.
 	timeout: 30_000,
