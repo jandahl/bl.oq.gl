@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "schema_version": "2.0.0",
+    "authoritative": false,
+    "status": "fixture"
+  },
+  "by_id": {
+    "qimmeq": [{
+      "lexical_facts": { "morpheme_type": "stem", "word_class": "N", "meaning": "dog" },
+      "application_logic": { "underlying_form": "qimmeq", "continuation_class": "N_POSTBASE" },
+      "plain_gloss": { "en_short": "dog", "da_short": "hund", "en": "dog", "da": "hund" }
+    }],
+    "neri": [{
+      "lexical_facts": { "morpheme_type": "stem", "word_class": "V", "meaning": "to eat" },
+      "application_logic": { "underlying_form": "neri", "continuation_class": "V_POSTBASE" },
+      "plain_gloss": { "en_short": "eat", "da_short": "spise", "en": "to eat", "da": "at spise" }
+    }],
+    "illu": [{
+      "lexical_facts": { "morpheme_type": "stem", "word_class": "N", "meaning": "house" },
+      "application_logic": { "underlying_form": "illu", "continuation_class": "N_POSTBASE" },
+      "plain_gloss": { "en_short": "house", "da_short": "hus", "en": "house", "da": "hus" }
+    }],
+    "N_qaq_Vb": [{
+      "lexical_facts": { "morpheme_type": "derivational_affix", "category_shift": "N -> V", "meaning": "to have a(n) N" },
+      "application_logic": { "underlying_form": "-qaq", "continuation_class": "V_POSTBASE", "boundary_behavior": "truncating" },
+      "plain_gloss": { "en_short": "have a ___", "da_short": "have en ___", "en": "to have a(n) N", "da": "at have en N" }
+    }],
+    "V_ngngit_Vb": [{
+      "lexical_facts": { "morpheme_type": "sentential_affix", "category_shift": "V -> V", "meaning": "negation" },
+      "application_logic": { "underlying_form": "-nngit", "continuation_class": "V_POSTBASE" },
+      "plain_gloss": { "en_short": "negation, ___ not", "da_short": "ikke ___", "en": "negation", "da": "negation" }
+    }],
+    "V_IND_INTR_1SG": [{
+      "lexical_facts": { "morpheme_type": "inflectional_ending", "word_class": "", "meaning": "statement — I" },
+      "application_logic": { "underlying_form": "-vunga", "continuation_class": "WORD_FINAL" },
+      "plain_gloss": { "en_short": "statement — I", "en_mood_label": "statement", "da_short": "udsagn — jeg" },
+      "inflection": { "mood": "indicative", "transitivity": "intransitive", "subject": { "person": 1, "number": "sg" } }
+    }],
+    "V_IND_INTR_3SG": [{
+      "lexical_facts": { "morpheme_type": "inflectional_ending", "word_class": "", "meaning": "statement — he/she/it" },
+      "application_logic": { "underlying_form": "-voq", "continuation_class": "WORD_FINAL" },
+      "plain_gloss": { "en_short": "statement — he/she/it", "en_mood_label": "statement", "da_short": "udsagn — han/hun/det" },
+      "inflection": { "mood": "indicative", "transitivity": "intransitive", "subject": { "person": 3, "number": "sg" } }
+    }],
+    "N_ABS_SG": [{
+      "lexical_facts": { "morpheme_type": "inflectional_ending", "word_class": "", "meaning": "absolutive singular" },
+      "application_logic": { "underlying_form": "", "continuation_class": "WORD_FINAL" },
+      "plain_gloss": { "en_short": "ABS.SG", "da_short": "ABS.SG" },
+      "lexical_facts_case": "ABS"
+    }]
+  }
+}

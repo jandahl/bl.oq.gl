@@ -7,7 +7,11 @@
 // The catalog is ~9 MB. Cache Storage keeps the last good payload so a
 // return visit can parse locally instead of waiting on the network; a
 // background HEAD/GET then refreshes it when the ETag changes.
-import { mergeMorphemeSources, GRAMMAR_MORPHEMES_URL } from "./oq-api.js";
+//
+// catalogFromPayload is pure given an injected mergeMorphemeSources — Node
+// unit tests pass a fixture merge and never import oq-api.js (which would
+// pull the live engine). loadCatalog lazy-loads the engine when callers do
+// not inject one.
 import {
 	catalogResponseFromBuffer,
 	catalogUnchanged,
@@ -27,23 +31,36 @@ export const GRAMMAR_MORPHEMES_FALLBACK_URL =
 	"https://jandahl.github.io/oq-grammarian/v2/grammar/morphemes-by-id.json";
 
 /**
- * @param {any} value
- * @returns {{ presets: any[], authoritative: boolean|undefined, meta: any }}
+ * Compatibility for grammarian mirrors published before the structured
+ * negation gloss: keep the ordinary negator learner-facing label stable.
+ * @param {any[]} presets
+ * @returns {any[]}
  */
-export function catalogFromPayload(value) {
-	const { presets, anyOk, failed } = mergeMorphemeSources(
-		[{ status: "fulfilled", value }],
-		[{ buildable: true, source: "grammarian" }],
-	);
-	if (!anyOk || failed.length) throw new Error("morpheme catalog failed to load");
-	// Compatibility for grammarian mirrors published before the structured
-	// negation gloss: keep the ordinary negator learner-facing label stable.
+export function applyCatalogCompatibility(presets) {
 	const negator = presets.find((preset) => preset.id === "V_ngngit_Vb"
 		|| preset.expected === "-nngit"
 		|| preset.underlyingForm === "-nngit");
 	if (negator && !negator.plainGloss?.en_short?.includes?.("do not")) {
 		negator.plainGloss = { ...(negator.plainGloss ?? {}), en_short: "do not ___" };
 	}
+	return presets;
+}
+
+/**
+ * @param {any} value
+ * @param {(results: any[], filters: any[]) => { presets: any[], anyOk: boolean, failed: any[] }} mergeMorphemeSources
+ * @returns {{ presets: any[], authoritative: boolean|undefined, meta: any }}
+ */
+export function catalogFromPayload(value, mergeMorphemeSources) {
+	if (typeof mergeMorphemeSources !== "function") {
+		throw new TypeError("catalogFromPayload requires mergeMorphemeSources");
+	}
+	const { presets, anyOk, failed } = mergeMorphemeSources(
+		[{ status: "fulfilled", value }],
+		[{ buildable: true, source: "grammarian" }],
+	);
+	if (!anyOk || failed.length) throw new Error("morpheme catalog failed to load");
+	applyCatalogCompatibility(presets);
 	return { presets, authoritative: value?.meta?.authoritative, meta: value?.meta ?? null };
 }
 
@@ -84,7 +101,7 @@ async function persistCatalog(cache, url, buffer, meta) {
 	}
 }
 
-async function revalidateCatalog(url, cache, meta, onUpdated) {
+async function revalidateCatalog(url, cache, meta, onUpdated, mergeMorphemeSources) {
 	try {
 		const head = await fetch(url, { method: "HEAD", cache: "no-cache" });
 		const headers = {
@@ -98,19 +115,29 @@ async function revalidateCatalog(url, cache, meta, onUpdated) {
 		const fresh = await fetchCatalogBuffer(url);
 		const value = parseCatalogBytes(fresh.buffer);
 		await persistCatalog(cache, url, fresh.buffer, fresh.meta);
-		onUpdated?.(catalogFromPayload(value));
+		onUpdated?.(catalogFromPayload(value, mergeMorphemeSources));
 	} catch {
 		// Keep the cached catalog; the next visit will try again.
 	}
 }
 
 /**
- * @param {{ onProgress?: (event: { phase: string, loaded?: number, total?: number }) => void, onUpdated?: (catalog: any) => void }} [opts]
+ * @param {{
+ *   onProgress?: (event: { phase: string, loaded?: number, total?: number }) => void,
+ *   onUpdated?: (catalog: any) => void,
+ *   engine?: { mergeMorphemeSources: Function, GRAMMAR_MORPHEMES_URL: string },
+ *   urls?: string[],
+ * }} [opts]
  * @returns {Promise<{ presets: any[], authoritative: boolean|undefined, meta: any, fromCache: boolean }>}
  */
 export async function loadCatalog(opts = {}) {
 	const { onProgress, onUpdated } = opts;
-	const urls = [GRAMMAR_MORPHEMES_URL, GRAMMAR_MORPHEMES_FALLBACK_URL];
+	const engine = opts.engine ?? await import("./oq-api.js");
+	const mergeMorphemeSources = engine.mergeMorphemeSources;
+	const overrideUrls = opts.urls ?? globalThis.__BLOQ_CATALOG_URLS__;
+	const urls = (Array.isArray(overrideUrls) && overrideUrls.length)
+		? overrideUrls
+		: [engine.GRAMMAR_MORPHEMES_URL, GRAMMAR_MORPHEMES_FALLBACK_URL];
 	const cache = await openCatalogCache();
 	const meta = await readCatalogMeta(cache);
 	let cachedUrl = urls.find((candidate) => meta?.url === candidate);
@@ -129,15 +156,15 @@ export async function loadCatalog(opts = {}) {
 		onProgress?.({ phase: "cached" });
 		const buffer = new Uint8Array(await cached.arrayBuffer());
 		onProgress?.({ phase: "parse", loaded: buffer.byteLength, total: buffer.byteLength });
-		const catalog = { ...catalogFromPayload(parseCatalogBytes(buffer)), fromCache: true };
+		const catalog = { ...catalogFromPayload(parseCatalogBytes(buffer), mergeMorphemeSources), fromCache: true };
 		queueMicrotask(() => {
-			revalidateCatalog(cachedUrl, cache, meta, onUpdated);
+			revalidateCatalog(cachedUrl, cache, meta, onUpdated, mergeMorphemeSources);
 		});
 		return catalog;
 	}
 
 	const fresh = await fetchCatalogBuffer(urls, onProgress);
-	const catalog = { ...catalogFromPayload(parseCatalogBytes(fresh.buffer)), fromCache: false };
+	const catalog = { ...catalogFromPayload(parseCatalogBytes(fresh.buffer), mergeMorphemeSources), fromCache: false };
 	await persistCatalog(cache, fresh.url, fresh.buffer, fresh.meta);
 	return catalog;
 }

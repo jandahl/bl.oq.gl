@@ -6,6 +6,7 @@
 // without Blockly's injected workspace or the network.
 
 import { canvasSentences } from "./sentence-plan.js";
+import { sameIdTree } from "./blocks.js";
 
 /**
  * Mutable workshop session. Pass this into helpers; do not close over it
@@ -82,7 +83,7 @@ export function planMatchesCanvas(sentences, plan, { sentenceContainerCount = nu
 	if (sentenceContainerCount != null && sentenceContainerCount !== (plan.sentences?.length ?? 0)) {
 		return false;
 	}
-	return JSON.stringify(sentences) === JSON.stringify(canvasSentences(plan));
+	return sameIdTree(sentences, canvasSentences(plan));
 }
 
 /**
@@ -108,7 +109,7 @@ export function normalizeDeconstructIds(ids) {
 export function deconstructIdsMatchSentences(sentences, lastDeconstructIds) {
 	const expected = normalizeDeconstructIds(lastDeconstructIds);
 	if (!expected.length || !sentences?.length) return false;
-	return JSON.stringify(sentences) === JSON.stringify(expected);
+	return sameIdTree(sentences, expected);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, canvasIdTree, sameIdTree } from "../../docs/blocks.js";
 
 // These blocks.js exports don't touch the `Blockly` global, so they're
 // unit-testable directly under
@@ -248,4 +248,37 @@ test("structuralCategoryConnections: stem cannot follow, particle is alone, encl
 	assert.equal(byId.enclitic.previousCheck, "MORPHEME_CHAIN");
 	assert.equal(byId.deriv_affix.hasPrevious, true);
 	assert.equal(byId.deriv_affix.hasNext, true);
+});
+
+test("canvasTree: two sentences, a held word, and a loose chain round-trip to the same id tree", () => {
+	const stemA = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => null };
+	const stemB = { type: "morpheme_block__stem_v", data: "neri", getNextBlock: () => null };
+	const drawable = {
+		type: "morpheme_block__word_container",
+		bloqHeld: null,
+		getInputTargetBlock: (name) => name === "MORPHEMES" ? stemA : null,
+		getNextBlock: () => held,
+	};
+	const held = {
+		type: "morpheme_block__word_container",
+		bloqHeld: "not drawn",
+		getInputTargetBlock: () => null,
+		getNextBlock: () => null,
+	};
+	const sentence = {
+		type: "morpheme_block__sentence_container",
+		getInputTargetBlock: (name) => name === "WORDS" ? drawable : null,
+	};
+	const loose = { type: "morpheme_block__stem_v", data: "aallarpoq", getNextBlock: () => null };
+	const tree = canvasTree({ getTopBlocks: () => [sentence, loose] });
+	assert.equal(tree.sentences.length, 2);
+	assert.equal(tree.sentences[0].words.length, 2);
+	assert.deepEqual(tree.sentences[0].words[0].ids, ["qimmeq"]);
+	assert.equal(tree.sentences[0].words[1].held, "not drawn");
+	assert.deepEqual(tree.sentences[1].words[0].ids, ["aallarpoq"]);
+	const ids = canvasIdTree(tree);
+	assert.deepEqual(ids, [[["qimmeq"]], [["aallarpoq"]]]);
+	assert.equal(sameIdTree(ids, topLevelSentences({ getTopBlocks: () => [sentence, loose] })), true);
+	assert.equal(sameIdTree(ids, [[["qimmeq", "extra"]], [["aallarpoq"]]]), false);
+	void stemB;
 });

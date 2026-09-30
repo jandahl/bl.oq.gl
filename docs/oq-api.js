@@ -1,77 +1,44 @@
-// Re-exports oq's experimental public API. jandahl/oq's SOURCE repo is
-// private, so a commit-pinned CDN URL (jsdelivr/raw.githubusercontent
-// against the repo) is not reachable from a browser — the only live copies
-// are oq's own published deployments, which public-api.md's own Quick Start
-// already assumes as the consumption path. `public-api.md`'s stability
-// posture is explicit ("API_VERSION is 0.x, any commit may rename, reshape,
-// or drop any export"), so which deployment this points at is a live,
-// tracked decision — see README.md for the current choice and why.
+// Pin + load the experimental oq public API. The SOURCE repo is private, so
+// the only live copies are published deployments. `public-api.md` is explicit
+// that API_VERSION is 0.x — this pin is a tracked decision (see README).
 //
-// Pin the engine in production. oq-api's exported GRAMMAR_MORPHEMES_URL is
-// the compatibility boundary for the matching grammarian catalog; consumers
-// must not pair a rolling API with an independently rolling legacy catalog.
-// Resolved from oq-api's published release (v0.3.55). The repository moved
-// to api.oq.gl, but its configured GitHub Pages site keeps the /api.oq.gl path.
-const OQ_API_URL = "https://jandahl.github.io/api.oq.gl/api/v0.3.55/public-api.js";
+// Pair this pin with the GRAMMAR_MORPHEMES_URL the module exports. Do not mix
+// a rolling API with an independently rolling catalog.
+//
+// loadEngine() is the testable port: unit tests and fixture e2e inject a
+// stub via globalThis.__BLOQ_ENGINE_URL__ (or pass a URL) instead of hitting
+// the live host. Production keeps the default CDN URL.
+export const OQ_API_URL = "https://jandahl.github.io/api.oq.gl/api/v0.3.55/public-api.js";
 
+/**
+ * @param {string} [url]
+ * @returns {Promise<Record<string, any>>}
+ */
+export async function loadEngine(url = globalThis.__BLOQ_ENGINE_URL__ || OQ_API_URL) {
+	return import(/* @vite-ignore */ url);
+}
+
+const api = await loadEngine();
+
+// Re-export only symbols docs/ actually calls. Conjugation / have-N helpers
+// stay on the pinned module for explorers who import it directly; BLOQ does
+// not surface them as its own API.
 export const {
 	buildWord,
-	analyzeWord,
 	analyzeWordAsync,
 	tokenizeSentence,
 	analyzeSentence,
 	assembleClause,
-	morphemeEntryToPreset,
 	mergeMorphemeSources,
-	glossSummary,
 	glossSummaryItems,
 	headlineGloss,
-	API_VERSION,
 	GRAMMAR_MORPHEMES_URL,
-	// Resolved conjugation labels (oq#881) — the same friendly text oq's own
-	// "conjugate to..." modal shows for a mood/person paradigm coordinate,
-	// so the verb ending picker doesn't have to re-derive its own wording
-	// independently. See verb-endings.js.
 	resolveMoodLabel,
 	resolvePersonLabel,
-	resolveFieldLabel,
-	// One-call conjugation transform (oq-api 0.3.22+) plus catalog helpers.
-	// Prefer conjugateForm when a consumer wants headword + mood/person(/object)
-	// → surface without assembling derive*/findEnding/conjugate locally.
-	// Options (spec): catalog, mood, subject|{person,number}, object?,
-	// transitive?, stemHint? (intr + tr since 0.3.23), gloss?.
-	// Returns { ok, word, approximate, stem, ending, schwa, errorKey, translation }.
-	buildEndingCatalog,
-	catalogMoods,
-	endingsForMood,
-	subjectsForMood,
-	objectsForSubject,
-	findEnding,
-	deriveIntransitiveStem,
-	deriveTransitiveStem,
-	deriveSchwaStem,
-	canConjugate,
-	conjugate,
-	conjugateSchwaStem,
-	conjugateForm,
-	// Have-N one-call transform (oq-api 0.3.33+): host N + optional count/howMany/many/truth +
-	// Bjørnum K6§2 INS companions (numeralInstrumentalSurface; qty-6 = arfinillit);
-	// intensifier + -qaq + conjugation ending via buildWord. Never invents stems.
-	// Returns { ok, word, phrase, numeral, truth, seq, errorKey, missingIds, … }.
-	haveNForm,
-	HAVE_N_CARDINALS,
-	HAVE_N_HOW_MANY,
-	HAVE_N_MANY,
-	HAVE_N_INTENSIFIERS,
-	HAVE_N_TRUTH,
-	HAVE_N_TRUTH_SURFACES,
-	numeralInstrumentalSurface,
-	glossSentence,
-	t,
-	setActiveLocale,
-	getActiveLocale,
 	WORD_CLASS_THEMES,
 	getWordClassColors,
 	STANDARD_EXAMPLES,
 	getStandardExamples,
-} = await import(/* @vite-ignore */ OQ_API_URL);
+	setActiveLocale,
+	getActiveLocale,
+} = api;

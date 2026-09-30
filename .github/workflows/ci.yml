@@ -1,14 +1,15 @@
 name: CI
 
-# Runs on every PR. Deliberately hits oq.dicknog.dk and grammarian's
-# live published catalog in the e2e job (see playwright.config.js's own
-# comment for why) rather than a frozen local fixture — this repo's stated
-# posture is that a red build here can mean either a regression in this
-# repo's own commit OR an upstream oq/grammarian break, and only the first
-# kind is this workflow's fault to fix. A red e2e run is real information
-# either way, not noise to route around.
+# Required PR (and master) checks: lint, unit tests, and fixture e2e.
+# Fixture e2e boots against docs/fixtures/ (engine stub + mini catalog) so a
+# red build here means a regression in this repo — not an upstream outage on
+# jandahl.github.io/api.oq.gl or the grammarian GitHub Pages mirror.
+# Live upstream smoke: npm run test:live-smoke (or test:e2e:live) locally /
+# as a separate scheduled job when desired.
 on:
   pull_request:
+  push:
+    branches: [master]
 
 jobs:
   # The image supplies Node, Chromium, and its system dependencies. Keep the
