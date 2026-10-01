@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor } from "../../docs/blocks.js";
 import { canvasIdTree, sameIdTree } from "../../docs/id-tree.js";
 
 // buildToolbox / the canvas walkers don't touch the Blockly global. renderSentencePlan
@@ -68,6 +68,44 @@ test("restoreNounPickerFields reads case from the id when lexical_facts.case is 
 	restoreNounPickerFields(block, { id: "N_ERG_SG", morpheme_type: "inflectional_ending" });
 	assert.equal(fields.CASE, "ergative");
 	assert.equal(block.data, "N_ERG_SG");
+});
+
+test("labelFor uses a context-map gloss default and does not throw in gloss-only mode", () => {
+	const item = preset({
+		id: "V_ssaar_Vb",
+		expected: "-ssaar",
+		morpheme_type: "derivational_affix",
+		word_class: "",
+		plainGloss: {
+			en_short: { default: "shall eventually ___", third_singular: "shall eventually he/she ___" },
+		},
+		glossShort: undefined,
+		gloss: undefined,
+	});
+	const label = labelFor(item, { showIds: false });
+	assert.equal(typeof label, "string");
+	assert.match(label, /shall eventually ___/);
+	assert.equal(label.includes("[object Object]"), false);
+	assert.equal(label.includes("he/she"), false);
+	const glossOnly = labelFor(item, { spellingMode: "gloss-only" });
+	assert.equal(typeof glossOnly, "string");
+	assert.match(glossOnly, /^shall eventually ___/);
+});
+
+test("labelFor falls back to the first context-map value when default is absent", () => {
+	const item = preset({
+		id: "V_ssaar_Vb",
+		expected: "-ssaar",
+		plainGloss: {
+			en_short: { third_singular: "shall eventually he/she ___", gerund: "eventually ___ing" },
+		},
+		glossShort: undefined,
+		gloss: undefined,
+	});
+	const label = labelFor(item, { spellingMode: "gloss-only" });
+	assert.equal(typeof label, "string");
+	assert.match(label, /shall eventually he\/she ___/);
+	assert.equal(label.includes("[object Object]"), false);
 });
 
 test("buildToolbox: groups presets into the right category by morpheme_type + word_class", () => {
