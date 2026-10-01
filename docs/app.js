@@ -1001,7 +1001,11 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 		const placed = plan.sentences.flatMap((sentence) => sentence.words.filter((word) => word.seq && word.built?.ok));
 		session.lastDeconstructSeq = placed[0]?.seq ?? null;
 		session.lastDeconstructBuilt = placed[0]?.built ?? null;
-		session.lastDeconstructIds = placed.map((word) => word.canvasIds);
+		// Keep one id list per source sentence. A flat map makes two sentences
+		// look like one, so deconstructIdsMatchSentences fails and the share
+		// URL is demoted to ?chain= (#130).
+		session.lastDeconstructIds = plan.sentences.map((sentence) =>
+			sentence.words.filter((word) => word.canvasIds?.length).map((word) => word.canvasIds));
 		session.mode = "deconstruct";
 		syncDocumentTitle();
 		rerenderBreakdown();
