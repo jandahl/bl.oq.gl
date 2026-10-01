@@ -8,6 +8,7 @@
 // small screen than a read-only block stack would be.
 
 import { splitMoodLabel, composedTranslation } from "./gloss.js";
+import { t as translate } from "./i18n.js";
 
 export const WORD_TONE_COUNT = 6;
 
@@ -168,15 +169,16 @@ export function renderAlternativeBreakdowns(container, alternatives, glossSummar
 	container.appendChild(details);
 }
 
-const READING_BAND_LABEL = {
-	gold: "gold",
-	hard_exact: "exact",
-	soft_exact: "soft",
-	none: "unparsed",
+const READING_BAND_KEY = {
+	gold: "bandGold",
+	hard_exact: "bandExact",
+	soft_exact: "bandSoft",
+	none: "bandNone",
 };
 
 function readingBandLabel(band) {
-	return READING_BAND_LABEL[band] || band;
+	const key = READING_BAND_KEY[band];
+	return key ? translate(key) : band;
 }
 
 /**
