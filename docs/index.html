@@ -34,7 +34,7 @@
 		</div>
 		<p class="subtitle" data-i18n="subtitle">A block-based learning aid for building and taking apart Kalaallisut words and short sentences. Prototype — nothing here is authoritative.</p>
 		<form class="deconstruct-input" id="deconstruct-form">
-			<label for="word-input" data-i18n="attested">Word or sentence</label>
+			<label for="word-input" class="visually-hidden" data-i18n="attested">Word or sentence</label>
 			<div class="clearable">
 				<input id="word-input" type="text" data-i18n-placeholder="wordPlaceholder" placeholder="e.g. qimmeqarpunga or Piitap inaaniippoq." autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off" />
 				<button type="button" class="clear-field" id="word-input-clear" hidden aria-label="Clear word" data-i18n-aria-label="clearWord">×</button>
@@ -164,7 +164,7 @@
 				<input id="worked-examples-filter" type="search" data-examples-filter data-i18n-placeholder="workedExamplesFilterPh" placeholder="Filter by word or gloss…" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" />
 			</label>
 			<p id="worked-examples-status" class="modal-status" data-examples-status aria-live="polite" data-i18n="workedExamplesLoading">Loading examples…</p>
-			<div id="worked-examples-list" class="examples-list worked-examples-list" data-examples-list role="list"></div>
+			<div id="worked-examples-list" class="examples-list worked-examples-list" data-examples-list></div>
 		</div>
 	</dialog>
 
