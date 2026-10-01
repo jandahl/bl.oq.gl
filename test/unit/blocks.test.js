@@ -487,10 +487,12 @@ test("structuralCategoryConnections: stem cannot follow, particle is alone, encl
 	assert.equal(byId.particle.hasPrevious, false);
 	assert.equal(byId.particle.hasNext, false);
 	assert.equal(byId.particle.nextCheck, null);
-	assert.equal(byId.enclitic.hasNext, false);
-	assert.equal(byId.enclitic.nextCheck, null);
+	assert.equal(byId.enclitic.hasNext, true);
+	assert.equal(byId.enclitic.nextCheck, "ENCLITIC_FOLLOW");
 	assert.equal(byId.enclitic.hasPrevious, true);
-	assert.equal(byId.enclitic.previousCheck, "MORPHEME_CHAIN");
+	assert.deepEqual(byId.enclitic.previousCheck, ["MORPHEME_CHAIN", "ENCLITIC_FOLLOW"]);
+	assert.deepEqual(byId.deriv_enclitic.previousCheck, ["MORPHEME_CHAIN", "ENCLITIC_FOLLOW"]);
+	assert.equal(byId.deriv_enclitic.nextCheck, "MORPHEME_CHAIN");
 	assert.equal(byId.deriv_affix.hasPrevious, true);
 	assert.equal(byId.deriv_affix.hasNext, true);
 });

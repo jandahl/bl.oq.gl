@@ -26,11 +26,10 @@
 //   - a particle is a free-standing word: it can only be the SOLE item of a
 //     sequence, nothing may precede or follow it, not even another particle
 //     -- no previousConnection AND no nextConnection.
-//   - a plain enclitic always seals the word once attached (nothing but
-//     another enclitic-family morpheme could follow, and Blockly's static
-//     per-category check strings can't express "only these specific
-//     categories," so this is drawn conservatively at "nothing") -- no
-//     nextConnection.
+//   - a plain enclitic seals the word against ordinary affixes. Another
+//     enclitic-family morpheme may still follow, so its next check is
+//     ENCLITIC_FOLLOW rather than "nothing" (a null next throws when a plan
+//     connects a legal follower).
 // An ordinary WORD_FINAL inflectional ending does NOT get this treatment
 // (an earlier version of this file wrongly disabled its nextConnection too)
 // -- morphotactics.js's CLOSED_BYPASS_TYPES explicitly allows an enclitic or
@@ -77,6 +76,7 @@ bindVerbPickerHost({ labelFor, applyChainConnections });
 // Category hasPrevious/hasNext in CATEGORY_ORDER encodes: stem cannot follow,
 // particle is alone, enclitic seals the chain.
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
+const ENCLITIC_FOLLOW = "ENCLITIC_FOLLOW";
 const WORD_START_CONNECTION_TYPE = "WORD_START";
 const WORD_CHAIN_CONNECTION_TYPE = "WORD_CHAIN";
 /** A picker with no catalog match. Kept in the chain so buildWord fails closed instead of dropping the ending. */
@@ -107,7 +107,7 @@ const CATEGORY_ORDER = [
 	{ key: "derivational_prefix", id: "deriv_prefix", name: "Derivational prefixes", colourClass: "oq_derivational" },
 	{ key: "derivational_affix", id: "deriv_affix", name: "Derivational affixes", colourClass: "oq_derivational" },
 	{ key: "inflectional_ending", id: "inflection", name: "Inflectional endings", colourClass: "oq_inflectional" },
-	{ key: "enclitic", id: "enclitic", name: "Enclitics", colourClass: "oq_enclitic", hasNext: false },
+	{ key: "enclitic", id: "enclitic", name: "Enclitics", colourClass: "oq_enclitic" },
 	{ key: "derivational_enclitic", id: "deriv_enclitic", name: "Derivational enclitics", colourClass: "oq_enclitic" },
 	{ key: "sentential_affix", id: "sentential", name: "Sentential affixes", colourClass: "oq_inflectional" },
 	{ key: "particle", id: "particle", name: "Particles", colourClass: "oq_neutral", hasPrevious: false, hasNext: false },
@@ -310,16 +310,28 @@ export function defineMorphemeBlocks() {
 	}
 }
 
+function previousCheckFor(cat) {
+	if (cat.hasPrevious === false) return WORD_START_CONNECTION_TYPE;
+	if (cat.key === "enclitic" || cat.key === "derivational_enclitic") return [CONNECTION_TYPE, ENCLITIC_FOLLOW];
+	return CONNECTION_TYPE;
+}
+
+function nextCheckFor(cat) {
+	if (cat.hasNext === false) return null;
+	if (cat.key === "enclitic") return ENCLITIC_FOLLOW;
+	return CONNECTION_TYPE;
+}
+
 function applyChainConnections(block, cat, { inline = true } = {}) {
-	const startsWord = cat.hasPrevious === false;
-	const hasNext = cat.hasNext !== false;
+	const prevCheck = previousCheckFor(cat);
+	const nextCheck = nextCheckFor(cat);
 	if (!sideBySide()) {
-		block.setPreviousStatement(true, startsWord ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE);
-		block.setNextStatement(hasNext, CONNECTION_TYPE);
+		block.setPreviousStatement(true, prevCheck);
+		block.setNextStatement(Boolean(nextCheck), nextCheck);
 		return;
 	}
-	block.setOutput(true, startsWord ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE);
-	if (hasNext) block.appendValueInput("NEXT").setCheck(CONNECTION_TYPE);
+	block.setOutput(true, prevCheck);
+	if (nextCheck) block.appendValueInput("NEXT").setCheck(nextCheck);
 	if (inline) block.setInputsInline(true);
 }
 
@@ -773,7 +785,7 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 			const socket = prev ? prev.getInput("NEXT")?.connection : container.getInput("MORPHEMES")?.connection;
 			if (socket && block.outputConnection) socket.connect(block.outputConnection);
 		} else if (prev) {
-			prev.nextConnection.connect(block.previousConnection);
+			if (prev.nextConnection) prev.nextConnection.connect(block.previousConnection);
 		} else {
 			container.getInput("MORPHEMES").connection.connect(block.previousConnection);
 		}
@@ -939,8 +951,8 @@ export function structuralCategoryConnections() {
 		wordClass: cat.wordClass ?? null,
 		hasPrevious: cat.hasPrevious !== false,
 		hasNext: cat.hasNext !== false,
-		previousCheck: cat.hasPrevious === false ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE,
-		nextCheck: cat.hasNext === false ? null : CONNECTION_TYPE,
+		previousCheck: previousCheckFor(cat),
+		nextCheck: nextCheckFor(cat),
 	}));
 }
 
