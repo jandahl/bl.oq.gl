@@ -10,6 +10,7 @@ import {
 	EXAMPLES_CDN_URL,
 	examplesVersionedUrl,
 	resolveExamplesCatalog,
+	shapeExamplesPayload,
 } from "../../docs/examples-schema.js";
 
 test("normalizeExamplesCatalog maps worked and sentences, including gloss_en/da and object gloss", () => {
@@ -132,6 +133,57 @@ test("a pin schema other than v1 still consults the remote catalog", async () =>
 	assert.equal(fetched, 1);
 	assert.equal(source, "remote");
 	assert.equal(catalog.worked[0].surface, "from-cdn");
+});
+
+test("shapeExamplesPayload rejects an empty object but keeps a v1 catalog with no sentences", () => {
+	assert.equal(shapeExamplesPayload(null), null);
+	assert.equal(shapeExamplesPayload([]), null);
+	assert.equal(shapeExamplesPayload({}), null);
+	assert.equal(shapeExamplesPayload({ worked: [], sentences: [] }), null);
+	const v1 = shapeExamplesPayload({
+		schema_version: STANDARD_EXAMPLES_SCHEMA,
+		worked: [],
+		sentences: [],
+	});
+	assert.equal(v1.schema_version, STANDARD_EXAMPLES_SCHEMA);
+	assert.deepEqual(v1.worked, []);
+	assert.deepEqual(v1.sentences, []);
+});
+
+test("resolveExamplesCatalog does not treat an empty pin payload as success", async () => {
+	let fetched = 0;
+	const { catalog, source } = await resolveExamplesCatalog({
+		pinSchema: STANDARD_EXAMPLES_SCHEMA,
+		fetchCatalog: async () => {
+			fetched += 1;
+			return normalizeExamplesCatalog({
+				schema_version: STANDARD_EXAMPLES_SCHEMA,
+				worked: [{ surface: "from-cdn", gloss: "cdn" }],
+				sentences: [],
+			});
+		},
+		getStandardExamples: async () => ({}),
+		remoteUrls: ["https://cdn.example/examples.json"],
+	});
+	assert.equal(fetched, 1);
+	assert.equal(source, "remote");
+	assert.equal(catalog.worked[0].surface, "from-cdn");
+});
+
+test("resolveExamplesCatalog rejects an override that shapes to nothing", async () => {
+	await assert.rejects(
+		() => resolveExamplesCatalog({
+			override: "https://example.test/empty.json",
+			pinSchema: STANDARD_EXAMPLES_SCHEMA,
+			fetchCatalog: async () => shapeExamplesPayload({}),
+			getStandardExamples: async () => ({
+				schema_version: STANDARD_EXAMPLES_SCHEMA,
+				worked: [{ surface: "local", gloss: "local" }],
+				sentences: [],
+			}),
+		}),
+		/Examples override failed/,
+	);
 });
 
 test("glossText handles string and locale object glosses", () => {
