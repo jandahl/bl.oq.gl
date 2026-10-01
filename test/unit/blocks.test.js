@@ -460,50 +460,21 @@ test("wordsFromBlock: a sentence of stacked word containers yields one chain per
 	assert.deepEqual(wordsFromBlock(sentence), [["qimmeq"], ["nerivoq"]]);
 });
 
-test("topLevelSentences: a sentence chained after another sentence is not dropped", () => {
+test("topLevelSentences: words snapped together without a Sentence are not dropped", () => {
 	const stemA = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => null };
 	const stemB = { type: "morpheme_block__stem_n", data: "illu", getNextBlock: () => null };
-	const wordA = {
-		type: "morpheme_block__word_container",
-		getInputTargetBlock: (name) => name === "MORPHEMES" ? stemA : null,
-		getNextBlock: () => null,
-	};
 	const wordB = {
 		type: "morpheme_block__word_container",
 		getInputTargetBlock: (name) => name === "MORPHEMES" ? stemB : null,
 		getNextBlock: () => null,
 	};
-	const sentenceB = {
-		type: "morpheme_block__sentence_container",
-		getInputTargetBlock: (name) => name === "WORDS" ? wordB : null,
-		getNextBlock: () => null,
-	};
-	const sentenceA = {
-		type: "morpheme_block__sentence_container",
-		getInputTargetBlock: (name) => name === "WORDS" ? wordA : null,
-		getNextBlock: () => sentenceB,
-	};
-	assert.deepEqual(topLevelSentences({ getTopBlocks: () => [sentenceA] }), [[["qimmeq"]], [["illu"]]]);
-});
-
-test("topLevelSentences: a sentence nested under WORDS is not dropped", () => {
-	const stem = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => null };
-	const word = {
+	const wordA = {
 		type: "morpheme_block__word_container",
-		getInputTargetBlock: (name) => name === "MORPHEMES" ? stem : null,
-		getNextBlock: () => null,
+		getInputTargetBlock: (name) => name === "MORPHEMES" ? stemA : null,
+		getNextBlock: () => wordB,
 	};
-	const nested = {
-		type: "morpheme_block__sentence_container",
-		getInputTargetBlock: (name) => name === "WORDS" ? word : null,
-		getNextBlock: () => null,
-	};
-	const outer = {
-		type: "morpheme_block__sentence_container",
-		getInputTargetBlock: (name) => name === "WORDS" ? nested : null,
-		getNextBlock: () => null,
-	};
-	assert.deepEqual(topLevelSentences({ getTopBlocks: () => [outer] }), [[["qimmeq"]]]);
+	assert.deepEqual(topLevelSentences({ getTopBlocks: () => [wordA] }), [[["qimmeq"], ["illu"]]]);
+	assert.deepEqual(wordsFromBlock(wordA), [["qimmeq"], ["illu"]]);
 });
 
 test("topLevelSentences: Word and Sentence roots are collected", () => {
