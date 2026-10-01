@@ -235,6 +235,11 @@ function canvasGlossOptions() {
 	return { ...glossOptions(), ...nounPresentationPreferences() };
 }
 
+function nounPresentationValue() {
+	const { numberPreference, determinationPreference } = nounPresentationPreferences();
+	return `${numberPreference}|${determinationPreference}`;
+}
+
 function sentenceLang(opts = displayOptions()) {
 	// "both" analyzes the lattice in English (primary) and may request DA
 	// alongside — same meaning as glossOptions().lang for the primary pass.
@@ -513,6 +518,9 @@ function injectWorkspace(serializedState = null) {
 	session.workspace.addChangeListener((event) => {
 		if (event?.isUiEvent) return;
 		applyBuildShare(refreshBuild());
+		// The breakdown is not a build product. A noun presentation change
+		// still has to repaint it, or it stays on the value from when it opened.
+		if (event?.type === Blockly.Events.BLOCK_CHANGE && event.name === "PRESENTATION") rerenderBreakdown();
 	});
 	if (serializedState) Blockly.serialization.workspaces.load(serializedState, session.workspace);
 	registerVerbPickerReactivity(session.workspace);
@@ -911,11 +919,15 @@ function applyBuildShare(result) {
 
 function breakdownView() {
 	const opts = displayOptions();
+	const gloss = canvasGlossOptions();
 	return {
 		t,
 		reverseOrder: opts.readLastFirst,
-		...glossOptions(opts),
-		presentationPreferences: nounPresentationPreferences(),
+		...gloss,
+		presentationPreferences: {
+			numberPreference: gloss.numberPreference,
+			determinationPreference: gloss.determinationPreference,
+		},
 		headlineGloss,
 		showDanish: opts.lang === "both",
 		visibleAssembly,
@@ -1033,8 +1045,8 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 			sentence.words.filter((word) => word.canvasIds?.length).map((word) => word.canvasIds));
 		session.mode = "deconstruct";
 		syncDocumentTitle();
-		rerenderBreakdown();
 		if (!skipCanvas && session.workspace && plan.sentences.length) {
+			const presentation = nounPresentationValue();
 			renderSentencePlan(session.workspace, plan.sentences.map((sentence) => ({
 				source: sentence.source,
 				assembly: visibleAssembly(sentence.assembly),
@@ -1043,6 +1055,7 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 					raw: word.raw,
 					canvasIds: word.canvasIds,
 					heldLabel: word.heldLabel,
+					presentation,
 				})),
 			})), session.presetsById, displayOptions(), { forceSentence: true });
 			session.workspace.scrollCenter();
@@ -1050,6 +1063,8 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 			// refreshBuild paints labels; plan status must win over any build flash.
 			refreshBuild();
 		}
+		// After the canvas, so the breakdown reads the stems just drawn.
+		rerenderBreakdown();
 		showPlanStatus(plan);
 		updateSentenceReading(plan);
 		// This function writes the Deconstruct share URL after the canvas is painted.
@@ -1121,16 +1136,12 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 		session.lastDeconstructIds = okParts.length === 1 ? okParts[0].ids : okParts.map((p) => p.ids);
 		session.mode = "deconstruct";
 		syncDocumentTitle();
-		if (okParts.length) rerenderBreakdown();
-		else {
-			breakdownSummaryMeta.textContent = t("noVerifiedBreakdown", { token: failures[0]?.token || surface });
-			breakdownDetails.hidden = false;
-		}
 		if (!skipCanvas && session.workspace) {
 			const chains = okParts.map((p) => p.ids).filter((ids) => ids.length);
 			if (chains.length) {
+				const presentation = nounPresentationValue();
 				renderSentencePlan(session.workspace, [{
-					words: chains.map((ids) => ({ canvasIds: ids })),
+					words: chains.map((ids) => ({ canvasIds: ids, presentation })),
 				}], session.presetsById, displayOptions());
 				session.workspace.scrollCenter();
 				requestAnimationFrame(() => Blockly.svgResize(session.workspace));
@@ -1143,6 +1154,11 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 				renderSentencePlan(session.workspace, [], session.presetsById, displayOptions());
 				updateReadingLine(null);
 			}
+		}
+		if (okParts.length) rerenderBreakdown();
+		else {
+			breakdownSummaryMeta.textContent = t("noVerifiedBreakdown", { token: failures[0]?.token || surface });
+			breakdownDetails.hidden = false;
 		}
 		if (failures.length) {
 			const detail = failures.map((f) => t("noVerifiedBreakdown", { token: f.token })).join(" · ");
