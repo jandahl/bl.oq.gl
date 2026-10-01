@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { applyCatalogCompatibility, catalogFromPayload } from "../../docs/catalog.js";
+import { applyCatalogCompatibility, catalogFromPayload, loadCatalog } from "../../docs/catalog.js";
+import { createMemoryHttpCache, writeCatalogMeta } from "../../docs/catalog-cache.js";
 import { fixtureMergeMorphemeSources } from "../helpers/catalog-fixture.js";
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -49,4 +50,32 @@ test("catalogFromPayload + fixture merge: build-shaped seq is present for stems"
 	const dog = presets.find((p) => p.id === "qimmeq");
 	assert.equal(dog.seq[0].id, "qimmeq");
 	assert.equal(dog.seq[0].text, "qimmeq");
+});
+
+test("loadCatalog deletes a corrupt cache entry and loads from the network", async () => {
+	const url = "https://example.test/morphemes-by-id.json";
+	const cache = createMemoryHttpCache();
+	await cache.put(url, new Response("not json"));
+	await writeCatalogMeta(cache, { url, etag: "bad" });
+	const original = globalThis.fetch;
+	globalThis.fetch = async () => new Response(JSON.stringify(mini), {
+		status: 200,
+		headers: { etag: "good", "content-type": "application/json" },
+	});
+	try {
+		const catalog = await loadCatalog({
+			cache,
+			urls: [url],
+			engine: { mergeMorphemeSources: fixtureMergeMorphemeSources, GRAMMAR_MORPHEMES_URL: url },
+		});
+		assert.equal(catalog.fromCache, false);
+		assert.ok(catalog.presets.some((preset) => preset.id === "qimmeq"));
+		const stored = await cache.match(url);
+		assert.match(await stored.text(), /qimmeq/);
+		const meta = await (await cache.match("https://bloq.invalid/catalog-meta")).json();
+		assert.equal(meta.etag, "good");
+		assert.equal(meta.url, url);
+	} finally {
+		globalThis.fetch = original;
+	}
 });
