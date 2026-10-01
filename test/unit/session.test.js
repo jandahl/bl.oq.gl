@@ -10,6 +10,7 @@ import {
 	deconstructIdsMatchSentences,
 	computeBuild,
 	formatStatus,
+	labelsForCanvasWords,
 } from "../../docs/session.js";
 
 function preset(id, text = id) {
@@ -96,6 +97,10 @@ test("computeBuild: fixture chains return surfaces without Blockly or network", 
 	assert.equal(result.reading, "seqs");
 	assert.equal(result.share.mode, "build");
 	assert.equal(result.share.clearDeconstruct, true);
+	const labels = labelsForCanvasWords(result);
+	assert.equal(labels.built.length, 1);
+	assert.equal(labels.built[0].word, "nerivugut");
+	assert.deepEqual(labels.seqs[0].map((item) => item.id), ["neri", "V_IND_INTR_1PL"]);
 });
 
 test("computeBuild: unknown id and join failure return error results", () => {
@@ -134,6 +139,13 @@ test("computeBuild: three-word stack reports every outcome when the middle id is
 	assert.equal(result.wordOutcomes[2].ok, true);
 	assert.equal(result.kind, "error");
 	assert.deepEqual(result.surfaces, ["a", "?", "c"]);
+	const labels = labelsForCanvasWords(result);
+	assert.equal(labels.built[0].word, "a");
+	assert.equal(labels.built[1], null);
+	assert.equal(labels.built[2].word, "c");
+	assert.equal(labels.seqs[1], null);
+	assert.deepEqual(labels.seqs[0].map((item) => item.id), ["a"]);
+	assert.deepEqual(labels.seqs[2].map((item) => item.id), ["c"]);
 });
 
 test("formatStatus: partial build outcomes become one assertive status line", () => {

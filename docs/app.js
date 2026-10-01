@@ -8,7 +8,7 @@ import {
 import { sameIdTree } from "./id-tree.js";
 import {
 	createSession, clearAnalysisCaches, cancelDeconstruct, seqForChain as resolveSeqForChain, planMatchesCanvas,
-	deconstructIdsMatchSentences, computeBuild, formatStatus,
+	deconstructIdsMatchSentences, computeBuild, formatStatus, labelsForCanvasWords,
 } from "./session.js";
 import { renderSentenceBreakdown, renderWordBreakdowns, renderTonedPhrases, wordTone } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
@@ -825,6 +825,16 @@ function announceCanvasChains() {
 	live.textContent = lines.length ? lines.join(" | ") : "";
 }
 
+function paintCanvasLabels(result) {
+	// Failures stay in their own slot. Indexing result.built would slide the
+	// next successful surface onto the broken word.
+	const { built, seqs } = labelsForCanvasWords(result);
+	const translations = seqs.map((seq) => (seq
+		? composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions())
+		: ""));
+	labelContainers(session.workspace, built, translations);
+}
+
 function refreshBuild() {
 	if (!session.workspace) return null;
 	const sentences = topLevelSentences(session.workspace);
@@ -839,8 +849,7 @@ function refreshBuild() {
 	announceCanvasChains();
 
 	if (result.usePlan) {
-		labelContainers(session.workspace, result.built, result.seqs.map((seq) =>
-			composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions())));
+		paintCanvasLabels(result);
 		showPlanStatus(session.lastSentencePlan);
 		updateSentenceReading(session.lastSentencePlan);
 		return result;
@@ -853,9 +862,7 @@ function refreshBuild() {
 		return result;
 	}
 
-	const translations = result.seqs.map((seq) =>
-		composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions()));
-	labelContainers(session.workspace, result.built, translations);
+	paintCanvasLabels(result);
 	applyStatus(formatStatus(result, { t }));
 	updateReadingLine(result.error ? null : result.seqs);
 	return result;
