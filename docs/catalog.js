@@ -15,6 +15,7 @@
 import {
 	catalogResponseFromBuffer,
 	catalogUnchanged,
+	digestCatalog,
 	openCatalogCache,
 	parseCatalogBytes,
 	readBufferWithProgress,
@@ -115,11 +116,25 @@ async function revalidateCatalog(url, cache, meta, onUpdated, mergeMorphemeSourc
 			return;
 		}
 		const fresh = await fetchCatalogBuffer(url, undefined, { cache: "no-cache" });
+		const sha256 = await digestCatalog(fresh.buffer);
+		// A hidden ETag makes catalogUnchanged return false. Matching bytes
+		// are still the same catalog: do not parse, notify, or rewrite the body.
+		if (meta?.sha256 && meta.sha256 === sha256) {
+			await writeCatalogMeta(cache, {
+				...meta,
+				sha256,
+				fetchedAt: Date.now(),
+				url: fresh.url || url,
+				...(fresh.meta.etag ? { etag: fresh.meta.etag } : {}),
+				...(fresh.meta.lastModified ? { lastModified: fresh.meta.lastModified } : {}),
+			});
+			return;
+		}
 		const value = parseCatalogBytes(fresh.buffer);
 		// Validate before replacing the last good entry. A body that parses
 		// but fails the merge must not become the next visit's cache.
 		const catalog = catalogFromPayload(value, mergeMorphemeSources);
-		await persistCatalog(cache, url, fresh.buffer, fresh.meta);
+		await persistCatalog(cache, url, fresh.buffer, { ...fresh.meta, sha256 });
 		onUpdated?.(catalog);
 	} catch {
 		// Keep the cached catalog; the next visit will try again.
@@ -181,7 +196,8 @@ export async function loadCatalog(opts = {}) {
 	}
 
 	const fresh = await fetchCatalogBuffer(urls, onProgress);
+	const sha256 = await digestCatalog(fresh.buffer);
 	const catalog = { ...catalogFromPayload(parseCatalogBytes(fresh.buffer), mergeMorphemeSources), fromCache: false };
-	await persistCatalog(cache, fresh.url, fresh.buffer, fresh.meta);
+	await persistCatalog(cache, fresh.url, fresh.buffer, { ...fresh.meta, sha256 });
 	return catalog;
 }
