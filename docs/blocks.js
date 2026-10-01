@@ -347,10 +347,13 @@ function isZeroEndingPreset(preset) {
 
 export function defineNounEndingPickerBlock(nounEndingIndex, presetsById, getDisplayOptions) {
 	const options = (values, labels = values) => (values.length ? values.map((value, i) => [labels[i] ?? value, value]) : [["—", "NONE"]]);
-	const resolveFor = (block) => {
+	const resolveFor = (block, variantOverride) => {
 		const candidates = nounCandidatesFor(nounEndingIndex, block.getFieldValue("CASE"), block.getFieldValue("POSSESSOR"), block.getFieldValue("NUMBER"));
 		block.nounEndingPickerState.candidates = candidates.map((c) => [c.label.slice(0, 70), c.id]);
-		const currentVariant = block.getFieldValue("VARIANT");
+		// Field validators run before the new value is stored. A VARIANT
+		// change has to pass that proposed id in, or this read of the field
+		// still sees the previous candidate and writes it back to block.data.
+		const currentVariant = variantOverride ?? block.getFieldValue("VARIANT");
 		const id = candidates.some((c) => c.id === currentVariant) ? currentVariant : candidates[0]?.id ?? null;
 		block.data = id;
 		block.getField("RESOLVED")?.setValue(id && presetsById.get(id) ? labelFor(presetsById.get(id), getDisplayOptions()) : t("noSuchEnding"));
@@ -361,7 +364,11 @@ export function defineNounEndingPickerBlock(nounEndingIndex, presetsById, getDis
 		init() {
 			this.nounEndingPickerState = { candidates: [] };
 			this.appendDummyInput("RESOLVED").appendField(new Blockly.FieldLabelSerializable(""), "RESOLVED");
-			const changed = function () { const block = this.getSourceBlock(); if (block) resolveFor(block); };
+			const changed = function (newValue) {
+				const block = this.getSourceBlock();
+				if (block) resolveFor(block, this.name === "VARIANT" ? newValue : undefined);
+				return newValue;
+			};
 			this.appendDummyInput().appendField(`${UI_INDENT}Case`).appendField(new Blockly.FieldDropdown(options(nounEndingIndex.cases), changed), "CASE");
 			this.appendDummyInput().appendField(`${UI_INDENT}Possessor`).appendField(new Blockly.FieldDropdown(options(nounEndingIndex.possessors), changed), "POSSESSOR");
 			this.appendDummyInput().appendField(`${UI_INDENT}Number`).appendField(new Blockly.FieldDropdown(options(nounEndingIndex.numbers), changed), "NUMBER");
@@ -1135,6 +1142,9 @@ export function restoreNounPickerFields(block, preset) {
 	if (!variantField) return;
 	variantField.getOptions(false);
 	block.setFieldValue(preset.id, "VARIANT");
+	// The validator may have resolved against the previous variant. The
+	// field value is committed now, so resolve once more from the field.
+	block.nounEndingPickerState.resolve();
 }
 
 /** Paints built surface forms and translations onto Word / Sentence containers.
