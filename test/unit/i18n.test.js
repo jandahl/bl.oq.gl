@@ -43,3 +43,25 @@ test("i18n covers status and canvas strings in English and Danish", () => {
 	assert.equal(t("results"), "Resultater");
 	setLocale("en");
 });
+
+test("learner-facing band, note, sentence, and candidate strings exist in both locales", () => {
+	setLocale("en");
+	assert.equal(t("bandGold"), "gold");
+	assert.equal(t("bandExact"), "exact");
+	assert.equal(t("bandSoft"), "soft");
+	assert.equal(t("bandNone"), "unparsed");
+	assert.equal(t("noBuilderSequence"), "Catalog entry has no builder sequence.");
+	assert.equal(t("closedReadingDoesNotBuild"), "This closed reading does not build.");
+	assert.equal(t("sentenceN", { n: 2 }), "Sentence 2");
+	assert.equal(t("evalCandidates", { count: 4 }), "4 candidates");
+	setLocale("da");
+	assert.equal(t("bandGold"), "guld");
+	assert.equal(t("bandExact"), "eksakt");
+	assert.equal(t("bandSoft"), "blød");
+	assert.equal(t("bandNone"), "utolket");
+	assert.equal(t("noBuilderSequence"), "Katalogposten har ingen byggesekvens.");
+	assert.equal(t("closedReadingDoesNotBuild"), "Denne lukkede læsning kan ikke bygges.");
+	assert.equal(t("sentenceN", { n: 2 }), "Sætning 2");
+	assert.equal(t("evalCandidates", { count: 4 }), "4 kandidater");
+	setLocale("en");
+});
