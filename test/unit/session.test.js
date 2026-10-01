@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
 	createSession,
 	clearAnalysisCaches,
+	cancelDeconstruct,
 	seqForChain,
 	planMatchesCanvas,
 	normalizeDeconstructIds,
@@ -35,6 +36,19 @@ test("createSession holds analysis caches off the module scope", () => {
 	clearAnalysisCaches(session);
 	assert.equal(session.lastDeconstructWord, "");
 	assert.equal(session.lastSentencePlan, null);
+});
+
+test("cancelDeconstruct aborts the controller and invalidates the run id", () => {
+	const session = createSession();
+	const controller = new AbortController();
+	session.deconstructAbort = controller;
+	session.deconstructRun = 2;
+	cancelDeconstruct(session);
+	assert.equal(controller.signal.aborted, true);
+	assert.equal(session.deconstructAbort, null);
+	assert.equal(session.deconstructRun, 3);
+	cancelDeconstruct(session);
+	assert.equal(session.deconstructRun, 4);
 });
 
 test("seqForChain resolves fixture presets without a live catalog", () => {
