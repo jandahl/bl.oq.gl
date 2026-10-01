@@ -134,9 +134,16 @@ function sideBySide() {
 }
 
 function categoryForPreset(preset) {
+	const wordClass = preset.word_class || "";
 	const match = CATEGORY_ORDER.find((c) =>
-		c.key === preset.morpheme_type && (c.wordClass === undefined || c.wordClass === (preset.word_class || "")));
-	return match ?? CATEGORY_ORDER.find((c) => c.key === preset.morpheme_type) ?? FALLBACK_CATEGORY;
+		c.key === preset.morpheme_type && (c.wordClass === undefined || c.wordClass === wordClass));
+	if (match) return match;
+	// Stem rows are N, then V, then "" ("Stems — other"). A class that is
+	// none of those must not fall through to the first stem row (nouns).
+	if (preset.morpheme_type === "stem") {
+		return CATEGORY_ORDER.find((c) => c.key === "stem" && c.wordClass === "") ?? FALLBACK_CATEGORY;
+	}
+	return CATEGORY_ORDER.find((c) => c.key === preset.morpheme_type) ?? FALLBACK_CATEGORY;
 }
 
 function blockTypeForCategory(cat) {

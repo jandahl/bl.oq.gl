@@ -34,6 +34,18 @@ test("buildToolbox: groups presets into the right category by morpheme_type + wo
 	assert.ok(names.some((n) => n.startsWith("Derivational affixes (1)")));
 });
 
+test("buildToolbox: a stem whose word class is neither N nor V goes to Stems — other", () => {
+	const presets = [
+		preset({ id: "qimmeq", morpheme_type: "stem", word_class: "N" }),
+		preset({ id: "aamma", morpheme_type: "stem", word_class: "P" }),
+	];
+	const toolbox = buildToolbox(presets, { showIds: false });
+	const nouns = toolbox.contents.find((c) => c.name.startsWith("Stems — nouns"));
+	const other = toolbox.contents.find((c) => c.name.startsWith("Stems — other"));
+	assert.deepEqual(nouns.contents.map((block) => block.data), ["qimmeq"]);
+	assert.deepEqual(other.contents.map((block) => block.data), ["aamma"]);
+});
+
 test("buildToolbox: a category with zero matching presets doesn't appear at all (regression guard for the filter box feeling 'live')", () => {
 	const presets = [preset({ id: "qimmeq", morpheme_type: "stem", word_class: "N" })];
 	const toolbox = buildToolbox(presets, { showIds: false });
