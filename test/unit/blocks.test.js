@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, restoreNounPickerFields } from "../../docs/blocks.js";
 import { canvasIdTree, sameIdTree } from "../../docs/id-tree.js";
 
 // These blocks.js exports don't touch the `Blockly` global, so they're
@@ -21,6 +21,55 @@ function preset(overrides) {
 		...overrides,
 	};
 }
+
+function fakeNounPicker(candidateIds) {
+	const fields = { CASE: null, POSSESSOR: null, NUMBER: null, VARIANT: "NONE" };
+	const variant = {
+		options: [["—", "NONE"]],
+		getOptions(useCache) {
+			if (useCache === false) this.options = candidateIds.map((id) => [id, id]);
+			return this.options;
+		},
+	};
+	const block = {
+		data: null,
+		nounEndingPickerState: {
+			resolve() {
+				const current = fields.VARIANT;
+				block.data = candidateIds.includes(current) ? current : (candidateIds[0] ?? null);
+			},
+		},
+		getField(name) {
+			return name === "VARIANT" ? variant : null;
+		},
+		setFieldValue(value, name) {
+			// Stale VARIANT menus reject an id they have not generated yet.
+			if (name === "VARIANT" && !variant.options.some((opt) => opt[1] === value)) return;
+			fields[name] = value;
+			if (name === "VARIANT") block.data = value;
+		},
+	};
+	return { block, fields };
+}
+
+test("restoreNounPickerFields selects the non-first candidate of a coordinate", () => {
+	const { block, fields } = fakeNounPicker(["N_ABS_POSS1SG_PL", "N_ABS_POSS1SG_PL_ARCHAIC"]);
+	restoreNounPickerFields(block, {
+		id: "N_ABS_POSS1SG_PL_ARCHAIC",
+		lexical_facts: { morpheme_type: "inflectional_ending", case: "absolutive" },
+	});
+	assert.equal(fields.CASE, "absolutive");
+	assert.equal(fields.POSSESSOR, "1SG");
+	assert.equal(fields.NUMBER, "PL");
+	assert.equal(block.data, "N_ABS_POSS1SG_PL_ARCHAIC");
+});
+
+test("restoreNounPickerFields reads case from the id when lexical_facts.case is absent", () => {
+	const { block, fields } = fakeNounPicker(["N_ERG_SG"]);
+	restoreNounPickerFields(block, { id: "N_ERG_SG", morpheme_type: "inflectional_ending" });
+	assert.equal(fields.CASE, "ergative");
+	assert.equal(block.data, "N_ERG_SG");
+});
 
 test("buildToolbox: groups presets into the right category by morpheme_type + word_class", () => {
 	const presets = [
