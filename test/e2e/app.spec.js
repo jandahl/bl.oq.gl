@@ -487,6 +487,29 @@ test("Build: directional connections — word starts accept only a container, en
 	expect(result.particleHasNext).toBe(false);
 });
 
+test("Build: a Sentence is a root with no previous or next notch", async ({ page }) => {
+	const result = await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		const sentence = ws.newBlock("morpheme_block__sentence_container");
+		sentence.initSvg();
+		sentence.render();
+		const word = ws.newBlock("morpheme_block__word_container");
+		word.initSvg();
+		word.render();
+		const out = {
+			sentencePrevious: sentence.previousConnection,
+			sentenceNext: sentence.nextConnection,
+			wordNext: word.nextConnection !== null,
+		};
+		sentence.dispose(false);
+		word.dispose(false);
+		return out;
+	});
+	expect(result.sentencePrevious).toBeNull();
+	expect(result.sentenceNext).toBeNull();
+	expect(result.wordNext).toBe(true);
+});
+
 test("Build: palette Hide/Show actually hides the toolbox, and never throws (bl-oq-ly#9: updateToolbox(null) throws — must use Toolbox.setVisible())", async ({ page }) => {
 	await expect(page.locator(".blocklyToolbox")).toBeVisible();
 	await page.click("#palette-toggle");

@@ -274,7 +274,9 @@ export function defineMorphemeBlocks() {
 	Blockly.Blocks[SENTENCE_CONTAINER_TYPE] = {
 		init() {
 			// Title row carries the translation label so the statement C stays open
-			// at the bottom (no sealing END dummy after WORDS).
+			// at the bottom (no sealing END dummy after WORDS). A sentence is a
+			// root: no previous/next, so it cannot snap inside another sentence
+			// or onto a word. WORD_CHAIN is only for words.
 			this.appendDummyInput("TITLE_ROW")
 				.appendField(new Blockly.FieldLabelSerializable("Sentence"), "TITLE")
 				.appendField(new Blockly.FieldLabelSerializable(""), "TRANSLATION");
@@ -572,31 +574,39 @@ export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker =
  * @param {any} workspace
  * @returns {{ sentences: Array<{ block: any, words: Array<{ ids: string[], held: string|null, block: any }> }> }}
  */
+function collectChainedWords(start) {
+	const words = [];
+	const seen = new Set();
+	let cur = start;
+	while (cur && !seen.has(cur)) {
+		seen.add(cur);
+		if (cur.type === WORD_CONTAINER_TYPE) {
+			const held = cur.bloqHeld || null;
+			const ids = held ? [] : idsInsideWord(cur);
+			if (held || ids.length) words.push({ ids, held, block: cur });
+		} else if (isMorphemeBlockType(cur.type)) {
+			const ids = morphemeIdsFrom(cur);
+			if (ids.length) words.push({ ids, held: null, block: cur });
+			break;
+		}
+		cur = cur.getNextBlock?.() || null;
+	}
+	return words;
+}
+
 export function canvasTree(workspace) {
 	const sentences = [];
 	for (const top of workspace.getTopBlocks(true)) {
 		if (top.type === SENTENCE_CONTAINER_TYPE) {
-			const words = [];
-			let cur = top.getInputTargetBlock("WORDS");
-			while (cur) {
-				if (cur.type === WORD_CONTAINER_TYPE) {
-					const held = cur.bloqHeld || null;
-					const ids = held ? [] : idsInsideWord(cur);
-					if (held || ids.length) words.push({ ids, held, block: cur });
-				} else if (isMorphemeBlockType(cur.type)) {
-					const ids = morphemeIdsFrom(cur);
-					if (ids.length) words.push({ ids, held: null, block: cur });
-					break;
-				}
-				cur = cur.getNextBlock();
-			}
+			const words = collectChainedWords(top.getInputTargetBlock?.("WORDS"));
 			if (words.length) sentences.push({ block: top, words });
 			continue;
 		}
 		if (top.type === WORD_CONTAINER_TYPE) {
-			const held = top.bloqHeld || null;
-			const ids = held ? [] : idsInsideWord(top);
-			if (held || ids.length) sentences.push({ block: null, words: [{ ids, held, block: top }] });
+			// A word snapped onto another word is not its own top block.
+			// Follow the chain or the tail never reaches the reading line.
+			const words = collectChainedWords(top);
+			if (words.length) sentences.push({ block: null, words });
 			continue;
 		}
 		if (isMorphemeBlockType(top.type)) {
