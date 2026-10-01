@@ -10,7 +10,7 @@ import {
 	createSession, clearAnalysisCaches, seqForChain as resolveSeqForChain, planMatchesCanvas,
 	deconstructIdsMatchSentences, computeBuild, formatStatus,
 } from "./session.js";
-import { renderBreakdown, renderAlternativeBreakdowns, renderTonedPhrases, wordTone } from "./breakdown.js";
+import { renderSentenceBreakdown, renderWordBreakdowns, renderTonedPhrases, wordTone } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
 import { readState, writeState, routeForState } from "./router.js";
@@ -255,7 +255,7 @@ function syncMoodLabels() {
 		block.setFieldValue(text, "TRANSLATION");
 	});
 	updateSentenceReading(session.lastSentencePlan);
-	renderSentenceBreakdown(session.lastSentencePlan);
+	revealBreakdown(renderSentenceBreakdown(breakdownDiv, session.lastSentencePlan, glossSummaryItems, breakdownView()));
 }
 
 function selectExample(word) {
@@ -886,9 +886,31 @@ function applyBuildShare(result) {
 	}
 }
 
+function breakdownView() {
+	const opts = displayOptions();
+	return {
+		t,
+		reverseOrder: opts.readLastFirst,
+		...glossOptions(opts),
+		headlineGloss,
+		showDanish: opts.lang === "both",
+		visibleAssembly,
+		builderHref: (seq) => `${location.pathname}${writeState({ chain: seq.map((item) => item.id).filter(Boolean) })}`,
+	};
+}
+
+function revealBreakdown(meta) {
+	breakdownSummaryMeta.textContent = meta;
+	// Only auto-open the first time the breakdown panel appears. A later
+	// re-render — display-option toggle, etc. — must leave its fold state alone.
+	const firstShow = breakdownDetails.hidden;
+	breakdownDetails.hidden = false;
+	if (firstShow) breakdownDetails.open = false;
+}
+
 function rerenderBreakdown() {
 	if (session.lastSentencePlan) {
-		renderSentenceBreakdown(session.lastSentencePlan);
+		revealBreakdown(renderSentenceBreakdown(breakdownDiv, session.lastSentencePlan, glossSummaryItems, breakdownView()));
 		return;
 	}
 	const parts = session.lastDeconstructParts?.length
@@ -897,48 +919,8 @@ function rerenderBreakdown() {
 			? [{ word: session.lastDeconstructWord, seq: session.lastDeconstructSeq, built: session.lastDeconstructBuilt, alternatives: session.lastDeconstructAlternatives }]
 			: []);
 	if (!parts.length) return;
-	breakdownDiv.innerHTML = "";
-	const metas = [];
-	for (let i = 0; i < parts.length; i++) {
-		const part = parts[i];
-		const article = document.createElement("article");
-		if (i === 0) article.id = "primary-breakdown";
-		article.classList.add("word-toned");
-		article.dataset.wordTone = wordTone(i);
-		if (parts.length > 1) article.classList.add("sentence-word-breakdown");
-		renderBreakdown(article, part.word, part.seq, part.built, glossSummaryItems, {
-			reverseOrder: displayOptions().readLastFirst,
-			...glossOptions(),
-			headlineGloss,
-		});
-		breakdownDiv.appendChild(article);
-		if (part.alternatives?.length) {
-			renderAlternativeBreakdowns(breakdownDiv, part.alternatives, glossSummaryItems, {
-				word: part.word,
-				reverseOrder: displayOptions().readLastFirst,
-				...glossOptions(),
-				headlineGloss,
-				builderHref: (seq) => `${location.pathname}${writeState({ chain: seq.map((item) => item.id).filter(Boolean) })}`,
-			});
-		}
-		const n = article.querySelectorAll(".breakdown-row").length;
-		const translation = article.querySelector(".breakdown-translation")?.textContent;
-		metas.push(translation ? `${n} · ${translation}` : String(n));
-	}
-	breakdownSummaryMeta.textContent = metas.join("  ·  ");
-	// Only auto-open the first time the breakdown panel appears. A later
-	// re-render — display-option toggle, etc. — must leave its fold state alone.
-	const firstShow = breakdownDetails.hidden;
-	breakdownDetails.hidden = false;
-	if (firstShow) breakdownDetails.open = false;
+	revealBreakdown(renderWordBreakdowns(breakdownDiv, parts, glossSummaryItems, breakdownView()));
 }
-
-const READING_BAND_LABEL = {
-	gold: "gold",
-	hard_exact: "exact",
-	soft_exact: "soft",
-	none: "unparsed",
-};
 
 function materializePlan(plan) {
 	return {
@@ -978,100 +960,6 @@ function planStatusMeta(plan) {
 	const modes = [...new Set(plan.sentences.map((sentence) => sentence.assembly?.mode).filter(Boolean))];
 	const modeLabel = modes.join(" + ") || "sentence";
 	return count > 1 ? `${count} sentences · ${modeLabel}` : modeLabel;
-}
-
-function renderSentenceBreakdown(plan) {
-	breakdownDiv.innerHTML = "";
-	if (plan.sentences.length > 1 && plan.assembly?.text) {
-		const lead = document.createElement("p");
-		lead.className = "sentence-assembly sentence-assembly-all";
-		lead.textContent = visibleAssembly(plan.assembly);
-		breakdownDiv.appendChild(lead);
-	}
-	const metas = [];
-	plan.sentences.forEach((sentence, s) => {
-		const section = document.createElement("section");
-		section.className = "sentence-breakdown";
-		section.dataset.wordTone = wordTone(s);
-		const head = document.createElement("header");
-		head.className = "sentence-breakdown-head";
-		const source = document.createElement("p");
-		source.className = "sentence-source";
-		source.textContent = sentence.source;
-		head.appendChild(source);
-		if (sentence.assembly?.text) {
-			const line = document.createElement("p");
-			line.className = "sentence-assembly";
-			const badge = document.createElement("span");
-			badge.className = `sentence-mode mode-${sentence.assembly.mode || "serial"}`;
-			badge.textContent = sentence.assembly.mode || "serial";
-			const reading = visibleAssembly(sentence.assembly);
-			line.append(badge, " ", reading);
-			head.appendChild(line);
-			metas.push(reading);
-		}
-		if (sentence.assemblyDa?.text && displayOptions().lang === "both") {
-			const da = document.createElement("p");
-			da.className = "sentence-assembly sentence-assembly-da";
-			da.textContent = visibleAssembly(sentence.assemblyDa);
-			head.appendChild(da);
-		}
-		section.appendChild(head);
-		sentence.words.forEach((word, i) => {
-			const article = document.createElement("article");
-			article.classList.add("word-toned", "sentence-word-breakdown");
-			article.dataset.wordTone = wordTone(i);
-			if (s === 0 && i === 0) article.id = "primary-breakdown";
-			const band = document.createElement("p");
-			band.className = `reading-band band-${word.band || "none"}`;
-			band.textContent = `${READING_BAND_LABEL[word.band] || word.band} · ${word.surface}`;
-			article.appendChild(band);
-			if (word.seq && word.built?.ok) {
-				renderBreakdown(article, word.surface, word.seq, word.built, glossSummaryItems, {
-					reverseOrder: displayOptions().readLastFirst,
-					...glossOptions(),
-					headlineGloss,
-				});
-			} else {
-				const heading = document.createElement("div");
-				heading.className = "breakdown-word";
-				heading.textContent = word.raw;
-				article.appendChild(heading);
-				if (word.headline && word.headline !== word.raw) {
-					const gloss = document.createElement("p");
-					gloss.className = "breakdown-translation";
-					gloss.textContent = word.headline;
-					article.appendChild(gloss);
-				}
-				if (word.compositional && word.compositional !== word.headline) {
-					const unused = document.createElement("p");
-					unused.className = "breakdown-note";
-					unused.textContent = t("closedChainUnused", { text: word.compositional });
-					article.appendChild(unused);
-				}
-				const note = document.createElement("p");
-				note.className = "breakdown-note";
-				note.textContent = word.note || t("notOnCanvas");
-				article.appendChild(note);
-			}
-			if (word.alternatives?.length) {
-				const list = document.createElement("ul");
-				list.className = "sentence-also";
-				for (const alt of word.alternatives) {
-					const item = document.createElement("li");
-					item.textContent = `${READING_BAND_LABEL[alt.band] || alt.band}: ${alt.headline || alt.ids.join(" + ")}`;
-					list.appendChild(item);
-				}
-				article.appendChild(list);
-			}
-			section.appendChild(article);
-		});
-		breakdownDiv.appendChild(section);
-	});
-	breakdownSummaryMeta.textContent = metas.join("  ·  ");
-	const firstShow = breakdownDetails.hidden;
-	breakdownDetails.hidden = false;
-	if (firstShow) breakdownDetails.open = false;
 }
 
 async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
@@ -1135,7 +1023,7 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 		}
 		showPlanStatus(plan);
 		updateSentenceReading(plan);
-		// Caller owns share URL: push a Deconstruct history entry after canvas paint.
+		// This function writes the Deconstruct share URL after the canvas is painted.
 		syncURL({ push: true });
 	} catch (err) {
 		if (err?.name === "AbortError" || run !== session.deconstructRun) return;
@@ -1226,7 +1114,7 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 				assertive: true,
 			});
 		}
-		// Caller owns share URL after programmatic render (events disabled in renderer).
+		// This function writes the Deconstruct share URL after the canvas is painted.
 		syncURL({ push: true });
 	} catch (err) {
 		if (err?.name === "AbortError" || run !== session.deconstructRun) return;
@@ -1297,7 +1185,7 @@ function bindUiEvents() {
 	filterInput.addEventListener("input", applyToolbox);
 }
 
-async function loadEngine() {
+async function loadCatalogAndBlocks() {
 	blocklyThemes = buildBlocklyThemes();
 	setStatus(t("loading"), "");
 	const catalog = await loadCatalog({
@@ -1394,7 +1282,7 @@ async function startInner() {
 		if (!session.presets.length) {
 			showLoadingModal();
 			setLoadingProgress({});
-			await loadEngine();
+			await loadCatalogAndBlocks();
 		}
 		if (!examplesPanel) {
 			await loadAndMountExamples();
