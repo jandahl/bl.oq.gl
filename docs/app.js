@@ -734,7 +734,7 @@ function syncURL({ push = false } = {}) {
 	const state = currentShareState();
 	const url = routeForState(location.pathname) + writeState(state) + location.hash;
 	const current = location.pathname + location.search + location.hash;
-	if (!push && url === current) return;
+	if (url === current) return;
 	preservePageScroll(() => {
 		if (push) history.pushState(null, "", url);
 		else history.replaceState(null, "", url);
@@ -748,13 +748,21 @@ function syncURL({ push = false } = {}) {
  * longer switches a hidden panel. Never itself touches the URL (the
  * caller already has it, or is about to set it). */
 function applyShareState(state) {
+	const sentences = state.sentences?.length
+		? state.sentences
+		: ((state.words && state.words.length) ? [state.words] : (state.chain.length ? [state.chain] : []));
+	// Back to a bare URL must undo the workshop. Build uses replaceState, so
+	// the history entry under a Deconstruct push is often `/` with no word
+	// and no chain. clearCanvas already cancels an in-flight analysis and
+	// does not push another history entry.
+	if (!state.word && sentences.length === 0) {
+		clearCanvas();
+		return;
+	}
 	if (state.word) {
 		setFieldValue(wordInput, state.word);
 		if (!session.lastDeconstructWord) session.lastDeconstructWord = state.word;
 	}
-	const sentences = state.sentences?.length
-		? state.sentences
-		: ((state.words && state.words.length) ? [state.words] : (state.chain.length ? [state.chain] : []));
 	if (sentences.length > 0 && session.workspace) {
 		const current = topLevelSentences(session.workspace);
 		const same = sameIdTree(current, sentences);
@@ -895,6 +903,7 @@ function applyBuildShare(result) {
 		session.mode = "build";
 		session.lastDeconstructWord = "";
 		session.lastSentencePlan = null;
+		syncDocumentTitle();
 		syncURL({ push: false });
 	}
 }
