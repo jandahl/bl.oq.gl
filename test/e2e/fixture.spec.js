@@ -123,6 +123,21 @@ test("a failed word Deconstruct clears the previous canvas", async ({ page }) =>
 	await expect(page).toHaveURL(/[?&]w=notaword/);
 });
 
+test("back to an empty URL clears the workshop", async ({ page }) => {
+	await page.locator("#word-input").fill("notaword");
+	await page.locator("#analyze-btn").click();
+	await expect(page).toHaveURL(/[?&]w=notaword/);
+	await expect(page).toHaveTitle("notaword - BLOQ");
+	const historyLength = await page.evaluate(() => history.length);
+	await page.locator("#analyze-btn").click();
+	expect(await page.evaluate(() => history.length)).toBe(historyLength);
+	await page.goBack();
+	await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:8000\/?$/);
+	await expect(page.locator("#word-input")).toHaveValue("");
+	await expect(page).toHaveTitle("BLOQ");
+	expect(await canvasBlockCount(page)).toBe(0);
+});
+
 test("empty Deconstruct submit cancels an in-flight analysis", async ({ page }) => {
 	await bootSlowAnalyze(page);
 	await page.locator("#word-input").fill("nerivoq");
