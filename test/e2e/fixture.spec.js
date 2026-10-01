@@ -106,6 +106,23 @@ test("clear canvas cancels an in-flight Deconstruct", async ({ page }) => {
 	expect(await canvasBlockCount(page)).toBe(0);
 });
 
+test("a failed word Deconstruct clears the previous canvas", async ({ page }) => {
+	await page.evaluate(() => {
+		const workspace = Blockly.getMainWorkspace();
+		const block = workspace.newBlock("morpheme_block__stem_n");
+		block.initSvg();
+		block.render();
+	});
+	expect(await canvasBlockCount(page)).toBeGreaterThan(0);
+	await page.locator("#word-input").fill("notaword");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#status-line")).toContainText(/No verified breakdown found for "notaword"/);
+	await expect(page.locator("#status-line")).not.toContainText(/Drag a morpheme/);
+	await expect(page.locator("#reading-line")).toBeHidden();
+	expect(await canvasBlockCount(page)).toBe(0);
+	await expect(page).toHaveURL(/[?&]w=notaword/);
+});
+
 test("empty Deconstruct submit cancels an in-flight analysis", async ({ page }) => {
 	await bootSlowAnalyze(page);
 	await page.locator("#word-input").fill("nerivoq");
