@@ -917,7 +917,7 @@ function breakdownView() {
 		headlineGloss,
 		showDanish: opts.lang === "both",
 		visibleAssembly,
-		builderHref: (seq) => `${location.pathname}${writeState({ chain: seq.map((item) => item.id).filter(Boolean) })}`,
+		builderHref: (seq) => `${routeForState(location.pathname)}${writeState({ chain: seq.map((item) => item.id).filter(Boolean) })}`,
 	};
 }
 
