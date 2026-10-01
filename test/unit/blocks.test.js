@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers, UNRESOLVED_MORPHEME_ID } from "../../docs/blocks.js";
 import { canvasIdTree, sameIdTree } from "../../docs/id-tree.js";
 
 // buildToolbox / the canvas walkers don't touch the Blockly global. renderSentencePlan
@@ -401,6 +401,12 @@ test("chainFromTopBlock: walks a fake block stack via getNextBlock(), collecting
 	const second = { type: "morpheme_block__deriv_affix", data: "N_qaq_Vb", getNextBlock: () => third };
 	const first = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => second };
 	assert.deepEqual(chainFromTopBlock(first), ["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"]);
+});
+
+test("chainFromTopBlock: a picker with no block.data stays in the chain", () => {
+	const picker = { type: "morpheme_block__verb_ending_picker", data: null, getNextBlock: () => null };
+	const stem = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => picker };
+	assert.deepEqual(chainFromTopBlock(stem), ["qimmeq", UNRESOLVED_MORPHEME_ID]);
 });
 
 test("chainFromTopBlock: a null/undefined chain link stops the walk cleanly", () => {

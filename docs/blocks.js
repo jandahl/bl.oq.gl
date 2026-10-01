@@ -79,6 +79,8 @@ bindVerbPickerHost({ labelFor, applyChainConnections });
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
 const WORD_START_CONNECTION_TYPE = "WORD_START";
 const WORD_CHAIN_CONNECTION_TYPE = "WORD_CHAIN";
+/** A picker with no catalog match. Kept in the chain so buildWord fails closed instead of dropping the ending. */
+export const UNRESOLVED_MORPHEME_ID = "bloq:unresolved";
 const BLOCK_TYPE_PREFIX = "morpheme_block__";
 const ROW_TYPE = `${BLOCK_TYPE_PREFIX}word_row`;
 const ROW_CONNECTION = "WORD_ROW";
@@ -590,7 +592,7 @@ function morphemeIdsFrom(block) {
 	const ids = [];
 	let cur = block;
 	while (cur) {
-		if (isMorphemeBlockType(cur.type) && cur.data) ids.push(cur.data);
+		if (isMorphemeBlockType(cur.type)) ids.push(cur.data || UNRESOLVED_MORPHEME_ID);
 		// Horizontal pieces plug into NEXT. Stack pieces use getNextBlock.
 		// A fake test block has only one of the two.
 		const next = cur.getInputTargetBlock?.("NEXT");
