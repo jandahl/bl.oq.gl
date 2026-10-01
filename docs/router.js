@@ -95,9 +95,11 @@ export function writeState({ mode, word, chain, words, sentences } = {}) {
 
 /** Returns the canonical route, preserving a deployed site's base path. */
 export function routeForState(pathname = "/") {
-	const suffix = "/deconstruct/";
-	const base = pathname.endsWith(suffix)
-		? pathname.slice(0, -suffix.length)
-		: pathname.endsWith("/") ? pathname : `${pathname}/`;
-	return base || "/";
+	const stripped = String(pathname || "/").replace(/\/deconstruct\/?$/, "") || "/";
+	if (stripped.endsWith("/")) return stripped;
+	// Only a final segment with one extension (index.html) is a file.
+	// A dotted base such as /bl.oq.gl is still a directory.
+	const last = stripped.slice(stripped.lastIndexOf("/") + 1);
+	if (/^[^./]+\.[a-z0-9]+$/i.test(last)) return stripped;
+	return `${stripped}/`;
 }
