@@ -309,6 +309,7 @@ function initDisplayOptions() {
 		setLocale(uiLangSelect.value);
 		setActiveLocale(uiLangSelect.value);
 		applyLocale();
+		syncPaletteToggle();
 		examplesPanel?.refreshChrome();
 		syncDocumentTitle();
 		applyTheme(document.documentElement.dataset.theme || "auto");
@@ -1145,6 +1146,12 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 // API for this -- NOT session.workspace.updateToolbox(null), which throws ("Can't
 // nullify an existing toolbox"): updateToolbox only supports swapping a
 // toolbox's *content*, never removing one already injected with a toolbox.
+function syncPaletteToggle() {
+	if (!paletteToggleBtn) return;
+	paletteToggleBtn.textContent = t(paletteVisible ? "paletteHide" : "paletteShow");
+	paletteToggleBtn.setAttribute("aria-expanded", paletteVisible ? "true" : "false");
+}
+
 function closeOpenFlyout() {
 	session.workspace?.getToolbox()?.getFlyout()?.hide();
 }
@@ -1191,9 +1198,8 @@ function bindUiEvents() {
 	clearCanvasBtn.addEventListener("click", () => { clearCanvas(); });
 	paletteToggleBtn.addEventListener("click", () => {
 		paletteVisible = !paletteVisible;
-		paletteToggleBtn.textContent = t(paletteVisible ? "paletteHide" : "paletteShow");
-		paletteToggleBtn.setAttribute("aria-expanded", paletteVisible ? "true" : "false");
 		filterWrap.hidden = !paletteVisible;
+		syncPaletteToggle();
 		applyToolbox();
 		requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 	});
@@ -1239,6 +1245,7 @@ function applyLayout(options = {}) {
 	const instruction = document.querySelector(".build-section .section-instruction");
 	if (instruction) instruction.dataset.i18n = layout === "stack" ? "buildInstruction" : "buildInstructionLinear";
 	applyLocale();
+	syncPaletteToggle();
 	const changed = getViewLayout() !== layout;
 	if (session.workspace && changed) {
 		const plan = snapshotCanvas(session.workspace);
@@ -1263,10 +1270,9 @@ function mountWorkspace() {
 	bindWindowEvents();
 	bindUiEvents();
 	setStatus(t("loadedMorphemes", { count: session.presets.length }), "");
-	paletteToggleBtn.setAttribute("aria-expanded", paletteVisible ? "true" : "false");
 	paletteToggleBtn.setAttribute("aria-controls", "blockly-div");
+	syncPaletteToggle();
 	if (!paletteVisible) {
-		paletteToggleBtn.textContent = t("paletteShow");
 		filterWrap.hidden = true;
 		applyToolbox();
 	}
@@ -1292,6 +1298,7 @@ async function startInner() {
 	}
 	setLocale(stored("bloq:ui-lang", "bl-oq-ly:ui-lang") || "en");
 	applyLocale();
+	syncPaletteToggle();
 	syncDocumentTitle();
 	try {
 		if (!session.presets.length) {
