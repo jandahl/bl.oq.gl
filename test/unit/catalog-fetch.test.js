@@ -55,3 +55,18 @@ test("every host is named when none answer", async () => {
 		(error) => error.message.includes("primary: HTTP 500") && error.message.includes("mirror: HTTP 500"),
 	);
 });
+
+test("a hung primary and a failing mirror settle on the rest deadline", async () => {
+	const fetchImpl = (url, { signal }) => {
+		if (url === "primary") return hangUntilAbort(signal);
+		return Promise.resolve(new Response("mirror", { status: 500 }));
+	};
+	const started = Date.now();
+	await assert.rejects(
+		() => raceCatalogResponses(["primary", "mirror"], { fetchImpl, waitMs: 30, restWaitMs: 30 }),
+		/morpheme catalog fetch failed/,
+	);
+	const elapsed = Date.now() - started;
+	assert.ok(elapsed >= 25, `settled too fast: ${elapsed}`);
+	assert.ok(elapsed < 500, `still pending too long: ${elapsed}`);
+});
