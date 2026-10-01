@@ -170,17 +170,22 @@ test("renderSentenceBreakdown shows a band for a built word and does not draw a 
 			],
 		}],
 	};
-	const glossSummaryItems = (items) => items.map((item) => ({
-		text: item.text,
-		marker: "",
-		gloss: "dog",
-		id: item.id,
-	}));
+	let seenPrefs = null;
+	const glossSummaryItems = (items, glossOpts) => {
+		seenPrefs = glossOpts;
+		return items.map((item) => ({
+			text: item.text,
+			marker: "",
+			gloss: "dog",
+			id: item.id,
+		}));
+	};
 	const meta = renderSentenceBreakdown(container, plan, glossSummaryItems, {
 		t: (_key, vars) => vars?.text ?? "not-on-canvas",
 		lang: "en",
 		headlineGloss: (items) => items.map((item) => item.gloss).join(" "),
 		visibleAssembly: (assembly) => assembly.text,
+		presentationPreferences: { numberPreference: "plural", determinationPreference: "definite" },
 	});
 	const articles = container.querySelectorAll("article");
 	assert.equal(articles.length, 2);
@@ -191,4 +196,6 @@ test("renderSentenceBreakdown shows a band for a built word and does not draw a 
 	assert.equal(articles[1].querySelector(".breakdown-row"), null);
 	assert.equal(articles[1].querySelector(".breakdown-body"), null);
 	assert.equal(meta, "The dog is bad.");
+	assert.equal(seenPrefs.numberPreference, "plural");
+	assert.equal(seenPrefs.determinationPreference, "definite");
 });

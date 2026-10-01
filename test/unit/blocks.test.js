@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers, wrapRowChainCheck, UNRESOLVED_MORPHEME_ID } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers, nounStemBlock, wrapRowChainCheck, UNRESOLVED_MORPHEME_ID } from "../../docs/blocks.js";
 import { canvasIdTree, sameIdTree } from "../../docs/id-tree.js";
 
 // buildToolbox / the canvas walkers don't touch the Blockly global. renderSentencePlan
@@ -344,6 +344,40 @@ test("renderSentencePlan: a chain keeps a zero-realization ending id", () => {
 	assert.match(ending.getFieldValue("LABEL"), /^Ø/);
 	assert.deepEqual(chainFromTopBlock(word), ["qimmeq", "N_ABS_SG"]);
 	assert.deepEqual(topLevelSentences(workspace), [[["qimmeq", "N_ABS_SG"]]]);
+});
+
+test("nounStemBlock reads a wrapped row instead of the empty MORPHEMES socket", () => {
+	const stem = { type: "morpheme_block__stem_n" };
+	const row = {
+		type: "morpheme_block__word_row",
+		getInputTargetBlock: (name) => name === "CHAIN" ? stem : null,
+		getNextBlock: () => null,
+	};
+	const word = {
+		type: "morpheme_block__word_container",
+		getInput: (name) => name === "ROWS" ? {} : null,
+		getInputTargetBlock: (name) => name === "ROWS" ? row : null,
+	};
+	assert.equal(nounStemBlock(word), stem);
+});
+
+test("renderSentencePlan restores a noun stem PRESENTATION", () => {
+	const stem = preset({ id: "qimmeq", morpheme_type: "stem", word_class: "N", expected: "qimmeq" });
+	const workspace = chainWorkspace();
+	renderSentencePlan(workspace, [{
+		words: [{ canvasIds: ["qimmeq"], presentation: "plural|definite" }],
+	}], new Map([["qimmeq", stem]]), { showIds: false });
+	const word = canvasTree(workspace).sentences[0].words[0].block;
+	assert.equal(nounStemBlock(word).getFieldValue("PRESENTATION"), "plural|definite");
+});
+
+test("renderSentencePlan keeps an unresolved picker from shortening the chain", () => {
+	const stem = preset({ id: "qimmeq", morpheme_type: "stem", word_class: "N", expected: "qimmeq" });
+	const workspace = chainWorkspace();
+	renderSentencePlan(workspace, [{
+		words: [{ canvasIds: ["qimmeq", UNRESOLVED_MORPHEME_ID] }],
+	}], new Map([["qimmeq", stem]]), { showIds: false });
+	assert.deepEqual(topLevelSentences(workspace), [[["qimmeq", UNRESOLVED_MORPHEME_ID]]]);
 });
 
 test("labelContainers: a null built slot does not take the next word's surface", () => {
