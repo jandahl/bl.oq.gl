@@ -247,6 +247,7 @@ export function renderSentenceBreakdown(container, plan, glossSummaryItems, opts
 					lang: opts.lang,
 					showOther: opts.showOther,
 					headlineGloss: opts.headlineGloss,
+					presentationPreferences: opts.presentationPreferences,
 				});
 			} else {
 				const heading = document.createElement("div");
@@ -306,6 +307,7 @@ export function renderWordBreakdowns(container, parts, glossSummaryItems, opts =
 			lang: opts.lang,
 			showOther: opts.showOther,
 			headlineGloss: opts.headlineGloss,
+			presentationPreferences: opts.presentationPreferences,
 		});
 		container.appendChild(article);
 		if (part.alternatives?.length) {
@@ -316,6 +318,7 @@ export function renderWordBreakdowns(container, parts, glossSummaryItems, opts =
 				showOther: opts.showOther,
 				headlineGloss: opts.headlineGloss,
 				builderHref: opts.builderHref,
+				presentationPreferences: opts.presentationPreferences,
 			});
 		}
 		const n = article.querySelectorAll(".breakdown-row").length;

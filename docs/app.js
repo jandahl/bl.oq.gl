@@ -4,7 +4,7 @@ import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
 	bindVerbPickerCatalog, bindNounPickerCatalog, reresolveBoundVerbPickers, reresolveBoundNounPickers,
-	presetMatchesQuery, canvasTree, setViewLayout, getViewLayout,
+	presetMatchesQuery, canvasTree, setViewLayout, getViewLayout, nounStemBlock,
 } from "./blocks.js";
 import { sameIdTree } from "./id-tree.js";
 import {
@@ -231,6 +231,15 @@ function glossOptions(opts = displayOptions()) {
 	};
 }
 
+function canvasGlossOptions() {
+	return { ...glossOptions(), ...nounPresentationPreferences() };
+}
+
+function nounPresentationValue() {
+	const { numberPreference, determinationPreference } = nounPresentationPreferences();
+	return `${numberPreference}|${determinationPreference}`;
+}
+
 function sentenceLang(opts = displayOptions()) {
 	// "both" analyzes the lattice in English (primary) and may request DA
 	// alongside — same meaning as glossOptions().lang for the primary pass.
@@ -373,11 +382,8 @@ function updateReadingLine(seqOrSeqs) {
 	const list = Array.isArray(seqOrSeqs) && seqOrSeqs.length && Array.isArray(seqOrSeqs[0])
 		? seqOrSeqs
 		: [seqOrSeqs];
-	const presentationPreferences = nounPresentationPreferences();
-	const parts = list.map((seq) => composedTranslation(glossSummaryItems(seq, {
-		...glossOptions(),
-		...presentationPreferences,
-	}), headlineGloss, glossOptions())).filter(Boolean);
+	const options = canvasGlossOptions();
+	const parts = list.map((seq) => composedTranslation(glossSummaryItems(seq, options), headlineGloss, glossOptions())).filter(Boolean);
 	if (!parts.length) {
 		readingLine.hidden = true;
 		return;
@@ -425,22 +431,15 @@ function updateSentenceReading(plan) {
 function nounPresentationPreferences() {
 	// Prefer the stem that owns the first drawable word on the canvas tree,
 	// not an arbitrary first stem from getAllBlocks (order is not semantic).
+	// Wrap layout stores that stem under ROWS → CHAIN, not MORPHEMES.
 	let noun = null;
 	if (session.workspace) {
 		const tree = canvasTree(session.workspace);
 		outer: for (const sentence of tree.sentences) {
 			for (const word of sentence.words) {
 				if (word.held || !word.ids.length) continue;
-				let cur = word.block?.type === "morpheme_block__word_container"
-					? word.block.getInputTargetBlock("MORPHEMES")
-					: word.block;
-				while (cur) {
-					if (cur.type === "morpheme_block__stem_n") {
-						noun = cur;
-						break outer;
-					}
-					cur = cur.getNextBlock();
-				}
+				noun = nounStemBlock(word.block);
+				if (noun) break outer;
 			}
 		}
 	}
@@ -519,6 +518,9 @@ function injectWorkspace(serializedState = null) {
 	session.workspace.addChangeListener((event) => {
 		if (event?.isUiEvent) return;
 		applyBuildShare(refreshBuild());
+		// The breakdown is not a build product. A noun presentation change
+		// still has to repaint it, or it stays on the value from when it opened.
+		if (event?.type === Blockly.Events.BLOCK_CHANGE && event.name === "PRESENTATION") rerenderBreakdown();
 	});
 	if (serializedState) Blockly.serialization.workspaces.load(serializedState, session.workspace);
 	registerVerbPickerReactivity(session.workspace);
@@ -526,10 +528,16 @@ function injectWorkspace(serializedState = null) {
 
 function rebuildWorkspace() {
 	if (!session.workspace) return;
-	const serializedState = Blockly.serialization.workspaces.save(session.workspace);
+	// Blockly serialization drops bloqSource / bloqAssembly / bloqHeld and the
+	// noun PRESENTATION field's meaning across a renderer change. Use the same
+	// snapshot the layout switch uses.
+	const plan = snapshotCanvas(session.workspace);
 	session.workspace.dispose();
-	injectWorkspace(serializedState);
+	injectWorkspace();
 	applyToolbox();
+	if (plan.some((sentence) => sentence.words?.length)) {
+		renderSentencePlan(session.workspace, plan, session.presetsById, displayOptions());
+	}
 	requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 	applyBuildShare(refreshBuild());
 }
@@ -838,8 +846,9 @@ function paintCanvasLabels(result) {
 	// Failures stay in their own slot. Indexing result.built would slide the
 	// next successful surface onto the broken word.
 	const { built, seqs } = labelsForCanvasWords(result);
+	const options = canvasGlossOptions();
 	const translations = seqs.map((seq) => (seq
-		? composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions())
+		? composedTranslation(glossSummaryItems(seq, options), headlineGloss, glossOptions())
 		: ""));
 	labelContainers(session.workspace, built, translations);
 }
@@ -910,10 +919,15 @@ function applyBuildShare(result) {
 
 function breakdownView() {
 	const opts = displayOptions();
+	const gloss = canvasGlossOptions();
 	return {
 		t,
 		reverseOrder: opts.readLastFirst,
-		...glossOptions(opts),
+		...gloss,
+		presentationPreferences: {
+			numberPreference: gloss.numberPreference,
+			determinationPreference: gloss.determinationPreference,
+		},
 		headlineGloss,
 		showDanish: opts.lang === "both",
 		visibleAssembly,
@@ -1031,8 +1045,8 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 			sentence.words.filter((word) => word.canvasIds?.length).map((word) => word.canvasIds));
 		session.mode = "deconstruct";
 		syncDocumentTitle();
-		rerenderBreakdown();
 		if (!skipCanvas && session.workspace && plan.sentences.length) {
+			const presentation = nounPresentationValue();
 			renderSentencePlan(session.workspace, plan.sentences.map((sentence) => ({
 				source: sentence.source,
 				assembly: visibleAssembly(sentence.assembly),
@@ -1041,6 +1055,7 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 					raw: word.raw,
 					canvasIds: word.canvasIds,
 					heldLabel: word.heldLabel,
+					presentation,
 				})),
 			})), session.presetsById, displayOptions(), { forceSentence: true });
 			session.workspace.scrollCenter();
@@ -1048,6 +1063,8 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 			// refreshBuild paints labels; plan status must win over any build flash.
 			refreshBuild();
 		}
+		// After the canvas, so the breakdown reads the stems just drawn.
+		rerenderBreakdown();
 		showPlanStatus(plan);
 		updateSentenceReading(plan);
 		// This function writes the Deconstruct share URL after the canvas is painted.
@@ -1119,16 +1136,12 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 		session.lastDeconstructIds = okParts.length === 1 ? okParts[0].ids : okParts.map((p) => p.ids);
 		session.mode = "deconstruct";
 		syncDocumentTitle();
-		if (okParts.length) rerenderBreakdown();
-		else {
-			breakdownSummaryMeta.textContent = t("noVerifiedBreakdown", { token: failures[0]?.token || surface });
-			breakdownDetails.hidden = false;
-		}
 		if (!skipCanvas && session.workspace) {
 			const chains = okParts.map((p) => p.ids).filter((ids) => ids.length);
 			if (chains.length) {
+				const presentation = nounPresentationValue();
 				renderSentencePlan(session.workspace, [{
-					words: chains.map((ids) => ({ canvasIds: ids })),
+					words: chains.map((ids) => ({ canvasIds: ids, presentation })),
 				}], session.presetsById, displayOptions());
 				session.workspace.scrollCenter();
 				requestAnimationFrame(() => Blockly.svgResize(session.workspace));
@@ -1141,6 +1154,11 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 				renderSentencePlan(session.workspace, [], session.presetsById, displayOptions());
 				updateReadingLine(null);
 			}
+		}
+		if (okParts.length) rerenderBreakdown();
+		else {
+			breakdownSummaryMeta.textContent = t("noVerifiedBreakdown", { token: failures[0]?.token || surface });
+			breakdownDetails.hidden = false;
 		}
 		if (failures.length) {
 			const detail = failures.map((f) => t("noVerifiedBreakdown", { token: f.token })).join(" · ");
@@ -1274,9 +1292,16 @@ function snapshotCanvas(workspace) {
 	return canvasTree(workspace).sentences.map((sentence) => ({
 		source: sentence.block?.bloqSource,
 		assembly: sentence.block?.bloqAssembly,
-		words: sentence.words.map((word) => word.held
-			? { surface: word.block?.getFieldValue?.("TITLE") || "…", heldLabel: word.held }
-			: { canvasIds: word.ids.slice() }),
+		words: sentence.words.map((word) => {
+			if (word.held) {
+				return { surface: word.block?.getFieldValue?.("TITLE") || "…", heldLabel: word.held };
+			}
+			const presentation = nounStemBlock(word.block)?.getFieldValue?.("PRESENTATION");
+			return {
+				canvasIds: word.ids.slice(),
+				...(presentation ? { presentation } : {}),
+			};
+		}),
 	}));
 }
 
