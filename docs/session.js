@@ -57,6 +57,19 @@ export function clearAnalysisCaches(session) {
 }
 
 /**
+ * Abort an in-flight Deconstruct and invalidate its run id.
+ * `runDeconstruct` captures `deconstructRun` before its awaits; Clear and an
+ * empty submit must bump that counter or a late response still paints the
+ * canvas and rewrites the share URL.
+ * @param {ReturnType<typeof createSession>} session
+ */
+export function cancelDeconstruct(session) {
+	session.deconstructAbort?.abort();
+	session.deconstructAbort = null;
+	session.deconstructRun += 1;
+}
+
+/**
  * Resolve catalog presets for a morpheme-id chain into the seq buildWord expects.
  * @param {Map<string, any>} presetsById
  * @param {string[]} ids
