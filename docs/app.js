@@ -3,6 +3,7 @@ import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
+	bindVerbPickerCatalog, bindNounPickerCatalog, reresolveBoundVerbPickers, reresolveBoundNounPickers,
 	presetMatchesQuery, canvasTree, setViewLayout, getViewLayout,
 } from "./blocks.js";
 import { sameIdTree } from "./id-tree.js";
@@ -1221,6 +1222,23 @@ async function loadCatalogAndBlocks() {
 		onUpdated: (next) => {
 			session.presets = next.presets;
 			session.presetsById = new Map(session.presets.map((p) => [p.id, p]));
+			// The picker block types stay registered. Point them at the new
+			// index before the toolbox is rebuilt, or a newly published ending
+			// is hidden by the picker and still not selectable inside it.
+			bindVerbPickerCatalog({
+				verbEndingIndex: buildVerbEndingIndex(session.presets),
+				presetsById: session.presetsById,
+				getDisplayOptions: displayOptions,
+				resolveMoodLabel,
+				resolvePersonLabel,
+			});
+			bindNounPickerCatalog({
+				nounEndingIndex: buildNounEndingIndex(session.presets),
+				presetsById: session.presetsById,
+				getDisplayOptions: displayOptions,
+			});
+			reresolveBoundVerbPickers(session.workspace);
+			reresolveBoundNounPickers(session.workspace);
 			if (session.workspace?.getToolbox()?.getFlyout()?.isVisible()) return;
 			applyToolbox();
 		},

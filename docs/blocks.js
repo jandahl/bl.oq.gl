@@ -63,7 +63,7 @@ import { canvasIdTree, sameIdTree } from "./id-tree.js";
 import {
 	VERB_ENDING_PICKER_TYPE, VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE,
 	defineVerbEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity, restoreVerbPickerFields,
-	bindVerbPickerHost,
+	bindVerbPickerHost, bindVerbPickerCatalog, reresolveBoundVerbPickers,
 } from "./verb-picker.js";
 
 bindVerbPickerHost({ labelFor, applyChainConnections });
@@ -340,10 +340,49 @@ function isZeroEndingPreset(preset) {
 		&& (preset.expected === "Ø" || preset.seq?.[0]?.text === "" || preset.seq?.[0]?.text === "Ø");
 }
 
+// Same reason as verbCatalog: the noun picker type is defined once, and a
+// catalog refresh has to change which endings that type resolves to.
+const nounCatalog = {
+	index: null,
+	presetsById: new Map(),
+	getDisplayOptions: () => ({}),
+};
+
+/**
+ * @param {{
+ *   nounEndingIndex?: ReturnType<typeof buildNounEndingIndex>,
+ *   presetsById?: Map<string, any>,
+ *   getDisplayOptions?: () => object,
+ * }} [next]
+ */
+export function bindNounPickerCatalog(next = {}) {
+	if (next.nounEndingIndex) nounCatalog.index = next.nounEndingIndex;
+	if (next.presetsById) nounCatalog.presetsById = next.presetsById;
+	if (typeof next.getDisplayOptions === "function") nounCatalog.getDisplayOptions = next.getDisplayOptions;
+}
+
+/** Re-run resolve on noun pickers already on the canvas after a catalog swap. */
+export function reresolveBoundNounPickers(workspace) {
+	if (!workspace?.getAllBlocks) return;
+	for (const block of workspace.getAllBlocks(false)) {
+		if (block.type === NOUN_ENDING_PICKER_TYPE) block.nounEndingPickerState?.resolve?.();
+	}
+}
+
+/** Candidates for one nominal coordinate against the catalog bound now. */
+export function nounPickerCandidates(caseName, possessor = "none", number = "SG") {
+	return nounCandidatesFor(nounCatalog.index, caseName, possessor, number);
+}
+
+function nounAxisMenu(axis) {
+	const values = nounCatalog.index?.[axis] ?? [];
+	return values.length ? values.map((value) => [value, value]) : [["—", "NONE"]];
+}
+
 export function defineNounEndingPickerBlock(nounEndingIndex, presetsById, getDisplayOptions) {
-	const options = (values, labels = values) => (values.length ? values.map((value, i) => [labels[i] ?? value, value]) : [["—", "NONE"]]);
+	bindNounPickerCatalog({ nounEndingIndex, presetsById, getDisplayOptions });
 	const resolveFor = (block, variantOverride) => {
-		const candidates = nounCandidatesFor(nounEndingIndex, block.getFieldValue("CASE"), block.getFieldValue("POSSESSOR"), block.getFieldValue("NUMBER"));
+		const candidates = nounCandidatesFor(nounCatalog.index, block.getFieldValue("CASE"), block.getFieldValue("POSSESSOR"), block.getFieldValue("NUMBER"));
 		block.nounEndingPickerState.candidates = candidates.map((c) => [c.label.slice(0, 70), c.id]);
 		// Field validators run before the new value is stored. A VARIANT
 		// change has to pass that proposed id in, or this read of the field
@@ -351,7 +390,8 @@ export function defineNounEndingPickerBlock(nounEndingIndex, presetsById, getDis
 		const currentVariant = variantOverride ?? block.getFieldValue("VARIANT");
 		const id = candidates.some((c) => c.id === currentVariant) ? currentVariant : candidates[0]?.id ?? null;
 		block.data = id;
-		block.getField("RESOLVED")?.setValue(id && presetsById.get(id) ? labelFor(presetsById.get(id), getDisplayOptions()) : t("noSuchEnding"));
+		const preset = id ? nounCatalog.presetsById.get(id) : null;
+		block.getField("RESOLVED")?.setValue(preset ? labelFor(preset, nounCatalog.getDisplayOptions()) : t("noSuchEnding"));
 		if (block.rendered) block.render();
 		return id;
 	};
@@ -364,9 +404,9 @@ export function defineNounEndingPickerBlock(nounEndingIndex, presetsById, getDis
 				if (block) resolveFor(block, this.name === "VARIANT" ? newValue : undefined);
 				return newValue;
 			};
-			this.appendDummyInput().appendField(`${UI_INDENT}Case`).appendField(new Blockly.FieldDropdown(options(nounEndingIndex.cases), changed), "CASE");
-			this.appendDummyInput().appendField(`${UI_INDENT}Possessor`).appendField(new Blockly.FieldDropdown(options(nounEndingIndex.possessors), changed), "POSSESSOR");
-			this.appendDummyInput().appendField(`${UI_INDENT}Number`).appendField(new Blockly.FieldDropdown(options(nounEndingIndex.numbers), changed), "NUMBER");
+			this.appendDummyInput().appendField(`${UI_INDENT}Case`).appendField(new Blockly.FieldDropdown(() => nounAxisMenu("cases"), changed), "CASE");
+			this.appendDummyInput().appendField(`${UI_INDENT}Possessor`).appendField(new Blockly.FieldDropdown(() => nounAxisMenu("possessors"), changed), "POSSESSOR");
+			this.appendDummyInput().appendField(`${UI_INDENT}Number`).appendField(new Blockly.FieldDropdown(() => nounAxisMenu("numbers"), changed), "NUMBER");
 			this.appendDummyInput("VARIANT").appendField(`${UI_INDENT}Variant`).appendField(new Blockly.FieldDropdown(function () { return this.getSourceBlock()?.nounEndingPickerState?.candidates ?? [["—", "NONE"]]; }, changed), "VARIANT");
 			this.setStyle(INFLECTION_BLOCK_STYLE);
 			this.setInputsInline(false);
@@ -380,6 +420,7 @@ export function defineNounEndingPickerBlock(nounEndingIndex, presetsById, getDis
 export {
 	VERB_ENDING_PICKER_TYPE, VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE,
 	defineVerbEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity, restoreVerbPickerFields,
+	bindVerbPickerCatalog, reresolveBoundVerbPickers,
 };
 
 /** True when `preset` is a real verb-mood inflectional ending -- one of the
