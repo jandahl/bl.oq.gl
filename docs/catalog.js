@@ -65,19 +65,20 @@ export function catalogFromPayload(value, mergeMorphemeSources) {
 	return { presets, authoritative: value?.meta?.authoritative, meta: value?.meta ?? null };
 }
 
-async function fetchCatalogBuffer(url, onProgress) {
+async function fetchCatalogBuffer(url, onProgress, fetchInit = {}) {
 	const candidates = (Array.isArray(url) ? url : [url]).filter(Boolean);
+	const request = { credentials: "omit", ...fetchInit };
 	let response;
 	let winner = candidates[0];
 	if (candidates.length <= 1) {
 		try {
-			response = await fetch(winner, { cache: "no-cache" });
+			response = await fetch(winner, request);
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
 		} catch (error) {
 			throw new Error(`morpheme catalog fetch failed (${winner}: ${error.message})`);
 		}
 	} else {
-		const raced = await raceCatalogResponses(candidates);
+		const raced = await raceCatalogResponses(candidates, fetchInit.cache ? { cache: fetchInit.cache } : {});
 		response = raced.response;
 		winner = raced.url;
 	}
@@ -104,7 +105,7 @@ async function persistCatalog(cache, url, buffer, meta) {
 
 async function revalidateCatalog(url, cache, meta, onUpdated, mergeMorphemeSources) {
 	try {
-		const head = await fetch(url, { method: "HEAD", cache: "no-cache" });
+		const head = await fetch(url, { method: "HEAD", cache: "no-cache", credentials: "omit" });
 		const headers = {
 			etag: head.ok ? head.headers.get("etag") || "" : "",
 			lastModified: head.ok ? head.headers.get("last-modified") || "" : "",
@@ -113,7 +114,7 @@ async function revalidateCatalog(url, cache, meta, onUpdated, mergeMorphemeSourc
 			await writeCatalogMeta(cache, { ...meta, ...headers, fetchedAt: Date.now(), url });
 			return;
 		}
-		const fresh = await fetchCatalogBuffer(url);
+		const fresh = await fetchCatalogBuffer(url, undefined, { cache: "no-cache" });
 		const value = parseCatalogBytes(fresh.buffer);
 		// Validate before replacing the last good entry. A body that parses
 		// but fails the merge must not become the next visit's cache.
