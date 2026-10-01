@@ -4,7 +4,7 @@ import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
 	bindVerbPickerCatalog, bindNounPickerCatalog, reresolveBoundVerbPickers, reresolveBoundNounPickers,
-	presetMatchesQuery, canvasTree, setViewLayout, getViewLayout,
+	presetMatchesQuery, canvasTree, setViewLayout, getViewLayout, nounStemBlock,
 } from "./blocks.js";
 import { sameIdTree } from "./id-tree.js";
 import {
@@ -231,6 +231,10 @@ function glossOptions(opts = displayOptions()) {
 	};
 }
 
+function canvasGlossOptions() {
+	return { ...glossOptions(), ...nounPresentationPreferences() };
+}
+
 function sentenceLang(opts = displayOptions()) {
 	// "both" analyzes the lattice in English (primary) and may request DA
 	// alongside — same meaning as glossOptions().lang for the primary pass.
@@ -373,11 +377,8 @@ function updateReadingLine(seqOrSeqs) {
 	const list = Array.isArray(seqOrSeqs) && seqOrSeqs.length && Array.isArray(seqOrSeqs[0])
 		? seqOrSeqs
 		: [seqOrSeqs];
-	const presentationPreferences = nounPresentationPreferences();
-	const parts = list.map((seq) => composedTranslation(glossSummaryItems(seq, {
-		...glossOptions(),
-		...presentationPreferences,
-	}), headlineGloss, glossOptions())).filter(Boolean);
+	const options = canvasGlossOptions();
+	const parts = list.map((seq) => composedTranslation(glossSummaryItems(seq, options), headlineGloss, glossOptions())).filter(Boolean);
 	if (!parts.length) {
 		readingLine.hidden = true;
 		return;
@@ -425,22 +426,15 @@ function updateSentenceReading(plan) {
 function nounPresentationPreferences() {
 	// Prefer the stem that owns the first drawable word on the canvas tree,
 	// not an arbitrary first stem from getAllBlocks (order is not semantic).
+	// Wrap layout stores that stem under ROWS → CHAIN, not MORPHEMES.
 	let noun = null;
 	if (session.workspace) {
 		const tree = canvasTree(session.workspace);
 		outer: for (const sentence of tree.sentences) {
 			for (const word of sentence.words) {
 				if (word.held || !word.ids.length) continue;
-				let cur = word.block?.type === "morpheme_block__word_container"
-					? word.block.getInputTargetBlock("MORPHEMES")
-					: word.block;
-				while (cur) {
-					if (cur.type === "morpheme_block__stem_n") {
-						noun = cur;
-						break outer;
-					}
-					cur = cur.getNextBlock();
-				}
+				noun = nounStemBlock(word.block);
+				if (noun) break outer;
 			}
 		}
 	}
@@ -526,10 +520,16 @@ function injectWorkspace(serializedState = null) {
 
 function rebuildWorkspace() {
 	if (!session.workspace) return;
-	const serializedState = Blockly.serialization.workspaces.save(session.workspace);
+	// Blockly serialization drops bloqSource / bloqAssembly / bloqHeld and the
+	// noun PRESENTATION field's meaning across a renderer change. Use the same
+	// snapshot the layout switch uses.
+	const plan = snapshotCanvas(session.workspace);
 	session.workspace.dispose();
-	injectWorkspace(serializedState);
+	injectWorkspace();
 	applyToolbox();
+	if (plan.some((sentence) => sentence.words?.length)) {
+		renderSentencePlan(session.workspace, plan, session.presetsById, displayOptions());
+	}
 	requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 	applyBuildShare(refreshBuild());
 }
@@ -838,8 +838,9 @@ function paintCanvasLabels(result) {
 	// Failures stay in their own slot. Indexing result.built would slide the
 	// next successful surface onto the broken word.
 	const { built, seqs } = labelsForCanvasWords(result);
+	const options = canvasGlossOptions();
 	const translations = seqs.map((seq) => (seq
-		? composedTranslation(glossSummaryItems(seq, glossOptions()), headlineGloss, glossOptions())
+		? composedTranslation(glossSummaryItems(seq, options), headlineGloss, glossOptions())
 		: ""));
 	labelContainers(session.workspace, built, translations);
 }
@@ -914,6 +915,7 @@ function breakdownView() {
 		t,
 		reverseOrder: opts.readLastFirst,
 		...glossOptions(opts),
+		presentationPreferences: nounPresentationPreferences(),
 		headlineGloss,
 		showDanish: opts.lang === "both",
 		visibleAssembly,
@@ -1274,9 +1276,16 @@ function snapshotCanvas(workspace) {
 	return canvasTree(workspace).sentences.map((sentence) => ({
 		source: sentence.block?.bloqSource,
 		assembly: sentence.block?.bloqAssembly,
-		words: sentence.words.map((word) => word.held
-			? { surface: word.block?.getFieldValue?.("TITLE") || "…", heldLabel: word.held }
-			: { canvasIds: word.ids.slice() }),
+		words: sentence.words.map((word) => {
+			if (word.held) {
+				return { surface: word.block?.getFieldValue?.("TITLE") || "…", heldLabel: word.held };
+			}
+			const presentation = nounStemBlock(word.block)?.getFieldValue?.("PRESENTATION");
+			return {
+				canvasIds: word.ids.slice(),
+				...(presentation ? { presentation } : {}),
+			};
+		}),
 	}));
 }
 

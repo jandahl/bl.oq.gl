@@ -633,6 +633,45 @@ function idsInsideWord(block) {
 	return morphemeIdsFrom(block.getInputTargetBlock?.("MORPHEMES"));
 }
 
+/** The noun stem block inside a word, including a wrap layout's ROWS → CHAIN. */
+export function nounStemBlock(block) {
+	if (!block) return null;
+	if (block.type === `${BLOCK_TYPE_PREFIX}stem_n`) return block;
+	if (block.getInput?.("ROWS")) {
+		let row = block.getInputTargetBlock?.("ROWS");
+		while (row) {
+			const stem = nounStemBlock(row.getInputTargetBlock?.("CHAIN"));
+			if (stem) return stem;
+			row = row.getNextBlock?.() || null;
+		}
+		return null;
+	}
+	const start = block.type === WORD_CONTAINER_TYPE ? block.getInputTargetBlock?.("MORPHEMES") : block;
+	let cur = start;
+	const seen = new Set();
+	while (cur && !seen.has(cur)) {
+		seen.add(cur);
+		if (cur.type === `${BLOCK_TYPE_PREFIX}stem_n`) return cur;
+		const next = cur.getInputTargetBlock?.("NEXT");
+		cur = next || cur.getNextBlock?.() || null;
+	}
+	return null;
+}
+
+function paintPresentation(block, presentation) {
+	if (!presentation) return;
+	nounStemBlock(block)?.setFieldValue?.(presentation, "PRESENTATION");
+}
+
+function paintWordPresentations(first, words) {
+	let block = first;
+	for (const word of words ?? []) {
+		if (!block) return;
+		paintPresentation(block, word.presentation);
+		block = block.getNextBlock?.() || null;
+	}
+}
+
 /** Walks a stack of morpheme blocks starting at `block`, returning morpheme ids top to bottom. */
 export function chainFromTopBlock(block) {
 	if (block?.type === SENTENCE_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("WORDS"));
@@ -702,6 +741,7 @@ export function renderSentencePlan(workspace, sentences, presetsById, displayOpt
 			const chains = list[0].words.map((word) => word.canvasIds.filter(Boolean));
 			if (chains.length <= 1) {
 				const container = buildWordBlock(workspace, chains[0] ?? [], presetsById, displayOptions);
+				paintPresentation(container, list[0].words[0]?.presentation);
 				container.moveBy(20, 20);
 				return;
 			}
@@ -710,6 +750,7 @@ export function renderSentencePlan(workspace, sentences, presetsById, displayOpt
 			sentence.render();
 			sentence.moveBy(20, 20);
 			connectWords(workspace, sentence, chains, presetsById, displayOptions);
+			paintWordPresentations(sentence.getInputTargetBlock("WORDS"), list[0].words);
 			return;
 		}
 
@@ -729,6 +770,7 @@ export function renderSentencePlan(workspace, sentences, presetsById, displayOpt
 					? buildWordBlock(workspace, ids, presetsById, displayOptions)
 					: buildHeldWord(workspace, !prevWord ? withInitialCapital(word.surface || word.raw) : (word.surface || word.raw), word.heldLabel || "heldNotDrawn");
 				if (ids.length) drawable.push(ids);
+				if (ids.length) paintPresentation(wordBlock, word.presentation);
 				if (prevWord) prevWord.nextConnection.connect(wordBlock.previousConnection);
 				else sentence.getInput("WORDS").connection.connect(wordBlock.previousConnection);
 				prevWord = wordBlock;
@@ -839,6 +881,17 @@ function lastStatement(block) {
 }
 
 function createMorphemeBlock(workspace, id, presetsById, displayOptions) {
+	if (id === UNRESOLVED_MORPHEME_ID) {
+		// Theme rebuild goes through the sentence plan, which only has ids.
+		// A picker that never resolved must stay a slot or the chain silently
+		// shortens. Do not newBlock a real picker: its init resolves a guess.
+		const block = workspace.newBlock(`${BLOCK_TYPE_PREFIX}inflection`);
+		block.data = null;
+		block.initSvg();
+		block.render();
+		block.setFieldValue("…", "LABEL");
+		return block;
+	}
 	const preset = presetsById.get(id);
 	if (!preset) return null;
 	// Toolbox flyouts omit a zero ending (there is nothing to drag). A chain
