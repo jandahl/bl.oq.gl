@@ -9,6 +9,7 @@ import {
 	STANDARD_EXAMPLES_SCHEMA,
 	EXAMPLES_CDN_URL,
 	examplesVersionedUrl,
+	resolveExamplesCatalog,
 } from "../../docs/examples-schema.js";
 
 test("normalizeExamplesCatalog maps worked and sentences, including gloss_en/da and object gloss", () => {
@@ -60,6 +61,77 @@ test("adaptLegacyExamplesCatalog trusts standard-examples/v1 including empty sen
 	assert.equal(adapted.schema_version, STANDARD_EXAMPLES_SCHEMA);
 	assert.equal(adapted.worked[0].surface, "nerivoq");
 	assert.deepEqual(adapted.sentences, []);
+});
+
+test("resolveExamplesCatalog rejects a failed override and does not use the local catalog", async () => {
+	let localCalls = 0;
+	await assert.rejects(
+		() => resolveExamplesCatalog({
+			override: "https://example.test/missing.json",
+			pinSchema: STANDARD_EXAMPLES_SCHEMA,
+			fetchCatalog: async () => null,
+			getStandardExamples: async () => {
+				localCalls += 1;
+				return { worked: [{ surface: "nerivoq", gloss: "He eats." }], sentences: [] };
+			},
+			remoteUrls: ["https://cdn.example/examples.json"],
+		}),
+		/Examples override failed/,
+	);
+	assert.equal(localCalls, 0);
+});
+
+test("resolveExamplesCatalog adapts a pin payload that is not standard-examples/v1", async () => {
+	const { catalog, source } = await resolveExamplesCatalog({
+		pinSchema: STANDARD_EXAMPLES_SCHEMA,
+		fetchCatalog: async () => {
+			throw new Error("CDN should not run when the pin answers");
+		},
+		getStandardExamples: async () => ({
+			worked: [{ surface: "nerivoq", gloss: "He eats." }],
+			sentences: [{ words: ["a", "b"], gloss: "legacy" }],
+		}),
+	});
+	assert.equal(source, "oq-api");
+	assert.equal(catalog.worked[0].surface, "nerivoq");
+	assert.deepEqual(catalog.sentences, []);
+});
+
+test("resolveExamplesCatalog keeps sentences on a real v1 pin payload", async () => {
+	const { catalog } = await resolveExamplesCatalog({
+		pinSchema: STANDARD_EXAMPLES_SCHEMA,
+		fetchCatalog: async () => null,
+		getStandardExamples: async () => ({
+			schema_version: STANDARD_EXAMPLES_SCHEMA,
+			worked: [{ surface: "nerivoq", gloss: "He eats." }],
+			sentences: [{ surface: "a b", words: ["a", "b"], gloss: "kept" }],
+		}),
+	});
+	assert.equal(catalog.sentences.length, 1);
+	assert.equal(catalog.sentences[0].surface, "a b");
+});
+
+test("a pin schema other than v1 still consults the remote catalog", async () => {
+	let fetched = 0;
+	const { catalog, source } = await resolveExamplesCatalog({
+		pinSchema: undefined,
+		fetchCatalog: async () => {
+			fetched += 1;
+			return normalizeExamplesCatalog({
+				schema_version: STANDARD_EXAMPLES_SCHEMA,
+				worked: [{ surface: "from-cdn", gloss: "cdn" }],
+				sentences: [],
+			});
+		},
+		getStandardExamples: async () => ({
+			worked: [{ surface: "local", gloss: "local" }],
+			sentences: [{ words: ["no"] }],
+		}),
+		remoteUrls: ["https://cdn.example/examples.json"],
+	});
+	assert.equal(fetched, 1);
+	assert.equal(source, "remote");
+	assert.equal(catalog.worked[0].surface, "from-cdn");
 });
 
 test("glossText handles string and locale object glosses", () => {
