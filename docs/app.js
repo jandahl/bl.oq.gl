@@ -1124,6 +1124,13 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 				session.workspace.scrollCenter();
 				requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 				refreshBuild();
+			} else {
+				// An unknown word used to leave the previous blocks and reading
+				// line up while the URL became ?w= for a word that was not drawn.
+				// Do not refreshBuild here: its empty-canvas hint would replace
+				// the error status painted just below.
+				renderSentencePlan(session.workspace, [], session.presetsById, displayOptions());
+				updateReadingLine(null);
 			}
 		}
 		if (failures.length) {
