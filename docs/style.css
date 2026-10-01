@@ -80,11 +80,6 @@ body {
 	color: var(--fg);
 }
 
-.app-shell {
-	min-height: 100%;
-	background: var(--bg);
-}
-
 header {
 	padding: 0 1rem 0.5rem;
 	border-bottom: 1px solid var(--border);
@@ -126,6 +121,19 @@ h1 { margin: 0 0 0.2rem; font-size: 1.35rem; font-weight: 750; letter-spacing: 0
 	margin: 0 0 0.5rem;
 }
 .deconstruct-input label { flex: 1 0 100%; font-size: 0.85rem; }
+@media (min-width: 720px) {
+	/* The shared visually-hidden class fixes the phone clip. The caption stays
+	   visible on a wide layout, which is what the old phone-only rule did. */
+	.deconstruct-input label.visually-hidden {
+		position: static;
+		width: auto;
+		height: auto;
+		margin: 0;
+		overflow: visible;
+		clip: auto;
+		white-space: normal;
+	}
+}
 .clearable {
 	position: relative;
 	flex: 1 1 12rem;
@@ -184,7 +192,6 @@ h1 { margin: 0 0 0.2rem; font-size: 1.35rem; font-weight: 750; letter-spacing: 0
 	font-size: 0.8rem;
 	align-items: center;
 }
-#display-panel[hidden] { display: none; }
 #display-panel:not(.is-open) { display: none; }
 .gloss-language-bar { margin-top: 0.35rem; }
 .view-note {
@@ -260,7 +267,6 @@ main {
 }
 #breakdown-details[hidden] { display: none; }
 
-:root { --results-footer-height: 3.25rem; }
 body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 
 .results-footer {
@@ -487,7 +493,6 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 	.header-banner { margin: 0 -0.75rem 0.4rem; }
 	.subtitle { display: none; }
 	.deconstruct-input { margin-bottom: 0.35rem; }
-	.deconstruct-input label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 	.deconstruct-input .clearable { flex: 1 1 100%; }
 	#analyze-btn { width: 100%; min-height: 2.75rem; }
 	.deconstruct-input .clearable input,
@@ -747,90 +752,6 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 	font-size: 0.9rem;
 }
 .reading-alt { opacity: 0.75; }
-
-.example-groups {
-	display: flex;
-	flex-direction: column;
-	gap: 0.7rem;
-}
-.example-group-label {
-	margin: 0 0 0.35rem;
-	font-size: 0.72rem;
-	font-weight: 650;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
-	color: color-mix(in srgb, var(--fg) 58%, transparent);
-}
-.example-word-list,
-.example-sentence-list {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.45rem;
-}
-.example-pill {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	margin: 0;
-	padding: 0.4rem 0.85rem;
-	border: 1px solid var(--border);
-	border-radius: 999px;
-	background: var(--bg);
-	color: var(--fg);
-	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-	font-size: 0.9rem;
-	line-height: 1.2;
-	min-height: 2.4rem;
-	cursor: pointer;
-	touch-action: manipulation;
-	transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease;
-}
-button.example-pill:hover,
-button.example-pill:focus-visible {
-	border-color: var(--accent);
-	color: var(--accent);
-	background: color-mix(in srgb, var(--accent) 8%, var(--bg));
-}
-button.example-pill:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
-}
-.example-sentence {
-	display: inline-flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 0.3rem;
-	margin: 0;
-	padding: 0.25rem;
-	border: 1px solid var(--border);
-	border-radius: 999px;
-	background: color-mix(in srgb, var(--accent) 8%, var(--panel-bg));
-	color: var(--fg);
-	cursor: pointer;
-	min-height: 2.75rem;
-	touch-action: manipulation;
-	transition: border-color 150ms ease, background-color 150ms ease;
-}
-.example-sentence .example-pill {
-	min-height: 2rem;
-	padding: 0.28rem 0.7rem;
-	pointer-events: none;
-	background: var(--panel-bg);
-	cursor: inherit;
-}
-.example-sentence:hover,
-.example-sentence:focus-visible {
-	border-color: var(--accent);
-	background: color-mix(in srgb, var(--accent) 14%, var(--panel-bg));
-}
-.example-sentence:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
-}
-@media (prefers-reduced-motion: reduce) {
-	.example-pill,
-	.example-sentence { transition: none; }
-}
 
 #example-words.examples-frame {
 	margin-top: 0;
