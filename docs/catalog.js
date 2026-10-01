@@ -104,37 +104,51 @@ async function persistCatalog(cache, url, buffer, meta) {
 	}
 }
 
-async function revalidateCatalog(url, cache, meta, onUpdated, mergeMorphemeSources) {
+async function revalidateCatalog(urls, cache, meta, onUpdated, mergeMorphemeSources, waitMs) {
+	const list = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
+	if (!list.length) return;
 	try {
-		const head = await fetch(url, { method: "HEAD", cache: "no-cache", credentials: "omit" });
+		// Race the pin and the mirror again. A cache hit used to revalidate
+		// only whichever host won the cold load, so a later pin publish stayed
+		// invisible when the mirror had won.
+		const raced = await raceCatalogResponses(list, {
+			cache: "no-cache",
+			method: "HEAD",
+			...(waitMs ? { waitMs } : {}),
+		});
+		const winner = raced.url;
 		const headers = {
-			etag: head.ok ? head.headers.get("etag") || "" : "",
-			lastModified: head.ok ? head.headers.get("last-modified") || "" : "",
+			etag: raced.response.headers.get("etag") || "",
+			lastModified: raced.response.headers.get("last-modified") || "",
 		};
-		if (head.ok && catalogUnchanged(meta, headers)) {
-			await writeCatalogMeta(cache, { ...meta, ...headers, fetchedAt: Date.now(), url });
+		const sameHost = winner === (meta?.url || list[0]);
+		if (sameHost && catalogUnchanged(meta, headers)) {
+			await writeCatalogMeta(cache, { ...meta, ...headers, fetchedAt: Date.now(), url: winner });
 			return;
 		}
-		const fresh = await fetchCatalogBuffer(url, undefined, { cache: "no-cache" });
+		const fresh = await fetchCatalogBuffer(winner, undefined, { cache: "no-cache" });
 		const sha256 = await digestCatalog(fresh.buffer);
 		// A hidden ETag makes catalogUnchanged return false. Matching bytes
-		// are still the same catalog: do not parse, notify, or rewrite the body.
+		// are still the same catalog: do not parse or notify. A different
+		// winner still replaces the cache so the next visit follows the pin.
 		if (meta?.sha256 && meta.sha256 === sha256) {
-			await writeCatalogMeta(cache, {
+			const nextMeta = {
 				...meta,
 				sha256,
 				fetchedAt: Date.now(),
-				url: fresh.url || url,
+				url: winner,
 				...(fresh.meta.etag ? { etag: fresh.meta.etag } : {}),
 				...(fresh.meta.lastModified ? { lastModified: fresh.meta.lastModified } : {}),
-			});
+			};
+			if (winner !== meta.url) await persistCatalog(cache, winner, fresh.buffer, nextMeta);
+			else await writeCatalogMeta(cache, nextMeta);
 			return;
 		}
 		const value = parseCatalogBytes(fresh.buffer);
 		// Validate before replacing the last good entry. A body that parses
 		// but fails the merge must not become the next visit's cache.
 		const catalog = catalogFromPayload(value, mergeMorphemeSources);
-		await persistCatalog(cache, url, fresh.buffer, { ...fresh.meta, sha256 });
+		await persistCatalog(cache, winner, fresh.buffer, { ...fresh.meta, sha256 });
 		onUpdated?.(catalog);
 	} catch {
 		// Keep the cached catalog; the next visit will try again.
@@ -147,6 +161,7 @@ async function revalidateCatalog(url, cache, meta, onUpdated, mergeMorphemeSourc
  *   onUpdated?: (catalog: any) => void,
  *   engine?: { mergeMorphemeSources: Function, GRAMMAR_MORPHEMES_URL: string },
  *   urls?: string[],
+ *   waitMs?: number,
  *   cache?: { match: Function, put: Function, delete: Function },
  * }} [opts]
  * @returns {Promise<{ presets: any[], authoritative: boolean|undefined, meta: any, fromCache: boolean }>}
@@ -185,7 +200,7 @@ export async function loadCatalog(opts = {}) {
 			if (meta?.sha256 !== sha256) await writeCatalogMeta(cache, seeded);
 			const catalog = { ...catalogFromPayload(parseCatalogBytes(buffer), mergeMorphemeSources), fromCache: true };
 			queueMicrotask(() => {
-				revalidateCatalog(cachedUrl, cache, seeded, onUpdated, mergeMorphemeSources);
+				revalidateCatalog(urls, cache, seeded, onUpdated, mergeMorphemeSources, opts.waitMs);
 			});
 			return catalog;
 		} catch {
