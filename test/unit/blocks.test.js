@@ -448,6 +448,22 @@ test("wordsFromBlock: a null chain link stops the walk", () => {
 	assert.deepEqual(wordsFromBlock(only), [["qimmeq"]]);
 });
 
+test("wordsFromBlock: a NEXT cycle stops after the repeated block", () => {
+	const stem = {
+		type: "morpheme_block__stem_n",
+		data: "qimmeq",
+		getNextBlock: () => null,
+		getInputTargetBlock: (name) => name === "NEXT" ? ending : null,
+	};
+	const ending = {
+		type: "morpheme_block__inflection",
+		data: "N_ABS",
+		getNextBlock: () => null,
+		getInputTargetBlock: (name) => name === "NEXT" ? stem : null,
+	};
+	assert.deepEqual(wordsFromBlock(stem), [["qimmeq", "N_ABS"]]);
+});
+
 test("wordsFromBlock: a non-morpheme block is not a word", () => {
 	const stray = { type: "some_other_block", data: "x", getNextBlock: () => null };
 	assert.deepEqual(wordsFromBlock(stray), []);

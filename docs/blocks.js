@@ -651,11 +651,14 @@ export function planFromCanvas(workspace) {
 
 function morphemeIdsFrom(block) {
 	const ids = [];
+	const seen = new Set();
 	let cur = block;
-	while (cur) {
+	while (cur && !seen.has(cur)) {
+		seen.add(cur);
 		if (isMorphemeBlockType(cur.type)) ids.push(cur.data || UNRESOLVED_MORPHEME_ID);
 		// Horizontal pieces plug into NEXT. Stack pieces use getNextBlock.
-		// A fake test block has only one of the two.
+		// A fake test block has only one of the two. A cycle must stop:
+		// nounStemBlock and collectChainedWords already do.
 		const next = cur.getInputTargetBlock?.("NEXT");
 		cur = next || cur.getNextBlock?.() || null;
 	}
