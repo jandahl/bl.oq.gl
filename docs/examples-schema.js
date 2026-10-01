@@ -97,8 +97,14 @@ export function adaptLegacyExamplesCatalog(raw) {
  * @param {unknown} raw
  */
 export function shapeExamplesPayload(raw) {
-	const src = raw && typeof raw === "object" ? /** @type {Record<string, unknown>} */ (raw) : {};
-	if (src.schema_version === STANDARD_EXAMPLES_SCHEMA) return normalizeExamplesCatalog(raw);
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+	const src = /** @type {Record<string, unknown>} */ (raw);
+	const worked = Array.isArray(src.worked) ? src.worked : null;
+	const sentences = Array.isArray(src.sentences) ? src.sentences : null;
+	const v1 = src.schema_version === STANDARD_EXAMPLES_SCHEMA;
+	// A 200 `{}` is not a catalog. v1 may legitimately ship an empty sentences list.
+	if (!v1 && !(worked && worked.length) && !(sentences && sentences.length)) return null;
+	if (v1) return normalizeExamplesCatalog(raw);
 	return adaptLegacyExamplesCatalog(raw);
 }
 
@@ -135,8 +141,8 @@ export async function resolveExamplesCatalog({
 
 	if (pinSchema === STANDARD_EXAMPLES_SCHEMA) {
 		try {
-			const local = await getStandardExamples();
-			return { catalog: shapeExamplesPayload(local), source: "oq-api" };
+			const local = shapeExamplesPayload(await getStandardExamples());
+			if (local) return { catalog: local, source: "oq-api" };
 		} catch {
 			/* CDN, then the versioned pin JSON */
 		}
@@ -148,8 +154,9 @@ export async function resolveExamplesCatalog({
 		if (catalog) return { catalog, source: "remote" };
 	}
 
-	const local = await getStandardExamples();
-	return { catalog: shapeExamplesPayload(local), source: "oq-api" };
+	const local = shapeExamplesPayload(await getStandardExamples());
+	if (!local) throw new Error("examples catalog was empty");
+	return { catalog: local, source: "oq-api" };
 }
 
 /**
