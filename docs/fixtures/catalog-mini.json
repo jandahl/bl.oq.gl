@@ -47,6 +47,12 @@
       "application_logic": { "underlying_form": "", "continuation_class": "WORD_FINAL" },
       "plain_gloss": { "en_short": "ABS.SG", "da_short": "ABS.SG" },
       "lexical_facts_case": "ABS"
+    }],
+    "N_ABS_PL": [{
+      "lexical_facts": { "morpheme_type": "inflectional_ending", "word_class": "", "meaning": "absolutive plural" },
+      "application_logic": { "underlying_form": "-it", "continuation_class": "WORD_FINAL" },
+      "plain_gloss": { "en_short": "ABS.PL", "da_short": "ABS.PL" },
+      "lexical_facts_case": "ABS"
     }]
   }
 }
