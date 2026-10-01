@@ -10,6 +10,13 @@ export function catalogUnchanged(meta, headers = {}) {
 	return false;
 }
 
+/** SHA-256 of catalog bytes. The pin hides ETag from page JS, so this is the validator revalidation can see. */
+export async function digestCatalog(buffer) {
+	const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+	const hash = await globalThis.crypto.subtle.digest("SHA-256", bytes.slice());
+	return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 function header(headers, name) {
 	if (!headers) return "";
 	if (typeof headers.get === "function") return headers.get(name) || headers.get(name.toLowerCase()) || "";
