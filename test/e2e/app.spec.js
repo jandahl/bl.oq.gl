@@ -453,23 +453,36 @@ test("Build: directional connections — word starts accept only a container, en
 		const ending = mk("morpheme_block__inflection");
 		const enclitic = mk("morpheme_block__enclitic");
 		const particle = mk("morpheme_block__particle");
+		const enclitic2 = mk("morpheme_block__enclitic");
+		const derivEnclitic = mk("morpheme_block__deriv_enclitic");
+		const typeChecks = (a, b) => (a && b
+			? a.getConnectionChecker().doTypeChecks(a, b)
+			: null);
 		const out = {
 			stemHasPrevious: stem.previousConnection !== null,
 			endingHasNext: ending.nextConnection !== null,
-			endingToEncliticTypeChecks: ending.nextConnection
-				? ending.nextConnection.getConnectionChecker().doTypeChecks(ending.nextConnection, enclitic.previousConnection)
-				: null,
+			endingToEncliticTypeChecks: typeChecks(ending.nextConnection, enclitic.previousConnection),
 			encliticHasNext: enclitic.nextConnection !== null,
+			encliticNextCheck: enclitic.nextConnection?.getCheck?.() ?? null,
+			encliticToEnclitic: typeChecks(enclitic.nextConnection, enclitic2.previousConnection),
+			encliticToDerivEnclitic: typeChecks(enclitic.nextConnection, derivEnclitic.previousConnection),
+			encliticToEnding: typeChecks(enclitic.nextConnection, ending.previousConnection),
+			encliticToParticle: typeChecks(enclitic.nextConnection, particle.previousConnection),
 			particleHasPrevious: particle.previousConnection !== null,
 			particleHasNext: particle.nextConnection !== null,
 		};
-		for (const b of [stem, ending, enclitic, particle]) b.dispose(false);
+		for (const b of [stem, ending, enclitic, enclitic2, derivEnclitic, particle]) b.dispose(false);
 		return out;
 	});
 	expect(result.stemHasPrevious).toBe(true);
 	expect(result.endingHasNext).toBe(true);
 	expect(result.endingToEncliticTypeChecks).toBe(true);
-	expect(result.encliticHasNext).toBe(false);
+	expect(result.encliticHasNext).toBe(true);
+	expect(result.encliticNextCheck).toEqual(["ENCLITIC_FOLLOW"]);
+	expect(result.encliticToEnclitic).toBe(true);
+	expect(result.encliticToDerivEnclitic).toBe(true);
+	expect(result.encliticToEnding).toBe(false);
+	expect(result.encliticToParticle).toBe(false);
 	expect(result.particleHasPrevious).toBe(true);
 	expect(result.particleHasNext).toBe(false);
 });

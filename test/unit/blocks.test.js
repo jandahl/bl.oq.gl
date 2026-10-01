@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers, UNRESOLVED_MORPHEME_ID } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers, wrapRowChainCheck, UNRESOLVED_MORPHEME_ID } from "../../docs/blocks.js";
 import { canvasIdTree, sameIdTree } from "../../docs/id-tree.js";
 
 // buildToolbox / the canvas walkers don't touch the Blockly global. renderSentencePlan
@@ -487,12 +487,22 @@ test("structuralCategoryConnections: stem cannot follow, particle is alone, encl
 	assert.equal(byId.particle.hasPrevious, false);
 	assert.equal(byId.particle.hasNext, false);
 	assert.equal(byId.particle.nextCheck, null);
-	assert.equal(byId.enclitic.hasNext, false);
-	assert.equal(byId.enclitic.nextCheck, null);
+	assert.equal(byId.enclitic.hasNext, true);
+	assert.equal(byId.enclitic.nextCheck, "ENCLITIC_FOLLOW");
 	assert.equal(byId.enclitic.hasPrevious, true);
-	assert.equal(byId.enclitic.previousCheck, "MORPHEME_CHAIN");
+	assert.deepEqual(byId.enclitic.previousCheck, ["MORPHEME_CHAIN", "ENCLITIC_FOLLOW"]);
+	assert.deepEqual(byId.deriv_enclitic.previousCheck, ["MORPHEME_CHAIN", "ENCLITIC_FOLLOW"]);
+	assert.equal(byId.deriv_enclitic.nextCheck, "MORPHEME_CHAIN");
+	assert.equal(byId.inflection.previousCheck, "MORPHEME_CHAIN");
+	assert.equal(byId.inflection.nextCheck, "MORPHEME_CHAIN");
+	assert.equal(byId.sentential.previousCheck, "MORPHEME_CHAIN");
+	assert.equal(byId.deriv_affix.previousCheck, "MORPHEME_CHAIN");
 	assert.equal(byId.deriv_affix.hasPrevious, true);
 	assert.equal(byId.deriv_affix.hasNext, true);
+	assert.equal(wrapRowChainCheck(null, true), "WORD_START");
+	assert.equal(wrapRowChainCheck("ENCLITIC_FOLLOW", false), "ENCLITIC_FOLLOW");
+	assert.deepEqual(wrapRowChainCheck(["ENCLITIC_FOLLOW"], false), ["ENCLITIC_FOLLOW"]);
+	assert.equal(wrapRowChainCheck(null, false), "MORPHEME_CHAIN");
 });
 
 test("canvasTree: two sentences, a held word, and a loose chain round-trip to the same id tree", () => {
