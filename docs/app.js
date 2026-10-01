@@ -7,7 +7,7 @@ import {
 } from "./blocks.js";
 import { sameIdTree } from "./id-tree.js";
 import {
-	createSession, clearAnalysisCaches, seqForChain as resolveSeqForChain, planMatchesCanvas,
+	createSession, clearAnalysisCaches, cancelDeconstruct, seqForChain as resolveSeqForChain, planMatchesCanvas,
 	deconstructIdsMatchSentences, computeBuild, formatStatus,
 } from "./session.js";
 import { renderSentenceBreakdown, renderWordBreakdowns, renderTonedPhrases, wordTone } from "./breakdown.js";
@@ -709,6 +709,10 @@ async function copyShareLink() {
 
 function clearCanvas() {
 	if (!session.workspace) return;
+	// Bump the run id before dropping share state. A Deconstruct that is
+	// awaiting analyzeWordAsync must see the new id and return before it
+	// calls renderSentencePlan or syncURL.
+	cancelDeconstruct(session);
 	session.workspace.clear();
 	// Clearing the canvas must also invalidate share state: otherwise
 	// session.lastDeconstructWord / the word input keep w= in the URL, and a reload
@@ -997,6 +1001,7 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 			analysesByWord: analyses,
 			daLattice,
 		}));
+		if (run !== session.deconstructRun) return;
 		session.lastDeconstructWord = surface;
 		session.lastSentencePlan = plan;
 		const placed = plan.sentences.flatMap((sentence) => sentence.words.filter((word) => word.seq && word.built?.ok));
@@ -1034,9 +1039,14 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 
 async function runDeconstruct({ skipCanvas = false } = {}) {
 	const surface = wordInput.value.trim();
-	if (session.deconstructAbort) session.deconstructAbort.abort();
-	const run = ++session.deconstructRun;
-	if (!surface) return;
+	cancelDeconstruct(session);
+	if (!surface) {
+		// The run counter just advanced. Without a status paint the live
+		// region stays on "Analyzing…" from the request this cancelled.
+		applyBuildShare(refreshBuild());
+		return;
+	}
+	const run = session.deconstructRun;
 	session.deconstructAbort = new AbortController();
 	session.lastSentencePlan = null;
 	if (isSentenceInput(surface)) {
@@ -1078,6 +1088,7 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 				ids: best.seq.map((item) => item.id).filter(Boolean),
 			});
 		}
+		if (run !== session.deconstructRun) return;
 		session.lastDeconstructWord = surface;
 		const okParts = parts.filter((p) => !p.missing && p.seq);
 		session.lastDeconstructParts = okParts.length ? okParts : parts;

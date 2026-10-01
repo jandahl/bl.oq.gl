@@ -68,6 +68,24 @@ export function buildWord(seq) {
 }
 
 export async function analyzeWordAsync() {
+	const slow = Number(globalThis.__BLOQ_SLOW_ANALYZE__) || 0;
+	if (slow > 0) {
+		// Resolve even if the caller aborted. The Clear-canvas regression is a
+		// response that lands after cancel; rejecting here would hide a missing
+		// deconstructRun bump.
+		await new Promise((resolve) => {
+			globalThis.setTimeout(resolve, slow);
+		});
+		return {
+			matches: [{
+				seq: [
+					{ id: "neri", text: "neri" },
+					{ id: "V_IND_INTR_3SG", text: "voq" },
+				],
+			}],
+			evalCount: 1,
+		};
+	}
 	return { matches: [], evalCount: 0 };
 }
 
