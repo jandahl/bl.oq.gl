@@ -29,6 +29,70 @@ export function bindVerbPickerHost(host) {
 	applyChainConnections = host.applyChainConnections;
 }
 
+// The block types are registered once. A later catalog refresh must not keep
+// resolving against the index and map captured at that call: menus, __resolve,
+// and variant validators read this object.
+const verbCatalog = {
+	index: null,
+	presetsById: new Map(),
+	getDisplayOptions: () => ({}),
+	resolveMoodLabel: (mood) => ({ text: String(mood ?? ""), title: null }),
+	resolvePersonLabel: () => "",
+};
+const polarityMapping = {};
+const polarityFallback = [["affirmative", "positive"], ["negative", "negative"]];
+
+function refreshPolarityMapping() {
+	for (const key of Object.keys(polarityMapping)) delete polarityMapping[key];
+	const index = verbCatalog.index;
+	for (const mood of index?.moods ?? []) {
+		polarityMapping[mood] = (index.polaritiesByMood.get(mood) ?? ["positive"]).map((polarity) => [
+			polarity === "negative" ? "negative" : "affirmative", polarity,
+		]);
+	}
+}
+
+/**
+ * Point every already-defined picker at a new catalog. Safe to call again
+ * when revalidateCatalog replaces session.presets.
+ * @param {{
+ *   verbEndingIndex?: ReturnType<import("./verb-endings.js").buildVerbEndingIndex>,
+ *   presetsById?: Map<string, any>,
+ *   getDisplayOptions?: () => object,
+ *   resolveMoodLabel?: (mood: string) => { text: string, title: string|null },
+ *   resolvePersonLabel?: (person: number, number: string) => string,
+ * }} [next]
+ */
+export function bindVerbPickerCatalog(next = {}) {
+	if (next.verbEndingIndex) verbCatalog.index = next.verbEndingIndex;
+	if (next.presetsById) verbCatalog.presetsById = next.presetsById;
+	if (typeof next.getDisplayOptions === "function") verbCatalog.getDisplayOptions = next.getDisplayOptions;
+	if (typeof next.resolveMoodLabel === "function") verbCatalog.resolveMoodLabel = next.resolveMoodLabel;
+	if (typeof next.resolvePersonLabel === "function") verbCatalog.resolvePersonLabel = next.resolvePersonLabel;
+	if (next.verbEndingIndex) refreshPolarityMapping();
+}
+
+/** Candidates for one grammatical selection against the catalog bound now. */
+export function verbPickerCandidates(mood, transitivity, sPerson, sNumber, oPerson, oNumber, polarity = "positive") {
+	if (!verbCatalog.index) return [];
+	return candidatesFor(verbCatalog.index, mood, transitivity, sPerson, sNumber, oPerson, oNumber, polarity);
+}
+
+function liveMoodOptions() {
+	const index = verbCatalog.index;
+	if (!index?.moods?.length) return [["—", "NONE"]];
+	return index.moods.map((mood) => [moodDisplayLabel(mood, verbCatalog.resolveMoodLabel), mood]);
+}
+
+function liveSubjectOptions(combos = verbCatalog.index?.subjectCombos) {
+	if (!combos?.length) return [["—", "NONE"]];
+	return combos.map((combo) => [personNumberLabel(combo, verbCatalog.resolvePersonLabel), combo]);
+}
+
+function liveObjectOptions() {
+	return liveSubjectOptions(verbCatalog.index?.objectCombos);
+}
+
 // ---------------------------------------------------------------------------
 // Verb ending picker (bl-oq-ly#18, object-as-plug-in bl-oq-ly#20 follow-up)
 // — a conjugation-style block, the same paradigm shape as oq's own
@@ -66,24 +130,13 @@ export function bindVerbPickerHost(host) {
 // "statement" rather than "indicative" -- not a bespoke grammar-terms
 // vocabulary a non-linguist learner wouldn't know.
 
-function verbEndingPickerFields(verbEndingIndex, resolveMoodLabel, resolvePersonLabel) {
-	const moodOptions = verbEndingIndex.moods.map((m) => [moodDisplayLabel(m, resolveMoodLabel), m]);
-	const subjectOptions = verbEndingIndex.subjectCombos.map((c) => [personNumberLabel(c, resolvePersonLabel), c]);
-	const polarityOptions = [["affirmative", "positive"], ["negative", "negative"]];
-	const polarityMapping = Object.fromEntries(verbEndingIndex.moods.map((mood) => [
-		mood,
-		(verbEndingIndex.polaritiesByMood.get(mood) ?? ["positive"]).map((polarity) => [
-			polarity === "negative" ? "negative" : "affirmative", polarity,
-		]),
-	]));
-	return { moodOptions, subjectOptions, polarityOptions, polarityMapping };
-}
-
-function subjectCombosFor(block, verbEndingIndex) {
+function subjectCombosFor(block) {
+	const index = verbCatalog.index;
+	if (!index) return [];
 	const mood = block?.getFieldValue("MOOD");
 	const transitivity = block?.getInputTargetBlock("OBJECT_SLOT") ? "transitive" : "intransitive";
-	return verbEndingIndex.subjectCombosByMoodTransitivity.get(`${mood}|${transitivity}`)
-		?? verbEndingIndex.subjectCombos;
+	return index.subjectCombosByMoodTransitivity.get(`${mood}|${transitivity}`)
+		?? index.subjectCombos;
 }
 
 /**
@@ -97,13 +150,16 @@ function subjectCombosFor(block, verbEndingIndex) {
  * the parent; object is a typed value block observed by the workspace
  * listener after its changes commit.
  */
-function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOptions, variantOverride) {
+function resolveVerbPicker(block, variantOverride) {
+	const index = verbCatalog.index;
+	const presetsById = verbCatalog.presetsById;
+	const getDisplayOptions = verbCatalog.getDisplayOptions;
 	const moodBlock = block.getInputTargetBlock("MOOD_SLOT");
 	const subjectBlock = block.getInputTargetBlock("SUBJECT_SLOT");
 	const mood = block.getFieldValue("MOOD") ?? moodBlock?.getFieldValue("MOOD");
 	let subjectValue = block.getFieldValue("SUBJECT") ?? subjectBlock?.getFieldValue("COMBO");
 	const subjectField = block.getField("SUBJECT");
-	const validSubjects = subjectCombosFor(block, verbEndingIndex);
+	const validSubjects = subjectCombosFor(block);
 	if (subjectField && validSubjects.length && !validSubjects.includes(subjectValue)) {
 		// setValue checks the cached menu. Regenerate it for this mood and
 		// transitivity or the correction no-ops and the old person sticks.
@@ -123,8 +179,8 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
 		? parsePersonNumber(objectBlock.getFieldValue("COMBO"))
 		: { person: undefined, number: undefined };
 
-	const candidates = mood && subjectValue
-		? candidatesFor(verbEndingIndex, mood, transitivity, sPerson, sNumber, oPerson, oNumber, polarity)
+	const candidates = index && mood && subjectValue
+		? candidatesFor(index, mood, transitivity, sPerson, sNumber, oPerson, oNumber, polarity)
 		: [];
 	const variantInput = block.getInput("VARIANT_GROUP");
 	const variantField = block.getField("VARIANT");
@@ -176,18 +232,18 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
  * @param {(person: number, number: string) => string} resolvePersonLabel oq's public-api export.
  */
 export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDisplayOptions, resolveMoodLabel, resolvePersonLabel) {
-	const { moodOptions, subjectOptions, polarityOptions, polarityMapping } = verbEndingPickerFields(verbEndingIndex, resolveMoodLabel, resolvePersonLabel);
+	bindVerbPickerCatalog({ verbEndingIndex, presetsById, getDisplayOptions, resolveMoodLabel, resolvePersonLabel });
 
 	function onVariantChange(newValue) {
 		const block = this.getSourceBlock();
-		if (block) resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOptions, newValue);
+		if (block) resolveVerbPicker(block, newValue);
 		return newValue;
 	}
 
 	Blockly.Blocks[VERB_MOOD_TYPE] = {
 		init() {
 			this.appendDummyInput()
-				.appendField(new Blockly.FieldDropdown(moodOptions), "MOOD");
+				.appendField(new Blockly.FieldDropdown(liveMoodOptions), "MOOD");
 			this.setOutput(true, VERB_MOOD_CONNECTION_TYPE);
 			this.setStyle(INFLECTION_BLOCK_STYLE);
 			this.setInputsInline(true);
@@ -198,7 +254,7 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 	Blockly.Blocks[VERB_SUBJECT_TYPE] = {
 		init() {
 			this.appendDummyInput()
-				.appendField(new Blockly.FieldDropdown(subjectOptions), "COMBO");
+				.appendField(new Blockly.FieldDropdown(liveSubjectOptions), "COMBO");
 			this.setOutput(true, VERB_SUBJECT_CONNECTION_TYPE);
 			this.setStyle(INFLECTION_BLOCK_STYLE);
 			this.setInputsInline(true);
@@ -214,16 +270,15 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 				.appendField(new Blockly.FieldLabelSerializable(""), "RESOLVED");
 			this.appendDummyInput("MOOD_ROW")
 				.appendField(`${UI_INDENT}Mood`)
-				.appendField(new Blockly.FieldDropdown(moodOptions), "MOOD");
+				.appendField(new Blockly.FieldDropdown(liveMoodOptions), "MOOD");
 			this.appendDummyInput("POLARITY_ROW")
 				.appendField(`${UI_INDENT}Polarity`)
-				.appendField(new FieldDependentDropdown("MOOD", polarityMapping, polarityOptions), "POLARITY");
+				.appendField(new FieldDependentDropdown("MOOD", polarityMapping, polarityFallback), "POLARITY");
 			this.appendDummyInput("SUBJECT_ROW")
 				.appendField(`${UI_INDENT}Person`)
 				.appendField(new Blockly.FieldDropdown(function () {
 					const source = this.getSourceBlock();
-					return subjectCombosFor(source, verbEndingIndex)
-						.map((combo) => [personNumberLabel(combo, resolvePersonLabel), combo]);
+					return liveSubjectOptions(subjectCombosFor(source));
 				}), "SUBJECT");
 			this.appendValueInput("OBJECT_SLOT")
 				.setCheck(VERB_OBJECT_CONNECTION_TYPE)
@@ -244,12 +299,20 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 			this.setStyle(INFLECTION_BLOCK_STYLE);
 			this.setInputsInline(false);
 			applyChainConnections(this, { hasNext: true }, { inline: false });
-			resolveVerbPicker(this, verbEndingIndex, presetsById, getDisplayOptions);
+			resolveVerbPicker(this);
 		},
 	};
 
-	Blockly.Blocks[VERB_ENDING_PICKER_TYPE].__resolve = (block) =>
-		resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOptions);
+	Blockly.Blocks[VERB_ENDING_PICKER_TYPE].__resolve = (block) => resolveVerbPicker(block);
+}
+
+/** Re-run __resolve on pickers already on the canvas after a catalog swap. */
+export function reresolveBoundVerbPickers(workspace) {
+	const resolve = Blockly.Blocks[VERB_ENDING_PICKER_TYPE]?.__resolve;
+	if (!workspace || !resolve) return;
+	for (const block of workspace.getAllBlocks(false)) {
+		if (block.type === VERB_ENDING_PICKER_TYPE) resolve(block);
+	}
 }
 
 /**
@@ -262,11 +325,14 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
  * @param {(person: number, number: string) => string} resolvePersonLabel oq's public-api export.
  */
 export function defineVerbObjectBlock(verbEndingIndex, resolvePersonLabel) {
-	const objectOptions = verbEndingIndex.objectCombos.map((c) => [personNumberLabel(c, resolvePersonLabel), c]);
+	bindVerbPickerCatalog({
+		...(verbEndingIndex ? { verbEndingIndex } : {}),
+		...(resolvePersonLabel ? { resolvePersonLabel } : {}),
+	});
 	Blockly.Blocks[VERB_OBJECT_TYPE] = {
 		init() {
 			this.appendDummyInput()
-				.appendField(new Blockly.FieldDropdown(objectOptions), "COMBO");
+				.appendField(new Blockly.FieldDropdown(liveObjectOptions), "COMBO");
 			this.setOutput(true, VERB_OBJECT_CONNECTION_TYPE);
 			this.setStyle(INFLECTION_BLOCK_STYLE);
 			this.setInputsInline(true);
