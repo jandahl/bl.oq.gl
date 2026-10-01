@@ -281,6 +281,24 @@ export function computeBuild({
 }
 
 /**
+ * One built result and one seq per canvas word, in canvas order.
+ * `built` and `seqs` omit failures, so a caller that indexes them by canvas
+ * position paints the next word's surface on the broken block.
+ * @param {any} result computeBuild return
+ * @returns {{ built: any[], seqs: any[] }}
+ */
+export function labelsForCanvasWords(result) {
+	const outcomes = result?.wordOutcomes;
+	if (!Array.isArray(outcomes)) {
+		return { built: result?.built ?? [], seqs: result?.seqs ?? [] };
+	}
+	return {
+		built: outcomes.map((outcome) => (outcome?.ok ? outcome.built : null)),
+		seqs: outcomes.map((outcome) => (outcome?.ok ? outcome.seq : null)),
+	};
+}
+
+/**
  * Pure status contract from a computeBuild / plan result.
  * UI only renders this — no ad hoc string assembly at call sites.
  * @param {any} result computeBuild return or { plan, surfaces? }

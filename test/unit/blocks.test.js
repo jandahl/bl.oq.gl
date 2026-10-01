@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers } from "../../docs/blocks.js";
 import { canvasIdTree, sameIdTree } from "../../docs/id-tree.js";
 
 // buildToolbox / the canvas walkers don't touch the Blockly global. renderSentencePlan
@@ -297,6 +297,9 @@ function chainBlock(type, ws) {
 	if (type === "morpheme_block__word_container") {
 		inputs.MORPHEMES = { connection: chainConnection(block, "input") };
 	}
+	if (type === "morpheme_block__sentence_container") {
+		inputs.WORDS = { connection: chainConnection(block, "input") };
+	}
 	return block;
 }
 
@@ -338,6 +341,30 @@ test("renderSentencePlan: a chain keeps a zero-realization ending id", () => {
 	assert.match(ending.getFieldValue("LABEL"), /^Ø/);
 	assert.deepEqual(chainFromTopBlock(word), ["qimmeq", "N_ABS_SG"]);
 	assert.deepEqual(topLevelSentences(workspace), [[["qimmeq", "N_ABS_SG"]]]);
+});
+
+test("labelContainers: a null built slot does not take the next word's surface", () => {
+	const workspace = chainWorkspace();
+	const sentence = workspace.newBlock("morpheme_block__sentence_container");
+	const words = ["a", "missing", "c"].map((id) => {
+		const word = workspace.newBlock("morpheme_block__word_container");
+		const stem = workspace.newBlock("morpheme_block__stem_n");
+		stem.data = id;
+		word.getInput("MORPHEMES").connection.connect(stem.previousConnection);
+		return word;
+	});
+	sentence.getInput("WORDS").connection.connect(words[0].previousConnection);
+	words[0].nextConnection.connect(words[1].previousConnection);
+	words[1].nextConnection.connect(words[2].previousConnection);
+	labelContainers(workspace, [{ word: "a" }, null, { word: "c" }], ["alpha", "", "gamma"]);
+	assert.equal(words[0].getFieldValue("TITLE"), "A");
+	assert.equal(words[1].getFieldValue("TITLE"), "Word");
+	assert.equal(words[2].getFieldValue("TITLE"), "c");
+	assert.equal(words[0].getFieldValue("TRANSLATION"), "alpha");
+	assert.equal(words[1].getFieldValue("TRANSLATION"), "");
+	assert.equal(words[2].getFieldValue("TRANSLATION"), "gamma");
+	assert.equal(sentence.getFieldValue("TITLE"), "A c");
+	assert.equal(sentence.getFieldValue("TRANSLATION"), "alpha gamma");
 });
 
 test("buildToolbox: hiding the pickers puts matching verb and noun endings back as blocks", () => {
