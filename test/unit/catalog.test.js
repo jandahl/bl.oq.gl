@@ -119,6 +119,10 @@ test("loadCatalog revalidation keeps the previous cache when the new body fails 
 	}
 });
 
+async function settleCatalogRevalidate() {
+	for (let i = 0; i < 8; i++) await new Promise((resolve) => global.setTimeout(resolve, 0));
+}
+
 test("digestCatalog is a stable sha-256 of the catalog bytes", async () => {
 	const bytes = new TextEncoder().encode("{\"id\":\"qimmeq\"}");
 	assert.equal(await digestCatalog(bytes), await digestCatalog(bytes.slice()));
@@ -134,7 +138,7 @@ test("loadCatalog revalidation skips parse when the body hash matches and ETag i
 		status: 200,
 		headers: { "content-type": "application/json" },
 	}));
-	await writeCatalogMeta(cache, { url, etag: "", sha256 });
+	await writeCatalogMeta(cache, { url, etag: "", fetchedAt: 1 });
 	const original = globalThis.fetch;
 	let updates = 0;
 	let gets = 0;
@@ -152,7 +156,7 @@ test("loadCatalog revalidation skips parse when the body hash matches and ETag i
 		});
 		assert.equal(catalog.fromCache, true);
 		assert.ok(catalog.presets.some((preset) => preset.id === "qimmeq"));
-		for (let i = 0; i < 10; i++) await new Promise((resolve) => queueMicrotask(resolve));
+		await settleCatalogRevalidate();
 		assert.equal(gets, 1);
 		assert.equal(updates, 0);
 		const stored = await cache.match(url);
@@ -160,6 +164,7 @@ test("loadCatalog revalidation skips parse when the body hash matches and ETag i
 		const meta = await (await cache.match("https://bloq.invalid/catalog-meta")).json();
 		assert.equal(meta.sha256, sha256);
 		assert.equal(meta.etag, "");
+		assert.ok(meta.fetchedAt > 1);
 	} finally {
 		globalThis.fetch = original;
 	}
@@ -186,7 +191,7 @@ test("loadCatalog revalidation still parses when the body hash differs", async (
 			onUpdated: () => { updates += 1; },
 			engine: { mergeMorphemeSources: fixtureMergeMorphemeSources, GRAMMAR_MORPHEMES_URL: url },
 		});
-		for (let i = 0; i < 10; i++) await new Promise((resolve) => queueMicrotask(resolve));
+		await settleCatalogRevalidate();
 		assert.equal(updates, 1);
 		const meta = await (await cache.match("https://bloq.invalid/catalog-meta")).json();
 		assert.equal(meta.sha256, await digestCatalog(new TextEncoder().encode(changed)));

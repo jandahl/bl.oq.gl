@@ -178,9 +178,14 @@ export async function loadCatalog(opts = {}) {
 			onProgress?.({ phase: "cached" });
 			const buffer = new Uint8Array(await cached.arrayBuffer());
 			onProgress?.({ phase: "parse", loaded: buffer.byteLength, total: buffer.byteLength });
+			// Old entries have no sha256. Digest the bytes already in hand so a
+			// hidden ETag cannot force a parse and onUpdated of an unchanged body.
+			const sha256 = meta?.sha256 || await digestCatalog(buffer);
+			const seeded = { ...meta, sha256, url: meta?.url || cachedUrl };
+			if (meta?.sha256 !== sha256) await writeCatalogMeta(cache, seeded);
 			const catalog = { ...catalogFromPayload(parseCatalogBytes(buffer), mergeMorphemeSources), fromCache: true };
 			queueMicrotask(() => {
-				revalidateCatalog(cachedUrl, cache, meta, onUpdated, mergeMorphemeSources);
+				revalidateCatalog(cachedUrl, cache, seeded, onUpdated, mergeMorphemeSources);
 			});
 			return catalog;
 		} catch {
