@@ -31,6 +31,10 @@ const messages = {
 		"workedExamplesCount": "{shown} of {total} examples", "workedExamplesFailed": "Could not load the CI example set: {message}",
 		"canvasLabel": "Morpheme workshop canvas", "canvasDescription": "Build words by stacking morpheme blocks. Current chains are listed in the results region.",
 		"canvasChains": "Current canvas chains", "filterLabel": "Filter morphemes",
+		"bandGold": "gold", "bandExact": "exact", "bandSoft": "soft", "bandNone": "unparsed",
+		"noBuilderSequence": "Catalog entry has no builder sequence.",
+		"closedReadingDoesNotBuild": "This closed reading does not build.",
+		"sentenceN": "Sentence {n}", "evalCandidates": "{count} candidates",
 	},
 	da: {
 		"app.title": "BLOQ", "theme.auto": "Tema: Automatisk", "theme.light": "Tema: Lys", "theme.dark": "Tema: Mørk", "display": "Indstillinger", "settingsHeading": "Visning og sprog",
@@ -64,6 +68,10 @@ const messages = {
 		"workedExamplesCount": "{shown} af {total} eksempler", "workedExamplesFailed": "Kunne ikke indlæse CI-eksempelsættet: {message}",
 		"canvasLabel": "Morfemværkstedets lærred", "canvasDescription": "Byg ord ved at stable morfemblokke. Aktuelle kæder står i resultatområdet.",
 		"canvasChains": "Aktuelle lærredskæder", "filterLabel": "Filtrér morfemer",
+		"bandGold": "guld", "bandExact": "eksakt", "bandSoft": "blød", "bandNone": "utolket",
+		"noBuilderSequence": "Katalogposten har ingen byggesekvens.",
+		"closedReadingDoesNotBuild": "Denne lukkede læsning kan ikke bygges.",
+		"sentenceN": "Sætning {n}", "evalCandidates": "{count} kandidater",
 	},
 };
 

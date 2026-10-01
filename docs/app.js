@@ -815,7 +815,7 @@ function announceCanvasChains() {
 			if (word.held) return word.block?.getFieldValue?.("TITLE") || word.held;
 			return word.ids.join(" + ") || "…";
 		});
-		lines.push(words.join(" · ") || `Sentence ${s + 1}`);
+		lines.push(words.join(" · ") || t("sentenceN", { n: s + 1 }));
 	});
 	live.textContent = lines.length ? lines.join(" | ") : "";
 }
@@ -935,7 +935,7 @@ function materializePlan(plan) {
 						...word,
 						status: "missing",
 						canvasIds: [],
-						note: "Catalog entry has no builder sequence.",
+						note: t("noBuilderSequence"),
 					};
 				}
 				const built = buildWord(seq);
@@ -946,7 +946,7 @@ function materializePlan(plan) {
 						built,
 						status: "invalid",
 						canvasIds: [],
-						note: built.reason || "This closed reading does not build.",
+						note: built.reason || t("closedReadingDoesNotBuild"),
 					};
 				}
 				return { ...word, seq, built };
@@ -1104,7 +1104,7 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 		}
 		if (failures.length) {
 			const detail = failures.map((f) => t("noVerifiedBreakdown", { token: f.token })).join(" · ");
-			const meta = failures.map((f) => `${f.evalCount} candidates`).join(" · ");
+			const meta = failures.map((f) => t("evalCandidates", { count: f.evalCount })).join(" · ");
 			const okSurfaces = okParts.map((p) => p.built?.word || p.word);
 			applyStatus({
 				kind: "error",
