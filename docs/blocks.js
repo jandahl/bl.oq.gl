@@ -568,8 +568,8 @@ export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker =
 
 /**
  * Single canvas walker. Workspace → tree of sentences/words with ids, held
- * flags, and owning blocks. chainFromTopBlock / wordsFromBlock /
- * topLevelSentences / labelContainers are views over this tree.
+ * flags, and owning blocks. wordsFromBlock / topLevelSentences /
+ * labelContainers / planFromCanvas are views over this tree.
  *
  * @param {any} workspace
  * @returns {{ sentences: Array<{ block: any, words: Array<{ ids: string[], held: string|null, block: any }> }> }}
@@ -712,13 +712,6 @@ function paintWordPresentations(first, words) {
 		paintPresentation(block, word.presentation);
 		block = block.getNextBlock?.() || null;
 	}
-}
-
-/** Walks a stack of morpheme blocks starting at `block`, returning morpheme ids top to bottom. */
-export function chainFromTopBlock(block) {
-	if (block?.type === SENTENCE_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("WORDS"));
-	if (block?.type === WORD_CONTAINER_TYPE) return idsInsideWord(block);
-	return morphemeIdsFrom(block);
 }
 
 /**

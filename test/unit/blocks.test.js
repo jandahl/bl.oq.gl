@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers, nounStemBlock, wrapRowChainCheck, planFromCanvas, UNRESOLVED_MORPHEME_ID } from "../../docs/blocks.js";
+import { buildToolbox, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers, nounStemBlock, wrapRowChainCheck, planFromCanvas, UNRESOLVED_MORPHEME_ID } from "../../docs/blocks.js";
 import { canvasIdTree, sameIdTree } from "../../docs/id-tree.js";
 
 // buildToolbox / the canvas walkers don't touch the Blockly global. renderSentencePlan
@@ -342,7 +342,7 @@ test("renderSentencePlan: a chain keeps a zero-realization ending id", () => {
 	assert.equal(ending.type, "morpheme_block__inflection");
 	assert.equal(ending.data, "N_ABS_SG");
 	assert.match(ending.getFieldValue("LABEL"), /^Ø/);
-	assert.deepEqual(chainFromTopBlock(word), ["qimmeq", "N_ABS_SG"]);
+	assert.deepEqual(wordsFromBlock(word), [["qimmeq", "N_ABS_SG"]]);
 	assert.deepEqual(topLevelSentences(workspace), [[["qimmeq", "N_ABS_SG"]]]);
 });
 
@@ -430,27 +430,27 @@ test("buildToolbox: hiding the pickers puts matching verb and noun endings back 
 	assert.ok(!open.contents.some((block) => block.data === "V_IND_INTR_1SG" || block.data === "N_ABS_SG"));
 });
 
-test("chainFromTopBlock: walks a fake block stack via getNextBlock(), collecting each block's .data", () => {
+test("wordsFromBlock: a loose morpheme stack is one word", () => {
 	const third = { type: "morpheme_block__inflection", data: "V_IND_INTR_1SG", getNextBlock: () => null };
 	const second = { type: "morpheme_block__deriv_affix", data: "N_qaq_Vb", getNextBlock: () => third };
 	const first = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => second };
-	assert.deepEqual(chainFromTopBlock(first), ["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"]);
+	assert.deepEqual(wordsFromBlock(first), [["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"]]);
 });
 
-test("chainFromTopBlock: a picker with no block.data stays in the chain", () => {
+test("wordsFromBlock: a picker with no block.data stays in the chain", () => {
 	const picker = { type: "morpheme_block__verb_ending_picker", data: null, getNextBlock: () => null };
 	const stem = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => picker };
-	assert.deepEqual(chainFromTopBlock(stem), ["qimmeq", UNRESOLVED_MORPHEME_ID]);
+	assert.deepEqual(wordsFromBlock(stem), [["qimmeq", UNRESOLVED_MORPHEME_ID]]);
 });
 
-test("chainFromTopBlock: a null/undefined chain link stops the walk cleanly", () => {
+test("wordsFromBlock: a null chain link stops the walk", () => {
 	const only = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => null };
-	assert.deepEqual(chainFromTopBlock(only), ["qimmeq"]);
+	assert.deepEqual(wordsFromBlock(only), [["qimmeq"]]);
 });
 
-test("chainFromTopBlock: ignores a non-morpheme block type (defensive; shouldn't occur in practice since only morpheme blocks connect)", () => {
+test("wordsFromBlock: a non-morpheme block is not a word", () => {
 	const stray = { type: "some_other_block", data: "x", getNextBlock: () => null };
-	assert.deepEqual(chainFromTopBlock(stray), []);
+	assert.deepEqual(wordsFromBlock(stray), []);
 });
 
 test("buildToolbox: always includes Word and Sentence container categories only", () => {
@@ -465,13 +465,13 @@ test("buildToolbox: always includes Word and Sentence container categories only"
 	assert.equal(sentences.contents[0].type, "morpheme_block__sentence_container");
 });
 
-test("chainFromTopBlock: unwraps a word container to its morpheme stack", () => {
+test("wordsFromBlock: unwraps a word container to its morpheme stack", () => {
 	const inner = { type: "morpheme_block__stem_n", data: "qimmeq", getNextBlock: () => null };
 	const container = {
 		type: "morpheme_block__word_container",
 		getInputTargetBlock: () => inner,
 	};
-	assert.deepEqual(chainFromTopBlock(container), ["qimmeq"]);
+	assert.deepEqual(wordsFromBlock(container), [["qimmeq"]]);
 });
 
 test("wordsFromBlock: a sentence of stacked word containers yields one chain per word", () => {
@@ -636,7 +636,7 @@ test("planFromCanvas leaves a lone Word on the simple path", () => {
 	assert.equal(again.getTopBlocks()[0].type, "morpheme_block__word_container");
 });
 
-test("chainFromTopBlock: a horizontal word follows NEXT plugs, not a vertical stack", () => {
+test("wordsFromBlock: a horizontal word follows NEXT plugs, not a vertical stack", () => {
 	const ending = { type: "morpheme_block__inflection", data: "V_IND", getInputTargetBlock: () => null, getNextBlock: () => null };
 	const stem = {
 		type: "morpheme_block__stem_v",
@@ -649,10 +649,10 @@ test("chainFromTopBlock: a horizontal word follows NEXT plugs, not a vertical st
 		getInput: (name) => name === "MORPHEMES" ? {} : null,
 		getInputTargetBlock: (name) => name === "MORPHEMES" ? stem : null,
 	};
-	assert.deepEqual(chainFromTopBlock(word), ["neri", "V_IND"]);
+	assert.deepEqual(wordsFromBlock(word), [["neri", "V_IND"]]);
 });
 
-test("chainFromTopBlock: wrap rows are read left to right, then top to bottom", () => {
+test("wordsFromBlock: wrap rows are read left to right, then top to bottom", () => {
 	const later = { type: "morpheme_block__enclitic", data: "encl", getInputTargetBlock: () => null, getNextBlock: () => null };
 	const early = { type: "morpheme_block__stem_n", data: "qimmeq", getInputTargetBlock: () => null, getNextBlock: () => null };
 	const row2 = {
@@ -670,5 +670,5 @@ test("chainFromTopBlock: wrap rows are read left to right, then top to bottom", 
 		getInput: (name) => name === "ROWS" ? {} : null,
 		getInputTargetBlock: (name) => name === "ROWS" ? row1 : null,
 	};
-	assert.deepEqual(chainFromTopBlock(word), ["qimmeq", "encl"]);
+	assert.deepEqual(wordsFromBlock(word), [["qimmeq", "encl"]]);
 });
