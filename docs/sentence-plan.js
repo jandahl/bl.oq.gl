@@ -142,18 +142,16 @@ export function wordFromToken(token, presetsById, analysesByWord = null) {
 			status: "span",
 			headline: spanText,
 			compositional,
-			heldLabel: "attested phrase",
-			note: "Attested phrase. The closed morpheme chain is a different reading, so it is not drawn.",
+			heldLabel: "heldAttestedPhrase",
+			note: "noteAttestedPhrase",
 		};
 	}
 	if (!primary || base.ids.length === 0) {
 		return {
 			...base,
 			status: "unparsed",
-			note: openMatchCount
-				? "No closed sentence reading. Open or approximate word analyses stay off the sentence canvas."
-				: "No closed reading for this word.",
-			heldLabel: "not in the catalog",
+			note: openMatchCount ? "noteOpenAnalyses" : "noteNoClosedReading",
+			heldLabel: "heldNotInCatalog",
 		};
 	}
 	const opaqueIds = base.ids.filter(isOpaqueId);
@@ -165,17 +163,16 @@ export function wordFromToken(token, presetsById, analysesByWord = null) {
 			status,
 			opaqueIds,
 			missingIds,
-			note: missingIds.length
-				? `Missing catalog morpheme${missingIds.length === 1 ? "" : "s"}: ${missingIds.join(", ")}.`
-				: "Name is not a catalog stem, so it is kept in the sentence gloss and not drawn as a block.",
-			heldLabel: missingIds.length ? "missing morpheme" : "name",
+			note: missingIds.length === 1 ? "noteMissingMorpheme" : (missingIds.length ? "noteMissingMorphemes" : "noteOpaqueName"),
+			noteVars: missingIds.length ? { ids: missingIds.join(", ") } : undefined,
+			heldLabel: missingIds.length ? "heldMissingMorpheme" : "heldName",
 		};
 	}
 	return {
 		...base,
 		status: primary.band === "soft_exact" ? "soft" : "verified",
 		canvasIds: base.ids.slice(),
-		note: primary.band === "soft_exact" ? "Soft exact — closed, but not a gold reading." : "",
+		note: primary.band === "soft_exact" ? "noteSoftExact" : "",
 	};
 }
 
@@ -249,8 +246,8 @@ function coverAttestedPhrase(sentences) {
 		for (const other of words) {
 			if (other.latticeIndex < from || other.latticeIndex > to) continue;
 			if (other.status !== "unparsed") continue;
-			other.heldLabel = "in the attested phrase";
-			other.note = "Part of an attested phrase, and not a catalog stem.";
+			other.heldLabel = "heldInAttestedPhrase";
+			other.note = "notePartOfAttested";
 		}
 	}
 }

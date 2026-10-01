@@ -12,6 +12,7 @@ import {
 	formatStatus,
 	labelsForCanvasWords,
 } from "../../docs/session.js";
+import { setLocale, t } from "../../docs/i18n.js";
 
 function preset(id, text = id) {
 	return { id, seq: [{ id, text }] };
@@ -160,6 +161,28 @@ test("formatStatus: partial build outcomes become one assertive status line", ()
 	assert.match(status.detail, /Unknown morpheme/);
 	assert.match(status.detail, /a/);
 	assert.match(status.detail, /c/);
+	assert.equal(status.meta, "word 2");
+});
+
+test("formatStatus: success and failure meta follow the UI locale", () => {
+	const presetsById = new Map([["a", preset("a")]]);
+	const ok = computeBuild({
+		sentences: [[["a"]]],
+		presetsById,
+		buildWord: fakeBuildWord,
+	});
+	const bad = computeBuild({
+		sentences: [[["a", "BAD"]]],
+		presetsById: new Map([["a", preset("a")], ["BAD", preset("BAD")]]),
+		buildWord: fakeBuildWord,
+	});
+	setLocale("da");
+	try {
+		assert.equal(formatStatus(ok, { t }).meta, "fuldstændigt ord");
+		assert.equal(formatStatus(bad, { t }).meta, "på position 2");
+	} finally {
+		setLocale("en");
+	}
 });
 
 test("computeBuild: matching sentence plan keeps deconstruct share", () => {

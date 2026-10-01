@@ -194,6 +194,9 @@ export function computeBuild({
 			const where = sentences.length > 1
 				? `sentence ${s + 1}, word ${i + 1}`
 				: (words.length > 1 ? `word ${i + 1}` : "");
+			const whereLabel = sentences.length > 1
+				? { key: "sentenceWord", sentence: s + 1, word: i + 1 }
+				: (words.length > 1 ? { key: "wordIndex", word: i + 1 } : null);
 			const seq = seqForChain(presetsById, words[i]);
 			if (!seq) {
 				const outcome = {
@@ -201,31 +204,35 @@ export function computeBuild({
 					kind: "unknown",
 					message: "Unknown morpheme in stack.",
 					meta: where,
+					whereLabel,
 					surface: null,
 					built: null,
 					seq: null,
 				};
 				wordOutcomes.push(outcome);
 				surfaces.push("?");
-				if (!firstError) firstError = { message: outcome.message, kind: "error", meta: where };
+				if (!firstError) firstError = { message: outcome.message, kind: "error", meta: where, whereLabel };
 				continue;
 			}
 			const result = buildWord(seq);
 			if (!result.ok) {
 				const reason = result.reason || "invalid sequence";
-				const meta = `${where ? `${where}, ` : ""}at position ${result.errorAt >= 0 ? result.errorAt + 1 : "?"}`;
+				const position = result.errorAt >= 0 ? result.errorAt + 1 : "?";
+				const meta = `${where ? `${where}, ` : ""}at position ${position}`;
 				const outcome = {
 					ok: false,
 					kind: "invalid",
 					message: reason,
 					meta,
+					whereLabel,
+					position,
 					surface: null,
 					built: result,
 					seq,
 				};
 				wordOutcomes.push(outcome);
 				surfaces.push(`✗ ${reason}`);
-				if (!firstError) firstError = { message: `✗ ${reason}`, kind: "error", meta };
+				if (!firstError) firstError = { message: `✗ ${reason}`, kind: "error", meta, whereLabel, position };
 				continue;
 			}
 			built.push(result);
@@ -253,6 +260,11 @@ export function computeBuild({
 		: (wordCount > 1
 			? (allClosed && !hasError ? `${wordCount} words` : "mid-derivation — keep building")
 			: (allClosed && !hasError ? "complete word" : "mid-derivation — keep building"));
+	const statusLabel = sentences.length > 1
+		? { key: "nSentences", count: sentences.length }
+		: (wordCount > 1
+			? (allClosed && !hasError ? { key: "nWords", count: wordCount } : { key: "midDerivation" })
+			: (allClosed && !hasError ? { key: "completeWord" } : { key: "midDerivation" }));
 
 	const base = {
 		empty: false,
@@ -263,6 +275,7 @@ export function computeBuild({
 		wordOutcomes,
 		kind,
 		meta,
+		statusLabel,
 		reading: hasError ? "none" : "seqs",
 		usePlan: false,
 		share: { mode: hasError ? null : "build", clearDeconstruct: !hasError },
@@ -315,6 +328,9 @@ export function formatStatus(result, opts = {}) {
 			midDerivation: "mid-derivation — keep building",
 			nWords: "{count} words",
 			nSentences: "{count} sentences",
+			sentenceWord: "sentence {sentence}, word {word}",
+			wordIndex: "word {word}",
+			atPosition: "at position {position}",
 		};
 		let text = fallback[key] ?? key;
 		for (const [name, value] of Object.entries(vars)) text = text.replaceAll(`{${name}}`, String(value));
@@ -334,7 +350,7 @@ export function formatStatus(result, opts = {}) {
 			return {
 				kind: "error",
 				words: null,
-				detail: missing.map((word) => `${word.raw}: ${word.note}`).join(" · "),
+				detail: missing.map((word) => `${word.raw}: ${localizedNote(word.note, translate, word.noteVars)}`).join(" · "),
 				meta,
 				assertive: true,
 			};
@@ -361,11 +377,12 @@ export function formatStatus(result, opts = {}) {
 				if (o.ok) return o.surface;
 				return o.kind === "unknown" ? translate("unknownMorpheme") : `✗ ${o.message}`;
 			}).join(" · ");
+			const locators = failed.map((outcome) => locatorText(outcome, translate)).filter(Boolean);
 			return {
 				kind: "error",
 				words: null,
 				detail,
-				meta: result.meta || failed.map((o) => o.meta).filter(Boolean).join(" · "),
+				meta: locators.join(" · ") || statusText(result, translate),
 				assertive: true,
 			};
 		}
@@ -376,7 +393,7 @@ export function formatStatus(result, opts = {}) {
 			kind: result.error.kind || "error",
 			words: null,
 			detail: result.error.message,
-			meta: result.error.meta || "",
+			meta: locatorText(result.error, translate) || result.error.meta || "",
 			assertive: true,
 		};
 	}
@@ -385,7 +402,26 @@ export function formatStatus(result, opts = {}) {
 		kind: result.kind || "ok",
 		words: result.surfaces || null,
 		detail: "",
-		meta: result.meta || "",
+		meta: statusText(result, translate),
 		assertive: false,
 	};
+}
+
+function statusText(result, translate) {
+	if (result?.statusLabel?.key) return translate(result.statusLabel.key, result.statusLabel);
+	return result?.meta || "";
+}
+
+function locatorText(source, translate) {
+	if (!source) return "";
+	const where = source.whereLabel?.key ? translate(source.whereLabel.key, source.whereLabel) : "";
+	if (source.position == null || source.position === "") return where;
+	const at = translate("atPosition", { position: source.position });
+	return where ? `${where}, ${at}` : at;
+}
+
+function localizedNote(note, translate, vars) {
+	if (!note) return "";
+	if (!/^[A-Za-z][A-Za-z0-9]*$/.test(note)) return note;
+	return translate(note, vars || {});
 }

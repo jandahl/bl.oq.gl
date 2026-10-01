@@ -63,5 +63,12 @@ test("learner-facing band, note, sentence, and candidate strings exist in both l
 	assert.equal(t("closedReadingDoesNotBuild"), "Denne lukkede læsning kan ikke bygges.");
 	assert.equal(t("sentenceN", { n: 2 }), "Sætning 2");
 	assert.equal(t("evalCandidates", { count: 4 }), "4 kandidater");
+	assert.equal(t("completeWord"), "fuldstændigt ord");
+	assert.equal(t("openDerivation"), "Midterivelse — denne kæde slutter ikke med et ordfinalt morfem.");
+	assert.equal(t("noteOpenAnalyses"), "Ingen lukket sætningslæsning. Åbne eller omtrentlige ordanalyser bliver ikke lagt på sætningslærredet.");
+	assert.equal(t("wordIndex", { word: 2 }), "ord 2");
 	setLocale("en");
+	assert.equal(t("completeWord"), "complete word");
+	assert.equal(t("atPosition", { position: 2 }), "at position 2");
+	assert.equal(t("otherBreakdowns", { count: 3 }), "Other verified breakdowns (3)");
 });

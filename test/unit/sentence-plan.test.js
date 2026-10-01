@@ -88,7 +88,7 @@ test("wordFromToken keeps closed catalog chains and refuses invented or missing 
 		readings: [],
 	}, catalog, new Map([["illuqar", { matches: [{}, {}] }]]));
 	assert.equal(open.status, "unparsed");
-	assert.match(open.note, /Open or approximate/);
+	assert.equal(open.note, "noteOpenAnalyses");
 	assert.equal(open.openMatchCount, 2);
 });
 
@@ -106,7 +106,7 @@ test("a span phrase that disagrees with the closed chain is not drawn", () => {
 	assert.equal(word.status, "span");
 	assert.equal(word.headline, "she is in Peter's room");
 	assert.equal(word.compositional, "someone is somewhere");
-	assert.equal(word.heldLabel, "attested phrase");
+	assert.equal(word.heldLabel, "heldAttestedPhrase");
 	assert.deepEqual(word.canvasIds, []);
 
 	const plan = planFromLattice({
@@ -128,7 +128,7 @@ test("a span phrase that disagrees with the closed chain is not drawn", () => {
 	}, { presetsById: catalog, assembleClause: assemble, lang: "en" });
 	assert.equal(plan.sentences.length, 1);
 	assert.equal(plan.sentences[0].words[0].status, "unparsed");
-	assert.equal(plan.sentences[0].words[0].heldLabel, "in the attested phrase");
+	assert.equal(plan.sentences[0].words[0].heldLabel, "heldInAttestedPhrase");
 	assert.equal(plan.sentences[0].words[1].status, "span");
 	assert.deepEqual(canvasSentences(plan), []);
 });
