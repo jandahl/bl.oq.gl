@@ -2,6 +2,27 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { wordTone, WORD_TONE_COUNT, renderBreakdown, renderTonedPhrases } from "../../docs/breakdown.js";
 
+function matches(el, sel) {
+	if (sel.startsWith(".")) return String(el.className || "").split(/\s+/).includes(sel.slice(1));
+	if (sel.startsWith("#")) return el.id === sel.slice(1);
+	return el.tagName === sel.toUpperCase();
+}
+
+function queryAll(root, sel) {
+	const found = [];
+	for (const child of root.children || []) {
+		if (matches(child, sel)) found.push(child);
+		found.push(...queryAll(child, sel));
+	}
+	return found;
+}
+
+function serialize(el) {
+	const own = el.textContent ? `${el.className}:${el.textContent}` : "";
+	const nested = (el.children || []).map(serialize).filter(Boolean).join("|");
+	return [own, nested].filter(Boolean).join("|");
+}
+
 function installDomShim() {
 	if (typeof document !== "undefined") return;
 	globalThis.document = {
@@ -29,15 +50,13 @@ function installDomShim() {
 					this.append(...nodes);
 				},
 				querySelector(sel) {
-					const cls = sel.startsWith(".") ? sel.slice(1) : sel;
-					return this.children.find((c) => c.className === cls || c.id === sel.replace(/^#/, "")) || null;
+					return queryAll(this, sel)[0] || null;
 				},
 				querySelectorAll(sel) {
-					const cls = sel.startsWith(".") ? sel.slice(1) : sel;
-					return this.children.filter((c) => c.className === cls);
+					return queryAll(this, sel);
 				},
 				get innerHTML() {
-					return this.children.map((c) => `${c.className}:${c.textContent}`).join("|");
+					return serialize(this);
 				},
 				set innerHTML(_v) {
 					this.children = [];
@@ -93,4 +112,23 @@ test("renderBreakdown: fixture seq renders via injected glossSummaryItems", () =
 	// Rows are appended after the translation; composedTranslation shape is
 	// covered in gloss.test.js — here we only need the fixture path to run.
 	assert.ok(container.children.length >= 1);
+});
+
+test("renderBreakdown keeps a sibling reading band across a re-render", () => {
+	installDomShim();
+	const article = document.createElement("article");
+	const band = document.createElement("p");
+	band.className = "reading-band";
+	band.textContent = "exact · qimmeqarpunga";
+	article.appendChild(band);
+	const seq = [{ id: "qimmeq", text: "qimmeq" }];
+	const built = { word: "qimmeqarpunga", approximate: false, closed: true };
+	const glossSummaryItems = () => [];
+	renderBreakdown(article, "qimmeqarpunga", seq, built, glossSummaryItems, { lang: "en" });
+	renderBreakdown(article, "qimmeqarpunga", seq, built, glossSummaryItems, { lang: "en" });
+	assert.equal(article.children[0], band);
+	assert.equal(band.textContent, "exact · qimmeqarpunga");
+	assert.equal(article.querySelectorAll(".reading-band").length, 1);
+	assert.equal(article.querySelectorAll(".breakdown-body").length, 1);
+	assert.equal(article.querySelector(".breakdown-word").textContent, "qimmeqarpunga");
 });
