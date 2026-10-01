@@ -381,19 +381,39 @@ function nounAxisMenu(axis) {
 
 export function defineNounEndingPickerBlock(nounEndingIndex, presetsById, getDisplayOptions) {
 	bindNounPickerCatalog({ nounEndingIndex, presetsById, getDisplayOptions });
-	const resolveFor = (block, variantOverride) => {
-		const candidates = nounCandidatesFor(nounCatalog.index, block.getFieldValue("CASE"), block.getFieldValue("POSSESSOR"), block.getFieldValue("NUMBER"));
-		block.nounEndingPickerState.candidates = candidates.map((c) => [c.label.slice(0, 70), c.id]);
-		// Field validators run before the new value is stored. A VARIANT
-		// change has to pass that proposed id in, or this read of the field
-		// still sees the previous candidate and writes it back to block.data.
-		const currentVariant = variantOverride ?? block.getFieldValue("VARIANT");
-		const id = candidates.some((c) => c.id === currentVariant) ? currentVariant : candidates[0]?.id ?? null;
-		block.data = id;
-		const preset = id ? nounCatalog.presetsById.get(id) : null;
-		block.getField("RESOLVED")?.setValue(preset ? labelFor(preset, nounCatalog.getDisplayOptions()) : t("noSuchEnding"));
-		if (block.rendered) block.render();
-		return id;
+	const resolveFor = (block, override) => {
+		const state = block.nounEndingPickerState;
+		const pending = { ...(state.pending || {}), ...(override || {}) };
+		state.pending = pending;
+		try {
+			// Validators run before the new value is stored. Read the in-flight
+			// axis from this call instead of getFieldValue, which is still the
+			// previous coordinate. A nested VARIANT setValue must keep that
+			// pending axis or it writes the old case/number back into block.data.
+			const caseName = pending.CASE ?? block.getFieldValue("CASE");
+			const possessor = pending.POSSESSOR ?? block.getFieldValue("POSSESSOR");
+			const number = pending.NUMBER ?? block.getFieldValue("NUMBER");
+			const candidates = nounCandidatesFor(nounCatalog.index, caseName, possessor, number);
+			state.candidates = candidates.map((c) => [c.label.slice(0, 70), c.id]);
+			const currentVariant = pending.VARIANT ?? block.getFieldValue("VARIANT");
+			const stillValid = candidates.some((c) => c.id === currentVariant);
+			const id = stillValid ? currentVariant : candidates[0]?.id ?? null;
+			block.data = id;
+			const preset = id ? nounCatalog.presetsById.get(id) : null;
+			block.getField("RESOLVED")?.setValue(preset ? labelFor(preset, nounCatalog.getDisplayOptions()) : t("noSuchEnding"));
+			if (block.rendered) block.render();
+			const axisChange = override && override.VARIANT === undefined
+				&& (override.CASE !== undefined || override.POSSESSOR !== undefined || override.NUMBER !== undefined);
+			const variantField = block.getField("VARIANT");
+			if (axisChange && !stillValid && variantField && id) {
+				state.pending = { ...pending, VARIANT: id };
+				variantField.getOptions(false);
+				variantField.setValue(id);
+			}
+			return id;
+		} finally {
+			state.pending = null;
+		}
 	};
 	Blockly.Blocks[NOUN_ENDING_PICKER_TYPE] = {
 		init() {
@@ -401,7 +421,7 @@ export function defineNounEndingPickerBlock(nounEndingIndex, presetsById, getDis
 			this.appendDummyInput("RESOLVED").appendField(new Blockly.FieldLabelSerializable(""), "RESOLVED");
 			const changed = function (newValue) {
 				const block = this.getSourceBlock();
-				if (block) resolveFor(block, this.name === "VARIANT" ? newValue : undefined);
+				if (block) resolveFor(block, { [this.name]: newValue });
 				return newValue;
 			};
 			this.appendDummyInput().appendField(`${UI_INDENT}Case`).appendField(new Blockly.FieldDropdown(() => nounAxisMenu("cases"), changed), "CASE");
