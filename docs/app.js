@@ -3,8 +3,9 @@ import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
-	presetMatchesQuery, canvasTree, sameIdTree, setViewLayout, getViewLayout,
+	presetMatchesQuery, canvasTree, setViewLayout, getViewLayout,
 } from "./blocks.js";
+import { sameIdTree } from "./id-tree.js";
 import {
 	createSession, clearAnalysisCaches, seqForChain as resolveSeqForChain, planMatchesCanvas,
 	deconstructIdsMatchSentences, computeBuild, formatStatus,

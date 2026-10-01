@@ -6,7 +6,7 @@
 // without Blockly's injected workspace or the network.
 
 import { canvasSentences } from "./sentence-plan.js";
-import { sameIdTree } from "./blocks.js";
+import { sameIdTree } from "./id-tree.js";
 
 /**
  * Mutable workshop session. Pass this into helpers; do not close over it

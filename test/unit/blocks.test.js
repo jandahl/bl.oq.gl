@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, canvasIdTree, sameIdTree } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree } from "../../docs/blocks.js";
+import { canvasIdTree, sameIdTree } from "../../docs/id-tree.js";
 
 // These blocks.js exports don't touch the `Blockly` global, so they're
 // unit-testable directly under
