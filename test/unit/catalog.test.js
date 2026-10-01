@@ -200,3 +200,91 @@ test("loadCatalog revalidation still parses when the body hash differs", async (
 		globalThis.fetch = original;
 	}
 });
+
+function hangUntilAbort(signal) {
+	return new Promise((resolve, reject) => {
+		const abort = () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+		if (signal?.aborted) abort();
+		else signal?.addEventListener("abort", abort, { once: true });
+	});
+}
+
+test("loadCatalog revalidation replaces a cached mirror when the pin wins", async () => {
+	const pin = "https://pin.test/morphemes-by-id.json";
+	const mirror = "https://mirror.test/morphemes-by-id.json";
+	const body = JSON.stringify(mini);
+	const changed = JSON.stringify({ ...mini, meta: { ...mini.meta, status: "pin" } });
+	const sha256 = await digestCatalog(new TextEncoder().encode(body));
+	const cache = createMemoryHttpCache();
+	await cache.put(mirror, new Response(body, { status: 200, headers: { "content-type": "application/json" } }));
+	await writeCatalogMeta(cache, { url: mirror, etag: "", sha256, fetchedAt: 1 });
+	const original = globalThis.fetch;
+	const gets = [];
+	globalThis.fetch = (url, init) => {
+		if (url === pin) {
+			if (init?.method === "HEAD") {
+				return Promise.resolve(new Response(null, {
+					status: 200,
+					headers: { "last-modified": "Tue, 01 Oct 2026 00:00:00 GMT" },
+				}));
+			}
+			gets.push(String(url));
+			return Promise.resolve(new Response(changed, { status: 200, headers: { "content-type": "application/json" } }));
+		}
+		return hangUntilAbort(init?.signal);
+	};
+	try {
+		let updates = 0;
+		await loadCatalog({
+			cache,
+			urls: [pin, mirror],
+			waitMs: 40,
+			onUpdated: () => { updates += 1; },
+			engine: { mergeMorphemeSources: fixtureMergeMorphemeSources, GRAMMAR_MORPHEMES_URL: pin },
+		});
+		await settleCatalogRevalidate();
+		assert.equal(updates, 1);
+		assert.deepEqual(gets, [pin]);
+		const meta = await (await cache.match("https://bloq.invalid/catalog-meta")).json();
+		assert.equal(meta.url, pin);
+		assert.match(await (await cache.match(pin)).text(), /"status":"pin"/);
+	} finally {
+		globalThis.fetch = original;
+	}
+});
+
+test("loadCatalog revalidation retargets the cache at the pin when the bytes already match", async () => {
+	const pin = "https://pin.test/morphemes-by-id.json";
+	const mirror = "https://mirror.test/morphemes-by-id.json";
+	const body = JSON.stringify(mini);
+	const sha256 = await digestCatalog(new TextEncoder().encode(body));
+	const cache = createMemoryHttpCache();
+	await cache.put(mirror, new Response(body, { status: 200, headers: { "content-type": "application/json" } }));
+	await writeCatalogMeta(cache, { url: mirror, etag: "", sha256, fetchedAt: 1 });
+	const original = globalThis.fetch;
+	globalThis.fetch = (url, init) => {
+		if (url === pin) {
+			if (init?.method === "HEAD") return Promise.resolve(new Response(null, { status: 200, headers: {} }));
+			return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/json" } }));
+		}
+		return hangUntilAbort(init?.signal);
+	};
+	try {
+		let updates = 0;
+		await loadCatalog({
+			cache,
+			urls: [pin, mirror],
+			waitMs: 40,
+			onUpdated: () => { updates += 1; },
+			engine: { mergeMorphemeSources: fixtureMergeMorphemeSources, GRAMMAR_MORPHEMES_URL: pin },
+		});
+		await settleCatalogRevalidate();
+		assert.equal(updates, 0);
+		const meta = await (await cache.match("https://bloq.invalid/catalog-meta")).json();
+		assert.equal(meta.url, pin);
+		assert.equal(meta.sha256, sha256);
+		assert.equal(await (await cache.match(pin)).text(), body);
+	} finally {
+		globalThis.fetch = original;
+	}
+});
