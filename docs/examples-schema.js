@@ -92,6 +92,67 @@ export function adaptLegacyExamplesCatalog(raw) {
 }
 
 /**
+ * A payload is v1 only when it says so. Anything else is the legacy pin:
+ * attested `sentences` are dropped.
+ * @param {unknown} raw
+ */
+export function shapeExamplesPayload(raw) {
+	const src = raw && typeof raw === "object" ? /** @type {Record<string, unknown>} */ (raw) : {};
+	if (src.schema_version === STANDARD_EXAMPLES_SCHEMA) return normalizeExamplesCatalog(raw);
+	return adaptLegacyExamplesCatalog(raw);
+}
+
+/**
+ * Examples load decision, with fetch and the pin injected so unit tests
+ * never import oq-api.js.
+ *
+ * An override URL is authoritative: a 404 or bad payload throws instead of
+ * falling through to the live catalog. The pin is v1 only when its schema
+ * constant is `standard-examples/v1` — exporting glossText is not enough.
+ * The payload itself is still shaped by its own schema_version.
+ *
+ * @param {{
+ *   override?: string|null,
+ *   pinSchema?: string|null,
+ *   fetchCatalog: (url: string) => Promise<ExamplesCatalog|null>,
+ *   getStandardExamples: () => Promise<unknown>,
+ *   remoteUrls?: Array<string|null|undefined>,
+ * }} args
+ * @returns {Promise<{ catalog: ExamplesCatalog, source: "remote"|"oq-api" }>}
+ */
+export async function resolveExamplesCatalog({
+	override = null,
+	pinSchema = null,
+	fetchCatalog,
+	getStandardExamples,
+	remoteUrls = [],
+}) {
+	if (override) {
+		const catalog = await fetchCatalog(override);
+		if (!catalog) throw new Error(`Examples override failed: ${override}`);
+		return { catalog, source: "remote" };
+	}
+
+	if (pinSchema === STANDARD_EXAMPLES_SCHEMA) {
+		try {
+			const local = await getStandardExamples();
+			return { catalog: shapeExamplesPayload(local), source: "oq-api" };
+		} catch {
+			/* CDN, then the versioned pin JSON */
+		}
+	}
+
+	for (const url of remoteUrls) {
+		if (!url) continue;
+		const catalog = await fetchCatalog(url);
+		if (catalog) return { catalog, source: "remote" };
+	}
+
+	const local = await getStandardExamples();
+	return { catalog: shapeExamplesPayload(local), source: "oq-api" };
+}
+
+/**
  * @param {unknown} item
  * @param {'words' | 'sentences'} kind
  * @returns {ExampleItem}

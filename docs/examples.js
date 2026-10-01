@@ -3,8 +3,10 @@
  *
  * Shared upstream: oq-api `standard-examples/v1` (`{ worked, sentences }`).
  * Load order:
- *   1. `globalThis.__BLOQ_EXAMPLES_URL__` (tests / local fixture override)
- *   2. pinned oq-api `getStandardExamples()` when the pin already ships v1
+ *   1. `globalThis.__BLOQ_EXAMPLES_URL__` (tests / local fixture override).
+ *      A failure throws. It does not fall through to the network.
+ *   2. pinned oq-api `getStandardExamples()` when the pin's schema constant
+ *      is standard-examples/v1. The payload is v1 only if it says so.
  *   3. rolling CDN `EXAMPLES_CDN_URL`, then versioned pin JSON
  *   4. transitional `getStandardExamples()` with legacy sentences stripped
  *
@@ -20,11 +22,10 @@ import {
 import { bindModal } from "./modal.js";
 import { t, getLocale } from "./i18n.js";
 import {
-	normalizeExamplesCatalog,
-	adaptLegacyExamplesCatalog,
+	shapeExamplesPayload,
+	resolveExamplesCatalog,
 	glossForExample,
 	glossText as localGlossText,
-	STANDARD_EXAMPLES_SCHEMA,
 	EXAMPLES_CDN_URL,
 	examplesVersionedUrl as versionedUrlFromPin,
 } from "./examples-schema.js";
@@ -59,10 +60,6 @@ export const EXAMPLES_REMOTE_URL = null;
 /** Prefer oq-api `glossText` when the pin exports it. */
 const resolveGlossText = typeof oqGlossText === "function" ? oqGlossText : localGlossText;
 
-function pinShipsStandardExamplesV1() {
-	return oqSchema === STANDARD_EXAMPLES_SCHEMA || typeof oqGlossText === "function";
-}
-
 /**
  * @param {string} url
  * @returns {Promise<import('./examples-schema.js').ExamplesCatalog | null>}
@@ -72,7 +69,7 @@ async function fetchExamplesCatalog(url) {
 		const res = await fetch(url, { credentials: "omit" });
 		if (!res.ok) return null;
 		const raw = await res.json();
-		return normalizeExamplesCatalog(raw);
+		return shapeExamplesPayload(raw);
 	} catch {
 		return null;
 	}
@@ -84,28 +81,13 @@ async function fetchExamplesCatalog(url) {
  * @returns {Promise<{ catalog: import('./examples-schema.js').ExamplesCatalog, source: 'remote' | 'oq-api' }>}
  */
 export async function loadExamplesCatalog() {
-	const override = examplesRemoteUrl();
-	if (override) {
-		const catalog = await fetchExamplesCatalog(override);
-		if (catalog) return { catalog, source: "remote" };
-	}
-
-	if (pinShipsStandardExamplesV1()) {
-		try {
-			const local = await getStandardExamples();
-			return { catalog: normalizeExamplesCatalog(local), source: "oq-api" };
-		} catch {
-			/* fall through to CDN / versioned JSON */
-		}
-	}
-
-	for (const url of [EXAMPLES_CDN_URL, examplesVersionedUrl()].filter(Boolean)) {
-		const catalog = await fetchExamplesCatalog(/** @type {string} */ (url));
-		if (catalog) return { catalog, source: "remote" };
-	}
-
-	const local = await getStandardExamples();
-	return { catalog: adaptLegacyExamplesCatalog(local), source: "oq-api" };
+	return resolveExamplesCatalog({
+		override: examplesRemoteUrl(),
+		pinSchema: oqSchema,
+		fetchCatalog: fetchExamplesCatalog,
+		getStandardExamples: () => getStandardExamples(),
+		remoteUrls: [EXAMPLES_CDN_URL, examplesVersionedUrl()].filter(Boolean),
+	});
 }
 
 /** @deprecated Prefer loadExamplesCatalog(); kept for existing call sites. */
