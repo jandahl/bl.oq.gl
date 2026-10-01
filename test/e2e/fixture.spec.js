@@ -33,6 +33,21 @@ test("fixture boot: palette hide/show does not throw", async ({ page }) => {
 	await expect(toggle).toBeVisible();
 });
 
+test("hiding the palette keeps the show-label across layout and locale", async ({ page }) => {
+	const toggle = page.locator("#palette-toggle");
+	await expect(toggle).toHaveAttribute("aria-expanded", "true");
+	await toggle.click();
+	await expect(toggle).toHaveAttribute("aria-expanded", "false");
+	await expect(toggle).toHaveText("Show palette");
+	await page.locator('#opt-layout [data-value="horizontal"]').click();
+	await expect(toggle).toHaveAttribute("aria-expanded", "false");
+	await expect(toggle).toHaveText("Show palette");
+	await page.locator("#display-toggle").click();
+	await page.locator('#opt-ui-lang [data-value="da"]').click();
+	await expect(toggle).toHaveAttribute("aria-expanded", "false");
+	await expect(toggle).toHaveText("Vis palette");
+});
+
 test("fixture boot: filter and clear-canvas controls are present", async ({ page }) => {
 	await expect(page.locator("#morpheme-filter")).toBeVisible();
 	await expect(page.locator("#blockly-div")).toBeVisible();
@@ -60,4 +75,47 @@ test("fixture boot: sentences tab tolerates empty standard-examples list", async
 	await expect(modal.locator("#worked-examples-status")).toContainText(/No examples|Ingen eksempler/i);
 	await modal.locator("#worked-examples-close").click();
 	await expect(modal).toBeHidden();
+});
+
+async function bootSlowAnalyze(page) {
+	await page.addInitScript(() => {
+		globalThis.__BLOQ_SLOW_ANALYZE__ = 600;
+	});
+	await page.reload();
+	await page.waitForFunction(
+		() => document.querySelector("#status-line")?.textContent?.includes("Loaded"),
+		undefined,
+		{ timeout: 15_000 },
+	);
+}
+
+function canvasBlockCount(page) {
+	return page.evaluate(() => Blockly.getMainWorkspace().getAllBlocks(false).length);
+}
+
+test("clear canvas cancels an in-flight Deconstruct", async ({ page }) => {
+	await bootSlowAnalyze(page);
+	await page.locator("#word-input").fill("nerivoq");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#status-line")).toContainText(/Analyzing|Analyserer/);
+	await page.locator("#clear-canvas-btn").click();
+	await expect(page.locator("#status-line")).toContainText(/Drag a morpheme|Træk et morfem/i);
+	await page.waitForTimeout(900);
+	await expect(page.locator("#status-line")).toContainText(/Drag a morpheme|Træk et morfem/i);
+	await expect(page).not.toHaveURL(/[?&]w=/);
+	expect(await canvasBlockCount(page)).toBe(0);
+});
+
+test("empty Deconstruct submit cancels an in-flight analysis", async ({ page }) => {
+	await bootSlowAnalyze(page);
+	await page.locator("#word-input").fill("nerivoq");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#status-line")).toContainText(/Analyzing|Analyserer/);
+	await page.locator("#word-input").fill("");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#status-line")).toContainText(/Drag a morpheme|Træk et morfem/i);
+	await page.waitForTimeout(900);
+	await expect(page.locator("#status-line")).toContainText(/Drag a morpheme|Træk et morfem/i);
+	await expect(page).not.toHaveURL(/[?&]w=/);
+	expect(await canvasBlockCount(page)).toBe(0);
 });
