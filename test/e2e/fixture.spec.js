@@ -61,3 +61,46 @@ test("fixture boot: sentences tab tolerates empty standard-examples list", async
 	await modal.locator("#worked-examples-close").click();
 	await expect(modal).toBeHidden();
 });
+
+async function bootSlowAnalyze(page) {
+	await page.addInitScript(() => {
+		globalThis.__BLOQ_SLOW_ANALYZE__ = 600;
+	});
+	await page.reload();
+	await page.waitForFunction(
+		() => document.querySelector("#status-line")?.textContent?.includes("Loaded"),
+		undefined,
+		{ timeout: 15_000 },
+	);
+}
+
+function canvasBlockCount(page) {
+	return page.evaluate(() => Blockly.getMainWorkspace().getAllBlocks(false).length);
+}
+
+test("clear canvas cancels an in-flight Deconstruct", async ({ page }) => {
+	await bootSlowAnalyze(page);
+	await page.locator("#word-input").fill("nerivoq");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#status-line")).toContainText(/Analyzing|Analyserer/);
+	await page.locator("#clear-canvas-btn").click();
+	await expect(page.locator("#status-line")).toContainText(/Drag a morpheme|Træk et morfem/i);
+	await page.waitForTimeout(900);
+	await expect(page.locator("#status-line")).toContainText(/Drag a morpheme|Træk et morfem/i);
+	await expect(page).not.toHaveURL(/[?&]w=/);
+	expect(await canvasBlockCount(page)).toBe(0);
+});
+
+test("empty Deconstruct submit cancels an in-flight analysis", async ({ page }) => {
+	await bootSlowAnalyze(page);
+	await page.locator("#word-input").fill("nerivoq");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#status-line")).toContainText(/Analyzing|Analyserer/);
+	await page.locator("#word-input").fill("");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#status-line")).toContainText(/Drag a morpheme|Træk et morfem/i);
+	await page.waitForTimeout(900);
+	await expect(page.locator("#status-line")).toContainText(/Drag a morpheme|Træk et morfem/i);
+	await expect(page).not.toHaveURL(/[?&]w=/);
+	expect(await canvasBlockCount(page)).toBe(0);
+});
