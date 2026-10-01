@@ -115,8 +115,11 @@ async function revalidateCatalog(url, cache, meta, onUpdated, mergeMorphemeSourc
 		}
 		const fresh = await fetchCatalogBuffer(url);
 		const value = parseCatalogBytes(fresh.buffer);
+		// Validate before replacing the last good entry. A body that parses
+		// but fails the merge must not become the next visit's cache.
+		const catalog = catalogFromPayload(value, mergeMorphemeSources);
 		await persistCatalog(cache, url, fresh.buffer, fresh.meta);
-		onUpdated?.(catalogFromPayload(value, mergeMorphemeSources));
+		onUpdated?.(catalog);
 	} catch {
 		// Keep the cached catalog; the next visit will try again.
 	}

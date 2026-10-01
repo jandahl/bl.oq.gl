@@ -79,3 +79,42 @@ test("loadCatalog deletes a corrupt cache entry and loads from the network", asy
 		globalThis.fetch = original;
 	}
 });
+
+test("loadCatalog revalidation keeps the previous cache when the new body fails to merge", async () => {
+	const url = "https://example.test/morphemes-by-id.json";
+	const cache = createMemoryHttpCache();
+	await cache.put(url, new Response(JSON.stringify(mini), {
+		status: 200,
+		headers: { etag: "good", "content-type": "application/json" },
+	}));
+	await writeCatalogMeta(cache, { url, etag: "good" });
+	const original = globalThis.fetch;
+	let updates = 0;
+	globalThis.fetch = async (_url, init) => {
+		if (init?.method === "HEAD") {
+			return new Response(null, { status: 200, headers: { etag: "changed" } });
+		}
+		return new Response("{}", {
+			status: 200,
+			headers: { etag: "changed", "content-type": "application/json" },
+		});
+	};
+	try {
+		const catalog = await loadCatalog({
+			cache,
+			urls: [url],
+			onUpdated: () => { updates += 1; },
+			engine: { mergeMorphemeSources: fixtureMergeMorphemeSources, GRAMMAR_MORPHEMES_URL: url },
+		});
+		assert.equal(catalog.fromCache, true);
+		assert.ok(catalog.presets.some((preset) => preset.id === "qimmeq"));
+		for (let i = 0; i < 10; i++) await new Promise((resolve) => queueMicrotask(resolve));
+		assert.equal(updates, 0);
+		const stored = await cache.match(url);
+		assert.match(await stored.text(), /qimmeq/);
+		const meta = await (await cache.match("https://bloq.invalid/catalog-meta")).json();
+		assert.equal(meta.etag, "good");
+	} finally {
+		globalThis.fetch = original;
+	}
+});
