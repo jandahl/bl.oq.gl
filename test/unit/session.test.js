@@ -191,6 +191,18 @@ test("normalizeDeconstructIds / deconstructIdsMatchSentences: single word and mu
 	assert.equal(deconstructIdsMatchSentences([], ["qimmeq"]), false);
 });
 
+test("deconstructIdsMatchSentences: a two-sentence store matches, a flattened one does not", () => {
+	const twoSentences = [
+		[["illu", "N_ABS_SG"]],
+		[["neri", "V_IND_INTR_3SG"]],
+	];
+	assert.deepEqual(normalizeDeconstructIds(twoSentences), twoSentences);
+	assert.equal(deconstructIdsMatchSentences(twoSentences, twoSentences), true);
+	assert.equal(deconstructIdsMatchSentences(twoSentences, twoSentences.flat()), false);
+	const oneSentence = [["qimmeq", "N_qaq_Vb"], ["neri", "V_IND_INTR_3SG"]];
+	assert.equal(deconstructIdsMatchSentences([oneSentence], oneSentence), true);
+});
+
 test("computeBuild has no history or timer side effects", () => {
 
 	const result = computeBuild({
