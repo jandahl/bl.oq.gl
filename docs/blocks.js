@@ -26,11 +26,10 @@
 //   - a particle is a free-standing word: it can only be the SOLE item of a
 //     sequence, nothing may precede or follow it, not even another particle
 //     -- no previousConnection AND no nextConnection.
-//   - a plain enclitic always seals the word once attached (nothing but
-//     another enclitic-family morpheme could follow, and Blockly's static
-//     per-category check strings can't express "only these specific
-//     categories," so this is drawn conservatively at "nothing") -- no
-//     nextConnection.
+//   - a plain enclitic seals the word against ordinary affixes. Another
+//     enclitic-family morpheme may still follow, so its next check is
+//     ENCLITIC_FOLLOW rather than "nothing" (a null next throws when a plan
+//     connects a legal follower).
 // An ordinary WORD_FINAL inflectional ending does NOT get this treatment
 // (an earlier version of this file wrongly disabled its nextConnection too)
 // -- morphotactics.js's CLOSED_BYPASS_TYPES explicitly allows an enclitic or
@@ -75,8 +74,10 @@ bindVerbPickerHost({ labelFor, applyChainConnections });
 //   WORD_CHAIN     — Word stacking inside a Sentence
 //   VERB_MOOD / VERB_SUBJECT / VERB_OBJECT — picker value sockets
 // Category hasPrevious/hasNext in CATEGORY_ORDER encodes: stem cannot follow,
-// particle is alone, enclitic seals the chain.
+// particle is alone. A plain enclitic does not use hasNext: false — that
+// threw when a legal enclitic followed. Its next check is ENCLITIC_FOLLOW.
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
+const ENCLITIC_FOLLOW = "ENCLITIC_FOLLOW";
 const WORD_START_CONNECTION_TYPE = "WORD_START";
 const WORD_CHAIN_CONNECTION_TYPE = "WORD_CHAIN";
 /** A picker with no catalog match. Kept in the chain so buildWord fails closed instead of dropping the ending. */
@@ -107,7 +108,7 @@ const CATEGORY_ORDER = [
 	{ key: "derivational_prefix", id: "deriv_prefix", name: "Derivational prefixes", colourClass: "oq_derivational" },
 	{ key: "derivational_affix", id: "deriv_affix", name: "Derivational affixes", colourClass: "oq_derivational" },
 	{ key: "inflectional_ending", id: "inflection", name: "Inflectional endings", colourClass: "oq_inflectional" },
-	{ key: "enclitic", id: "enclitic", name: "Enclitics", colourClass: "oq_enclitic", hasNext: false },
+	{ key: "enclitic", id: "enclitic", name: "Enclitics", colourClass: "oq_enclitic" },
 	{ key: "derivational_enclitic", id: "deriv_enclitic", name: "Derivational enclitics", colourClass: "oq_enclitic" },
 	{ key: "sentential_affix", id: "sentential", name: "Sentential affixes", colourClass: "oq_inflectional" },
 	{ key: "particle", id: "particle", name: "Particles", colourClass: "oq_neutral", hasPrevious: false, hasNext: false },
@@ -312,16 +313,34 @@ export function defineMorphemeBlocks() {
 	}
 }
 
+/** Check for a wrap row's CHAIN socket. The row must keep the previous morpheme's NEXT check, or a line break would let an ordinary affix follow a plain enclitic. */
+export function wrapRowChainCheck(previousNextCheck, wordStart) {
+	if (wordStart) return WORD_START_CONNECTION_TYPE;
+	return previousNextCheck || CONNECTION_TYPE;
+}
+
+function previousCheckFor(cat) {
+	if (cat.hasPrevious === false) return WORD_START_CONNECTION_TYPE;
+	if (cat.key === "enclitic" || cat.key === "derivational_enclitic") return [CONNECTION_TYPE, ENCLITIC_FOLLOW];
+	return CONNECTION_TYPE;
+}
+
+function nextCheckFor(cat) {
+	if (cat.hasNext === false) return null;
+	if (cat.key === "enclitic") return ENCLITIC_FOLLOW;
+	return CONNECTION_TYPE;
+}
+
 function applyChainConnections(block, cat, { inline = true } = {}) {
-	const startsWord = cat.hasPrevious === false;
-	const hasNext = cat.hasNext !== false;
+	const prevCheck = previousCheckFor(cat);
+	const nextCheck = nextCheckFor(cat);
 	if (!sideBySide()) {
-		block.setPreviousStatement(true, startsWord ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE);
-		block.setNextStatement(hasNext, CONNECTION_TYPE);
+		block.setPreviousStatement(true, prevCheck);
+		block.setNextStatement(Boolean(nextCheck), nextCheck);
 		return;
 	}
-	block.setOutput(true, startsWord ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE);
-	if (hasNext) block.appendValueInput("NEXT").setCheck(CONNECTION_TYPE);
+	block.setOutput(true, prevCheck);
+	if (nextCheck) block.appendValueInput("NEXT").setCheck(nextCheck);
 	if (inline) block.setInputsInline(true);
 }
 
@@ -783,7 +802,7 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 			const socket = prev ? prev.getInput("NEXT")?.connection : container.getInput("MORPHEMES")?.connection;
 			if (socket && block.outputConnection) socket.connect(block.outputConnection);
 		} else if (prev) {
-			prev.nextConnection.connect(block.previousConnection);
+			if (prev.nextConnection) prev.nextConnection.connect(block.previousConnection);
 		} else {
 			container.getInput("MORPHEMES").connection.connect(block.previousConnection);
 		}
@@ -797,17 +816,18 @@ function fillWrappedWord(workspace, container, ids, presetsById, displayOptions)
 	let row = null;
 	let prev = null;
 	let used = 0;
-	let firstOfWord = true;
 	for (const id of ids) {
 		const block = createMorphemeBlock(workspace, id, presetsById, displayOptions);
 		if (!block) continue;
 		const label = block.getFieldValue("LABEL") || block.getFieldValue("RESOLVED") || id;
 		const est = Math.min(240, 56 + String(label).length * 7);
 		if (!row || (prev && used + est > max)) {
+			const wordStart = !prev;
+			const previousNextCheck = prev?.getInput?.("NEXT")?.connection?.getCheck?.() ?? null;
 			row = workspace.newBlock(ROW_TYPE);
 			row.initSvg();
 			row.render();
-			row.getInput("CHAIN").setCheck(firstOfWord ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE);
+			row.getInput("CHAIN").setCheck(wrapRowChainCheck(previousNextCheck, wordStart));
 			const rows = container.getInput("ROWS").connection;
 			const tail = lastStatement(rows.targetBlock());
 			if (tail) tail.nextConnection.connect(row.previousConnection);
@@ -819,7 +839,6 @@ function fillWrappedWord(workspace, container, ids, presetsById, displayOptions)
 		if (socket && block.outputConnection) socket.connect(block.outputConnection);
 		prev = block;
 		used += est;
-		firstOfWord = false;
 	}
 }
 
@@ -939,8 +958,8 @@ export function relabelBlocks(workspace, presetsById, displayOptions) {
 
 /**
  * Category-level previous/next shapes for unit tests. These are structural
- * (stem cannot follow, particle is alone, enclitic seals the chain); join
- * legality stays in buildWord().
+ * (stem cannot follow, particle is alone, a plain enclitic's next check is
+ * ENCLITIC_FOLLOW); join legality stays in buildWord().
  */
 export function structuralCategoryConnections() {
 	return CATEGORY_ORDER.map((cat) => ({
@@ -949,8 +968,8 @@ export function structuralCategoryConnections() {
 		wordClass: cat.wordClass ?? null,
 		hasPrevious: cat.hasPrevious !== false,
 		hasNext: cat.hasNext !== false,
-		previousCheck: cat.hasPrevious === false ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE,
-		nextCheck: cat.hasNext === false ? null : CONNECTION_TYPE,
+		previousCheck: previousCheckFor(cat),
+		nextCheck: nextCheckFor(cat),
 	}));
 }
 
