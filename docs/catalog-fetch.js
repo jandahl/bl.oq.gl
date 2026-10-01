@@ -44,28 +44,42 @@ export function raceCatalogResponses(urls, options = {}) {
 		(error) => ({ kind: "error", error }),
 	);
 
+	const restWaitMs = options.restWaitMs ?? waitMs;
+
 	return Promise.race([primary, wait]).then(async (early) => {
 		if (early.kind === "ok") {
 			globalThis.clearTimeout(timer);
 			abortExcept(0);
 			return early.result;
 		}
+		let restTimer;
+		const deadline = new Promise((_, reject) => {
+			restTimer = globalThis.setTimeout(() => {
+				controllers.forEach((controller) => controller.abort());
+				reject(Object.assign(new Error("catalog fetch deadline"), { name: "TimeoutError" }));
+			}, restWaitMs);
+		});
 		try {
-			const result = await Promise.any(attempts);
+			const any = Promise.any(attempts);
+			// The deadline can win first. The leftover aggregate must not
+			// surface as an unhandled rejection once every host is aborted.
+			any.catch(() => {});
+			const result = await Promise.race([any, deadline]);
 			abortExcept(result.index);
 			return result;
 		} catch (aggregate) {
-			const errors = aggregate?.errors ?? [early.error];
-			const detail = errors
+			const errors = aggregate?.errors ?? [early.kind === "error" ? early.error : aggregate];
+			const detail = (Array.isArray(errors) ? errors : [errors])
 				.map((error, index) => {
-					if (!error || error.name === "AbortError") return "";
+					if (!error || error.name === "AbortError" || error.name === "TimeoutError") return "";
 					return `${list[index] ?? "?"}: ${error.message}`;
 				})
 				.filter(Boolean)
 				.join("; ");
-			throw new Error(`morpheme catalog fetch failed (${detail || "no response"})`);
+			throw new Error(`morpheme catalog fetch failed (${detail || aggregate?.message || "no response"})`);
 		} finally {
 			globalThis.clearTimeout(timer);
+			globalThis.clearTimeout(restTimer);
 		}
 	});
 }
