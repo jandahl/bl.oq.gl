@@ -1083,9 +1083,14 @@ function lastStatement(block) {
 
 function createMorphemeBlock(workspace, id, presetsById, displayOptions) {
 	const preset = presetsById.get(id);
-	if (!preset || isZeroEndingPreset(preset)) return null;
-	const isVerbEnding = isVerbEndingPreset(preset);
-	const isNounEnding = isNounEndingPreset(preset);
+	if (!preset) return null;
+	// Toolbox flyouts omit a zero ending (there is nothing to drag). A chain
+	// that already names that id must still draw it — dropping it makes the
+	// canvas disagree with the analysis. A plain block keeps block.data equal
+	// to that id; the noun/verb pickers would resolve it to some other candidate.
+	const zero = isZeroEndingPreset(preset);
+	const isVerbEnding = !zero && isVerbEndingPreset(preset);
+	const isNounEnding = !zero && isNounEndingPreset(preset);
 	const block = workspace.newBlock(isVerbEnding ? VERB_ENDING_PICKER_TYPE : isNounEnding ? NOUN_ENDING_PICKER_TYPE : blockTypeForCategory(categoryForPreset(preset)));
 	if (!isVerbEnding && !isNounEnding) {
 		block.data = id;
