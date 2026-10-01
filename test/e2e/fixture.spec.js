@@ -33,6 +33,21 @@ test("fixture boot: palette hide/show does not throw", async ({ page }) => {
 	await expect(toggle).toBeVisible();
 });
 
+test("hiding the palette keeps the show-label across layout and locale", async ({ page }) => {
+	const toggle = page.locator("#palette-toggle");
+	await expect(toggle).toHaveAttribute("aria-expanded", "true");
+	await toggle.click();
+	await expect(toggle).toHaveAttribute("aria-expanded", "false");
+	await expect(toggle).toHaveText("Show palette");
+	await page.locator('#opt-layout [data-value="horizontal"]').click();
+	await expect(toggle).toHaveAttribute("aria-expanded", "false");
+	await expect(toggle).toHaveText("Show palette");
+	await page.locator("#display-toggle").click();
+	await page.locator('#opt-ui-lang [data-value="da"]').click();
+	await expect(toggle).toHaveAttribute("aria-expanded", "false");
+	await expect(toggle).toHaveText("Vis palette");
+});
+
 test("fixture boot: filter and clear-canvas controls are present", async ({ page }) => {
 	await expect(page.locator("#morpheme-filter")).toBeVisible();
 	await expect(page.locator("#blockly-div")).toBeVisible();
