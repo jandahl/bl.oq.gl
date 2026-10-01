@@ -1094,15 +1094,31 @@ function createMorphemeBlock(workspace, id, presetsById, displayOptions) {
 	block.initSvg();
 	block.render();
 	if (isVerbEnding) restoreVerbPickerFields(workspace, block, preset);
-	if (isNounEnding) {
-		const coordinate = preset.lexical_facts ?? preset;
-		const match = /^N_[A-Z]+(?:_POSS(1SG|2SG|3SG|4SG|1PL|2PL|3PL|4PL))?_(SG|PL)/.exec(preset.id);
-		block.setFieldValue(coordinate.case, "CASE");
-		block.setFieldValue(match?.[1] ?? "none", "POSSESSOR");
-		block.setFieldValue(match?.[2] ?? "SG", "NUMBER");
-		block.nounEndingPickerState.resolve();
-	}
+	if (isNounEnding) restoreNounPickerFields(block, preset);
 	return block;
+}
+
+/**
+ * Restore a nominal-ending picker to one catalog id.
+ * Case, possessor, and number come from parseNominalCoordinate, including when
+ * case lives only on the id. resolve() then keeps VARIANT on the first
+ * candidate of that coordinate; a second id (N_ABS_POSS1SG_PL_ARCHAIC) has to
+ * be chosen after the dropdown cache is refreshed, or setFieldValue no-ops.
+ * @param {any} block
+ * @param {any} preset
+ */
+export function restoreNounPickerFields(block, preset) {
+	const coordinate = parseNominalCoordinate(preset);
+	if (!coordinate) return;
+	block.setFieldValue(coordinate.case, "CASE");
+	block.setFieldValue(coordinate.possessor, "POSSESSOR");
+	block.setFieldValue(coordinate.number, "NUMBER");
+	block.nounEndingPickerState.resolve();
+	if (block.data === preset.id) return;
+	const variantField = block.getField("VARIANT");
+	if (!variantField) return;
+	variantField.getOptions(false);
+	block.setFieldValue(preset.id, "VARIANT");
 }
 
 /** Paints built surface forms and translations onto Word / Sentence containers.
