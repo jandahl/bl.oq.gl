@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers, nounStemBlock, wrapRowChainCheck, UNRESOLVED_MORPHEME_ID } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields, labelFor, labelContainers, nounStemBlock, wrapRowChainCheck, planFromCanvas, UNRESOLVED_MORPHEME_ID } from "../../docs/blocks.js";
 import { canvasIdTree, sameIdTree } from "../../docs/id-tree.js";
 
 // buildToolbox / the canvas walkers don't touch the Blockly global. renderSentencePlan
@@ -587,6 +587,53 @@ test("canvasTree: two sentences, a held word, and a loose chain round-trip to th
 	assert.equal(sameIdTree(ids, topLevelSentences({ getTopBlocks: () => [sentence, loose] })), true);
 	assert.equal(sameIdTree(ids, [[["qimmeq", "extra"]], [["aallarpoq"]]]), false);
 	void stemB;
+});
+
+test("planFromCanvas keeps a one-word Sentence and an empty Sentence", () => {
+	const stem = preset({ id: "qimmeq", morpheme_type: "stem", word_class: "N", expected: "qimmeq" });
+	const presetsById = new Map([["qimmeq", stem]]);
+	const workspace = chainWorkspace();
+	const sentence = workspace.newBlock("morpheme_block__sentence_container");
+	sentence.setFieldValue("Dogs", "TITLE");
+	const word = workspace.newBlock("morpheme_block__word_container");
+	const morpheme = workspace.newBlock("morpheme_block__stem_n");
+	morpheme.data = "qimmeq";
+	word.getInput("MORPHEMES").connection.connect(morpheme.previousConnection);
+	sentence.getInput("WORDS").connection.connect(word.previousConnection);
+	workspace.newBlock("morpheme_block__sentence_container");
+
+	const plan = planFromCanvas(workspace);
+	assert.equal(plan[0].source, "Dogs");
+	assert.deepEqual(plan[0].words, [{ canvasIds: ["qimmeq"] }]);
+	assert.equal(plan[1].source, "Sentence");
+	assert.deepEqual(plan[1].words, []);
+
+	const again = chainWorkspace();
+	renderSentencePlan(again, plan, presetsById, { showIds: false });
+	const tops = again.getTopBlocks();
+	assert.equal(tops.length, 2);
+	assert.equal(tops.every((block) => block.type === "morpheme_block__sentence_container"), true);
+	assert.equal(tops[0].bloqSource, "Dogs");
+	assert.equal(tops[1].bloqSource, "Sentence");
+	assert.deepEqual(topLevelSentences(again), [[["qimmeq"]]]);
+	const round = planFromCanvas(again);
+	assert.equal(round[0].source, "Dogs");
+	assert.deepEqual(round[0].words[0].canvasIds, ["qimmeq"]);
+	assert.equal(round[1].source, "Sentence");
+	assert.deepEqual(round[1].words, []);
+});
+
+test("planFromCanvas leaves a lone Word on the simple path", () => {
+	const stem = preset({ id: "qimmeq", morpheme_type: "stem", word_class: "N", expected: "qimmeq" });
+	const presetsById = new Map([["qimmeq", stem]]);
+	const workspace = chainWorkspace();
+	renderSentencePlan(workspace, [{ words: [{ canvasIds: ["qimmeq"] }] }], presetsById, { showIds: false });
+	const plan = planFromCanvas(workspace);
+	assert.equal(plan[0].source, undefined);
+	assert.equal(canvasTree(workspace).sentences[0].block, null);
+	const again = chainWorkspace();
+	renderSentencePlan(again, plan, presetsById, { showIds: false });
+	assert.equal(again.getTopBlocks()[0].type, "morpheme_block__word_container");
 });
 
 test("chainFromTopBlock: a horizontal word follows NEXT plugs, not a vertical stack", () => {

@@ -598,8 +598,10 @@ export function canvasTree(workspace) {
 	const sentences = [];
 	for (const top of workspace.getTopBlocks(true)) {
 		if (top.type === SENTENCE_CONTAINER_TYPE) {
+			// Keep the container even when WORDS is empty. Dropping it makes a
+			// theme or layout switch erase a Sentence that was just placed.
 			const words = collectChainedWords(top.getInputTargetBlock?.("WORDS"));
-			if (words.length) sentences.push({ block: top, words });
+			sentences.push({ block: top, words });
 			continue;
 		}
 		if (top.type === WORD_CONTAINER_TYPE) {
@@ -615,6 +617,36 @@ export function canvasTree(workspace) {
 		}
 	}
 	return { sentences };
+}
+
+/**
+ * Layout and theme snapshot. A Sentence block stays a sentence: source comes
+ * from bloqSource, else the title field, else "Sentence", including when the
+ * container is empty or holds one word. A bare Word chain has no sentence
+ * block, so it stays on the simple render path.
+ * @param {any} workspace
+ */
+export function planFromCanvas(workspace) {
+	return canvasTree(workspace).sentences.map((sentence) => {
+		const block = sentence.block;
+		const sentenceBlock = block?.type === SENTENCE_CONTAINER_TYPE ? block : null;
+		return {
+			source: sentenceBlock
+				? (sentenceBlock.bloqSource || sentenceBlock.getFieldValue?.("TITLE") || "Sentence")
+				: block?.bloqSource,
+			assembly: block?.bloqAssembly,
+			words: sentence.words.map((word) => {
+				if (word.held) {
+					return { surface: word.block?.getFieldValue?.("TITLE") || "…", heldLabel: word.held };
+				}
+				const presentation = nounStemBlock(word.block)?.getFieldValue?.("PRESENTATION");
+				return {
+					canvasIds: word.ids.slice(),
+					...(presentation ? { presentation } : {}),
+				};
+			}),
+		};
+	});
 }
 
 function morphemeIdsFrom(block) {

@@ -4,7 +4,7 @@ import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
 	bindVerbPickerCatalog, bindNounPickerCatalog, reresolveBoundVerbPickers, reresolveBoundNounPickers,
-	presetMatchesQuery, canvasTree, setViewLayout, getViewLayout, nounStemBlock,
+	presetMatchesQuery, canvasTree, setViewLayout, getViewLayout, nounStemBlock, planFromCanvas,
 } from "./blocks.js";
 import { sameIdTree } from "./id-tree.js";
 import {
@@ -535,7 +535,9 @@ function rebuildWorkspace() {
 	session.workspace.dispose();
 	injectWorkspace();
 	applyToolbox();
-	if (plan.some((sentence) => sentence.words?.length)) {
+	// An empty Sentence has a source and no words. Rendering only when some
+	// sentence has words dropped that container on Classic ↔ Zelos.
+	if (plan.length) {
 		renderSentencePlan(session.workspace, plan, session.presetsById, displayOptions());
 	}
 	requestAnimationFrame(() => Blockly.svgResize(session.workspace));
@@ -1289,20 +1291,7 @@ async function loadCatalogAndBlocks() {
 }
 
 function snapshotCanvas(workspace) {
-	return canvasTree(workspace).sentences.map((sentence) => ({
-		source: sentence.block?.bloqSource,
-		assembly: sentence.block?.bloqAssembly,
-		words: sentence.words.map((word) => {
-			if (word.held) {
-				return { surface: word.block?.getFieldValue?.("TITLE") || "…", heldLabel: word.held };
-			}
-			const presentation = nounStemBlock(word.block)?.getFieldValue?.("PRESENTATION");
-			return {
-				canvasIds: word.ids.slice(),
-				...(presentation ? { presentation } : {}),
-			};
-		}),
-	}));
+	return planFromCanvas(workspace);
 }
 
 function applyLayout(options = {}) {
