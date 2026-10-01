@@ -72,6 +72,8 @@ const CONNECTION_TYPE = "MORPHEME_CHAIN";
 const WORD_START_CONNECTION_TYPE = "WORD_START";
 const WORD_CHAIN_CONNECTION_TYPE = "WORD_CHAIN";
 const BLOCK_TYPE_PREFIX = "morpheme_block__";
+const ROW_TYPE = `${BLOCK_TYPE_PREFIX}word_row`;
+const ROW_CONNECTION = "WORD_ROW";
 const VERB_ENDING_PICKER_TYPE = `${BLOCK_TYPE_PREFIX}verb_ending_picker`;
 const WORD_CONTAINER_TYPE = `${BLOCK_TYPE_PREFIX}word_container`;
 const SENTENCE_CONTAINER_TYPE = `${BLOCK_TYPE_PREFIX}sentence_container`;
@@ -113,6 +115,23 @@ const CATEGORY_ORDER = [
 	{ key: "particle", id: "particle", name: "Particles", colourClass: "oq_neutral", hasPrevious: false, hasNext: false },
 ];
 const FALLBACK_CATEGORY = { key: "other", id: "other", name: "Other", colourClass: "oq_neutral" };
+
+// Stack is the live workshop (previous/next, top to bottom). Horizontal and
+// wrap keep the same blocks, but a word reads left to right through value
+// plugs. Wrap breaks that row once it is wider than the canvas.
+let viewLayout = "stack";
+
+export function getViewLayout() {
+	return viewLayout;
+}
+
+export function setViewLayout(layout) {
+	viewLayout = layout === "horizontal" || layout === "wrap" ? layout : "stack";
+}
+
+function sideBySide() {
+	return viewLayout !== "stack";
+}
 
 function categoryForPreset(preset) {
 	const match = CATEGORY_ORDER.find((c) =>
@@ -232,8 +251,14 @@ export function defineMorphemeBlocks() {
 			this.appendDummyInput("TITLE_ROW")
 				.appendField(new Blockly.FieldLabelSerializable("Word"), "TITLE")
 				.appendField(new Blockly.FieldLabelSerializable(""), "TRANSLATION");
-			this.appendStatementInput("MORPHEMES")
-				.setCheck(WORD_START_CONNECTION_TYPE);
+			if (viewLayout === "wrap") {
+				this.appendStatementInput("ROWS").setCheck(ROW_CONNECTION);
+			} else if (viewLayout === "horizontal") {
+				this.appendValueInput("MORPHEMES").setCheck(WORD_START_CONNECTION_TYPE);
+				this.setInputsInline(true);
+			} else {
+				this.appendStatementInput("MORPHEMES").setCheck(WORD_START_CONNECTION_TYPE);
+			}
 			this.setPreviousStatement(true, WORD_CHAIN_CONNECTION_TYPE);
 			this.setNextStatement(true, WORD_CHAIN_CONNECTION_TYPE);
 			this.setStyle("bloq_word_container_blocks");
@@ -253,6 +278,16 @@ export function defineMorphemeBlocks() {
 			this.setTooltip("A sentence built from a sequence of words");
 		},
 	};
+	Blockly.Blocks[ROW_TYPE] = {
+		init() {
+			this.appendValueInput("CHAIN");
+			this.setPreviousStatement(true, ROW_CONNECTION);
+			this.setNextStatement(true, ROW_CONNECTION);
+			this.setInputsInline(true);
+			this.setStyle("bloq_word_container_blocks");
+			this.setTooltip("One line of a left-to-right word");
+		},
+	};
 	for (const cat of [...CATEGORY_ORDER, FALLBACK_CATEGORY]) {
 		Blockly.Blocks[blockTypeForCategory(cat)] = {
 			init() {
@@ -263,15 +298,24 @@ export function defineMorphemeBlocks() {
 						.appendField(`${UI_INDENT}translation`)
 						.appendField(new Blockly.FieldDropdown(NOUN_PRESENTATION_OPTIONS), "PRESENTATION");
 				}
-				this.setPreviousStatement(
-					true,
-					cat.hasPrevious === false ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE,
-				);
-				this.setNextStatement(cat.hasNext !== false, CONNECTION_TYPE);
 				this.setStyle(`${cat.colourClass}_blocks`);
+				applyChainConnections(this, cat);
 			},
 		};
 	}
+}
+
+function applyChainConnections(block, cat, { inline = true } = {}) {
+	const startsWord = cat.hasPrevious === false;
+	const hasNext = cat.hasNext !== false;
+	if (!sideBySide()) {
+		block.setPreviousStatement(true, startsWord ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE);
+		block.setNextStatement(hasNext, CONNECTION_TYPE);
+		return;
+	}
+	block.setOutput(true, startsWord ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE);
+	if (hasNext) block.appendValueInput("NEXT").setCheck(CONNECTION_TYPE);
+	if (inline) block.setInputsInline(true);
 }
 
 function isMorphemeBlockType(type) {
@@ -281,7 +325,7 @@ function isMorphemeBlockType(type) {
 	// Left unplugged and sitting loose on the canvas, it must not register as
 	// a word chain in topLevelSentences().
 	return typeof type === "string" && type.startsWith(BLOCK_TYPE_PREFIX)
-		&& ![WORD_CONTAINER_TYPE, SENTENCE_CONTAINER_TYPE, VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE].includes(type);
+		&& ![WORD_CONTAINER_TYPE, SENTENCE_CONTAINER_TYPE, ROW_TYPE, VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE].includes(type);
 }
 
 function isNounEndingPreset(preset) {
@@ -314,11 +358,10 @@ export function defineNounEndingPickerBlock(nounEndingIndex, presetsById, getDis
 			this.appendDummyInput().appendField(`${UI_INDENT}Possessor`).appendField(new Blockly.FieldDropdown(options(nounEndingIndex.possessors), changed), "POSSESSOR");
 			this.appendDummyInput().appendField(`${UI_INDENT}Number`).appendField(new Blockly.FieldDropdown(options(nounEndingIndex.numbers), changed), "NUMBER");
 			this.appendDummyInput("VARIANT").appendField(`${UI_INDENT}Variant`).appendField(new Blockly.FieldDropdown(function () { return this.getSourceBlock()?.nounEndingPickerState?.candidates ?? [["—", "NONE"]]; }, changed), "VARIANT");
-			this.setPreviousStatement(true, CONNECTION_TYPE);
-			this.setNextStatement(true, CONNECTION_TYPE);
 			this.setStyle(INFLECTION_BLOCK_STYLE);
 			this.setInputsInline(false);
 			this.nounEndingPickerState.resolve = () => resolveFor(this);
+			applyChainConnections(this, { hasNext: true }, { inline: false });
 			resolveFor(this);
 		},
 	};
@@ -533,10 +576,9 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 					// at once.
 					return this.getSourceBlock()?.verbPickerState?.candidateOptions ?? [["—", "NONE"]];
 				}, onVariantChange), "VARIANT");
-			this.setPreviousStatement(true, CONNECTION_TYPE);
-			this.setNextStatement(true, CONNECTION_TYPE);
 			this.setStyle(INFLECTION_BLOCK_STYLE);
 			this.setInputsInline(false);
+			applyChainConnections(this, { hasNext: true }, { inline: false });
 			resolveVerbPicker(this, verbEndingIndex, presetsById, getDisplayOptions);
 		},
 	};
@@ -771,7 +813,7 @@ export function canvasTree(workspace) {
 			while (cur) {
 				if (cur.type === WORD_CONTAINER_TYPE) {
 					const held = cur.bloqHeld || null;
-					const ids = held ? [] : morphemeIdsFrom(cur.getInputTargetBlock("MORPHEMES"));
+					const ids = held ? [] : idsInsideWord(cur);
 					if (held || ids.length) words.push({ ids, held, block: cur });
 				} else if (isMorphemeBlockType(cur.type)) {
 					const ids = morphemeIdsFrom(cur);
@@ -785,7 +827,7 @@ export function canvasTree(workspace) {
 		}
 		if (top.type === WORD_CONTAINER_TYPE) {
 			const held = top.bloqHeld || null;
-			const ids = held ? [] : morphemeIdsFrom(top.getInputTargetBlock("MORPHEMES"));
+			const ids = held ? [] : idsInsideWord(top);
 			if (held || ids.length) sentences.push({ block: null, words: [{ ids, held, block: top }] });
 			continue;
 		}
@@ -802,9 +844,25 @@ function morphemeIdsFrom(block) {
 	let cur = block;
 	while (cur) {
 		if (isMorphemeBlockType(cur.type) && cur.data) ids.push(cur.data);
-		cur = cur.getNextBlock();
+		// Horizontal pieces plug into NEXT. Stack pieces use getNextBlock.
+		// A fake test block has only one of the two.
+		const next = cur.getInputTargetBlock?.("NEXT");
+		cur = next || cur.getNextBlock?.() || null;
 	}
 	return ids;
+}
+
+function idsInsideWord(block) {
+	if (block.getInput?.("ROWS")) {
+		const ids = [];
+		let row = block.getInputTargetBlock?.("ROWS");
+		while (row) {
+			ids.push(...morphemeIdsFrom(row.getInputTargetBlock?.("CHAIN")));
+			row = row.getNextBlock?.() || null;
+		}
+		return ids;
+	}
+	return morphemeIdsFrom(block.getInputTargetBlock?.("MORPHEMES"));
 }
 
 /** Id-only view of a canvas tree (share URL / plan compare shape). */
@@ -835,7 +893,7 @@ export function sameIdTree(a, b) {
 /** Walks a stack of morpheme blocks starting at `block`, returning morpheme ids top to bottom. */
 export function chainFromTopBlock(block) {
 	if (block?.type === SENTENCE_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("WORDS"));
-	if (block?.type === WORD_CONTAINER_TYPE) return morphemeIdsFrom(block.getInputTargetBlock("MORPHEMES"));
+	if (block?.type === WORD_CONTAINER_TYPE) return idsInsideWord(block);
 	return morphemeIdsFrom(block);
 }
 
@@ -978,30 +1036,18 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 	const container = workspace.newBlock(WORD_CONTAINER_TYPE);
 	container.initSvg();
 	container.render();
+	if (viewLayout === "wrap") {
+		fillWrappedWord(workspace, container, ids, presetsById, displayOptions);
+		return container;
+	}
 	let prev = null;
 	for (const id of ids) {
-		const preset = presetsById.get(id);
-		if (!preset) continue;
-		if (isZeroEndingPreset(preset)) continue;
-		const isVerbEnding = isVerbEndingPreset(preset);
-		const isNounEnding = isNounEndingPreset(preset);
-		const block = workspace.newBlock(isVerbEnding ? VERB_ENDING_PICKER_TYPE : isNounEnding ? NOUN_ENDING_PICKER_TYPE : blockTypeForCategory(categoryForPreset(preset)));
-		if (!isVerbEnding && !isNounEnding) {
-			block.data = id;
-			block.setFieldValue(labelFor(preset, displayOptions), "LABEL");
-		}
-		block.initSvg();
-		block.render();
-		if (isVerbEnding) restoreVerbPickerFields(workspace, block, preset);
-		if (isNounEnding) {
-			const coordinate = preset.lexical_facts ?? preset;
-			const match = /^N_[A-Z]+(?:_POSS(1SG|2SG|3SG|4SG|1PL|2PL|3PL|4PL))?_(SG|PL)/.exec(preset.id);
-			block.setFieldValue(coordinate.case, "CASE");
-			block.setFieldValue(match?.[1] ?? "none", "POSSESSOR");
-			block.setFieldValue(match?.[2] ?? "SG", "NUMBER");
-			block.nounEndingPickerState.resolve();
-		}
-		if (prev) {
+		const block = createMorphemeBlock(workspace, id, presetsById, displayOptions);
+		if (!block) continue;
+		if (sideBySide()) {
+			const socket = prev ? prev.getInput("NEXT")?.connection : container.getInput("MORPHEMES")?.connection;
+			if (socket && block.outputConnection) socket.connect(block.outputConnection);
+		} else if (prev) {
 			prev.nextConnection.connect(block.previousConnection);
 		} else {
 			container.getInput("MORPHEMES").connection.connect(block.previousConnection);
@@ -1009,6 +1055,67 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 		prev = block;
 	}
 	return container;
+}
+
+function fillWrappedWord(workspace, container, ids, presetsById, displayOptions) {
+	const max = Math.max(280, (container.workspace?.getParentSvg?.()?.clientWidth || 720) - 260);
+	let row = null;
+	let prev = null;
+	let used = 0;
+	let firstOfWord = true;
+	for (const id of ids) {
+		const block = createMorphemeBlock(workspace, id, presetsById, displayOptions);
+		if (!block) continue;
+		const label = block.getFieldValue("LABEL") || block.getFieldValue("RESOLVED") || id;
+		const est = Math.min(240, 56 + String(label).length * 7);
+		if (!row || (prev && used + est > max)) {
+			row = workspace.newBlock(ROW_TYPE);
+			row.initSvg();
+			row.render();
+			row.getInput("CHAIN").setCheck(firstOfWord ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE);
+			const rows = container.getInput("ROWS").connection;
+			const tail = lastStatement(rows.targetBlock());
+			if (tail) tail.nextConnection.connect(row.previousConnection);
+			else rows.connect(row.previousConnection);
+			prev = null;
+			used = 0;
+		}
+		const socket = prev ? prev.getInput("NEXT")?.connection : row.getInput("CHAIN").connection;
+		if (socket && block.outputConnection) socket.connect(block.outputConnection);
+		prev = block;
+		used += est;
+		firstOfWord = false;
+	}
+}
+
+function lastStatement(block) {
+	let cur = block;
+	while (cur?.getNextBlock()) cur = cur.getNextBlock();
+	return cur;
+}
+
+function createMorphemeBlock(workspace, id, presetsById, displayOptions) {
+	const preset = presetsById.get(id);
+	if (!preset || isZeroEndingPreset(preset)) return null;
+	const isVerbEnding = isVerbEndingPreset(preset);
+	const isNounEnding = isNounEndingPreset(preset);
+	const block = workspace.newBlock(isVerbEnding ? VERB_ENDING_PICKER_TYPE : isNounEnding ? NOUN_ENDING_PICKER_TYPE : blockTypeForCategory(categoryForPreset(preset)));
+	if (!isVerbEnding && !isNounEnding) {
+		block.data = id;
+		block.setFieldValue(labelFor(preset, displayOptions), "LABEL");
+	}
+	block.initSvg();
+	block.render();
+	if (isVerbEnding) restoreVerbPickerFields(workspace, block, preset);
+	if (isNounEnding) {
+		const coordinate = preset.lexical_facts ?? preset;
+		const match = /^N_[A-Z]+(?:_POSS(1SG|2SG|3SG|4SG|1PL|2PL|3PL|4PL))?_(SG|PL)/.exec(preset.id);
+		block.setFieldValue(coordinate.case, "CASE");
+		block.setFieldValue(match?.[1] ?? "none", "POSSESSOR");
+		block.setFieldValue(match?.[2] ?? "SG", "NUMBER");
+		block.nounEndingPickerState.resolve();
+	}
+	return block;
 }
 
 /** Paints built surface forms and translations onto Word / Sentence containers.
