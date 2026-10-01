@@ -20,6 +20,7 @@ import {
 	readBufferWithProgress,
 	readCatalogMeta,
 	writeCatalogMeta,
+	CATALOG_META_URL,
 } from "./catalog-cache.js";
 import { raceCatalogResponses } from "./catalog-fetch.js";
 
@@ -127,6 +128,7 @@ async function revalidateCatalog(url, cache, meta, onUpdated, mergeMorphemeSourc
  *   onUpdated?: (catalog: any) => void,
  *   engine?: { mergeMorphemeSources: Function, GRAMMAR_MORPHEMES_URL: string },
  *   urls?: string[],
+ *   cache?: { match: Function, put: Function, delete: Function },
  * }} [opts]
  * @returns {Promise<{ presets: any[], authoritative: boolean|undefined, meta: any, fromCache: boolean }>}
  */
@@ -138,7 +140,7 @@ export async function loadCatalog(opts = {}) {
 	const urls = (Array.isArray(overrideUrls) && overrideUrls.length)
 		? overrideUrls
 		: [engine.GRAMMAR_MORPHEMES_URL, GRAMMAR_MORPHEMES_FALLBACK_URL];
-	const cache = await openCatalogCache();
+	const cache = opts.cache ?? await openCatalogCache();
 	const meta = await readCatalogMeta(cache);
 	let cachedUrl = urls.find((candidate) => meta?.url === candidate);
 	let cached = cachedUrl ? await cache.match(cachedUrl) : null;
@@ -153,14 +155,25 @@ export async function loadCatalog(opts = {}) {
 	}
 
 	if (cached) {
-		onProgress?.({ phase: "cached" });
-		const buffer = new Uint8Array(await cached.arrayBuffer());
-		onProgress?.({ phase: "parse", loaded: buffer.byteLength, total: buffer.byteLength });
-		const catalog = { ...catalogFromPayload(parseCatalogBytes(buffer), mergeMorphemeSources), fromCache: true };
-		queueMicrotask(() => {
-			revalidateCatalog(cachedUrl, cache, meta, onUpdated, mergeMorphemeSources);
-		});
-		return catalog;
+		try {
+			onProgress?.({ phase: "cached" });
+			const buffer = new Uint8Array(await cached.arrayBuffer());
+			onProgress?.({ phase: "parse", loaded: buffer.byteLength, total: buffer.byteLength });
+			const catalog = { ...catalogFromPayload(parseCatalogBytes(buffer), mergeMorphemeSources), fromCache: true };
+			queueMicrotask(() => {
+				revalidateCatalog(cachedUrl, cache, meta, onUpdated, mergeMorphemeSources);
+			});
+			return catalog;
+		} catch {
+			// A truncated or unpinable payload must not brick the next visit.
+			// Cache Storage is not keyed by the oq-api pin.
+			try {
+				if (cachedUrl) await cache.delete(cachedUrl);
+				await cache.delete(CATALOG_META_URL);
+			} catch {
+				// Still try the network.
+			}
+		}
 	}
 
 	const fresh = await fetchCatalogBuffer(urls, onProgress);

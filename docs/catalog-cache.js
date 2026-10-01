@@ -63,6 +63,9 @@ export function createMemoryHttpCache() {
 		async put(url, response) {
 			map.set(String(url), response.clone());
 		},
+		async delete(url) {
+			return map.delete(String(url));
+		},
 	};
 }
 
