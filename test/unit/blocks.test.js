@@ -1,12 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, restoreNounPickerFields } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, wordsFromBlock, topLevelSentences, presetMatchesQuery, structuralCategoryConnections, canvasTree, renderSentencePlan, restoreNounPickerFields } from "../../docs/blocks.js";
 import { canvasIdTree, sameIdTree } from "../../docs/id-tree.js";
 
-// These blocks.js exports don't touch the `Blockly` global, so they're
-// unit-testable directly under
-// Node — everything else (defineMorphemeBlocks, renderSentencePlan, relabelBlocks)
-// needs a real Blockly runtime and is covered by test/e2e/ instead.
+// buildToolbox / the canvas walkers don't touch the Blockly global. renderSentencePlan
+// is exercised here with a fake workspace that only implements the connection
+// surface the walker reads back — defineMorphemeBlocks still needs real Blockly.
 // structuralCategoryConnections() covers stem/particle/enclitic shapes without
 // the live catalog or Blockly.
 
@@ -217,6 +216,87 @@ test("buildToolbox: zero-realization endings are not exposed as blocks", () => {
 	assert.ok(category);
 	assert.equal(category.contents.length, 1);
 	assert.equal(category.contents[0].type, "morpheme_block__verb_ending_picker");
+});
+
+function chainConnection(owner, role) {
+	return {
+		owner,
+		role,
+		target: null,
+		connect(other) {
+			this.target = other.owner;
+			other.target = this.owner;
+			if (other.role === "previous") other.owner._ws.untop(other.owner);
+		},
+		targetBlock() {
+			return this.target;
+		},
+	};
+}
+
+function chainBlock(type, ws) {
+	const fields = {};
+	const inputs = {};
+	const block = {
+		type,
+		data: null,
+		_ws: ws,
+		initSvg() {},
+		render() {},
+		moveBy() {},
+		dispose() { ws.untop(block); },
+		getFieldValue(name) { return fields[name] ?? null; },
+		setFieldValue(value, name) { fields[name] = value; },
+		getInput(name) { return inputs[name] ?? null; },
+		getInputTargetBlock(name) { return inputs[name]?.connection.targetBlock() ?? null; },
+		getNextBlock() { return block.nextConnection.targetBlock(); },
+	};
+	block.previousConnection = chainConnection(block, "previous");
+	block.nextConnection = chainConnection(block, "next");
+	if (type === "morpheme_block__word_container") {
+		inputs.MORPHEMES = { connection: chainConnection(block, "input") };
+	}
+	return block;
+}
+
+function chainWorkspace() {
+	const tops = [];
+	return {
+		untop(block) {
+			const index = tops.indexOf(block);
+			if (index >= 0) tops.splice(index, 1);
+		},
+		getTopBlocks() { return tops.slice(); },
+		newBlock(type) {
+			const block = chainBlock(type, this);
+			tops.push(block);
+			return block;
+		},
+	};
+}
+
+test("renderSentencePlan: a chain keeps a zero-realization ending id", () => {
+	const stem = preset({ id: "qimmeq", morpheme_type: "stem", word_class: "N", expected: "qimmeq" });
+	const zero = preset({
+		id: "N_ABS_SG",
+		expected: "Ø",
+		glossShort: "absolutive singular",
+		morpheme_type: "inflectional_ending",
+		lexical_facts: { morpheme_type: "inflectional_ending", case: "absolutive" },
+		seq: [{ text: "", type: "INFLECTION" }],
+	});
+	const workspace = chainWorkspace();
+	renderSentencePlan(workspace, [{ words: [{ canvasIds: ["qimmeq", "N_ABS_SG"] }] }], new Map([
+		["qimmeq", stem],
+		["N_ABS_SG", zero],
+	]), { showIds: false });
+	const word = canvasTree(workspace).sentences[0].words[0].block;
+	const ending = word.getInputTargetBlock("MORPHEMES").getNextBlock();
+	assert.equal(ending.type, "morpheme_block__inflection");
+	assert.equal(ending.data, "N_ABS_SG");
+	assert.match(ending.getFieldValue("LABEL"), /^Ø/);
+	assert.deepEqual(chainFromTopBlock(word), ["qimmeq", "N_ABS_SG"]);
+	assert.deepEqual(topLevelSentences(workspace), [[["qimmeq", "N_ABS_SG"]]]);
 });
 
 test("buildToolbox: hiding the pickers puts matching verb and noun endings back as blocks", () => {
