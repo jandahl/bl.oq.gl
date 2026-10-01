@@ -45,12 +45,21 @@ export function renderTonedPhrases(container, phrases, className) {
  *   languages glossSummaryItems resolves each gloss in.
  */
 export function renderBreakdown(container, word, seq, buildResult, glossSummaryItems, opts = {}) {
-	container.innerHTML = "";
+	// Own a child, not the container. Sentence breakdown puts a reading band
+	// on the same article; wiping the article would delete that band, and a
+	// variant click re-enters this function on the same node.
+	let host = [...container.children].find((child) => child.classList?.contains("breakdown-body") || child.className === "breakdown-body");
+	if (!host) {
+		host = document.createElement("div");
+		host.className = "breakdown-body";
+		container.appendChild(host);
+	}
+	host.innerHTML = "";
 
 	const heading = document.createElement("div");
 	heading.className = "breakdown-word";
 	heading.textContent = (buildResult.approximate ? "≈ " : "") + buildResult.word;
-	container.appendChild(heading);
+	host.appendChild(heading);
 
 	const presentationPreferences = opts.presentationPreferences ?? { numberPreference: "singular", determinationPreference: "indefinite" };
 	const allItems = glossSummaryItems(seq, { lang: opts.lang, ...presentationPreferences });
@@ -59,7 +68,7 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 		const translationEl = document.createElement("p");
 		translationEl.className = "breakdown-translation";
 		translationEl.textContent = translation;
-		container.appendChild(translationEl);
+		host.appendChild(translationEl);
 	}
 	const variants = allItems.find((item) => item.presentationVariants)?.presentationVariants;
 	if (variants) {
@@ -76,7 +85,7 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 			button.addEventListener("click", () => renderBreakdown(container, word, seq, buildResult, glossSummaryItems, { ...opts, presentationPreferences: { numberPreference, determinationPreference } }));
 			controls.appendChild(button);
 		}
-		container.appendChild(controls);
+		host.appendChild(controls);
 	}
 
 	let items = allItems.filter((item) => item.marker !== "Ø");
@@ -108,13 +117,13 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 
 		rows.appendChild(row);
 	}
-	container.appendChild(rows);
+	host.appendChild(rows);
 
 	if (!buildResult.closed) {
 		const note = document.createElement("p");
 		note.className = "breakdown-note";
 		note.textContent = "Mid-derivation — this chain doesn't end in a word-final morpheme.";
-		container.appendChild(note);
+		host.appendChild(note);
 	}
 }
 
