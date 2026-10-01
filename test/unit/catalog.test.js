@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { applyCatalogCompatibility, catalogFromPayload, loadCatalog } from "../../docs/catalog.js";
-import { createMemoryHttpCache, writeCatalogMeta } from "../../docs/catalog-cache.js";
+import { createMemoryHttpCache, digestCatalog, writeCatalogMeta } from "../../docs/catalog-cache.js";
 import { fixtureMergeMorphemeSources } from "../helpers/catalog-fixture.js";
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -114,6 +114,88 @@ test("loadCatalog revalidation keeps the previous cache when the new body fails 
 		assert.match(await stored.text(), /qimmeq/);
 		const meta = await (await cache.match("https://bloq.invalid/catalog-meta")).json();
 		assert.equal(meta.etag, "good");
+	} finally {
+		globalThis.fetch = original;
+	}
+});
+
+async function settleCatalogRevalidate() {
+	for (let i = 0; i < 8; i++) await new Promise((resolve) => global.setTimeout(resolve, 0));
+}
+
+test("digestCatalog is a stable sha-256 of the catalog bytes", async () => {
+	const bytes = new TextEncoder().encode("{\"id\":\"qimmeq\"}");
+	assert.equal(await digestCatalog(bytes), await digestCatalog(bytes.slice()));
+	assert.notEqual(await digestCatalog(bytes), await digestCatalog(new TextEncoder().encode("{}")));
+});
+
+test("loadCatalog revalidation skips parse when the body hash matches and ETag is hidden", async () => {
+	const url = "https://example.test/morphemes-by-id.json";
+	const body = JSON.stringify(mini);
+	const sha256 = await digestCatalog(new TextEncoder().encode(body));
+	const cache = createMemoryHttpCache();
+	await cache.put(url, new Response(body, {
+		status: 200,
+		headers: { "content-type": "application/json" },
+	}));
+	await writeCatalogMeta(cache, { url, etag: "", fetchedAt: 1 });
+	const original = globalThis.fetch;
+	let updates = 0;
+	let gets = 0;
+	globalThis.fetch = async (_url, init) => {
+		if (init?.method === "HEAD") return new Response(null, { status: 200, headers: {} });
+		gets += 1;
+		return new Response(body, { status: 200, headers: { "content-type": "application/json" } });
+	};
+	try {
+		const catalog = await loadCatalog({
+			cache,
+			urls: [url],
+			onUpdated: () => { updates += 1; },
+			engine: { mergeMorphemeSources: fixtureMergeMorphemeSources, GRAMMAR_MORPHEMES_URL: url },
+		});
+		assert.equal(catalog.fromCache, true);
+		assert.ok(catalog.presets.some((preset) => preset.id === "qimmeq"));
+		await settleCatalogRevalidate();
+		assert.equal(gets, 1);
+		assert.equal(updates, 0);
+		const stored = await cache.match(url);
+		assert.equal(await stored.text(), body);
+		const meta = await (await cache.match("https://bloq.invalid/catalog-meta")).json();
+		assert.equal(meta.sha256, sha256);
+		assert.equal(meta.etag, "");
+		assert.ok(meta.fetchedAt > 1);
+	} finally {
+		globalThis.fetch = original;
+	}
+});
+
+test("loadCatalog revalidation still parses when the body hash differs", async () => {
+	const url = "https://example.test/morphemes-by-id.json";
+	const body = JSON.stringify(mini);
+	const changed = JSON.stringify({ ...mini, meta: { ...mini.meta, status: "changed" } });
+	const sha256 = await digestCatalog(new TextEncoder().encode(body));
+	const cache = createMemoryHttpCache();
+	await cache.put(url, new Response(body, { status: 200, headers: { "content-type": "application/json" } }));
+	await writeCatalogMeta(cache, { url, etag: "", sha256 });
+	const original = globalThis.fetch;
+	let updates = 0;
+	globalThis.fetch = async (_url, init) => {
+		if (init?.method === "HEAD") return new Response(null, { status: 200, headers: {} });
+		return new Response(changed, { status: 200, headers: { "content-type": "application/json" } });
+	};
+	try {
+		await loadCatalog({
+			cache,
+			urls: [url],
+			onUpdated: () => { updates += 1; },
+			engine: { mergeMorphemeSources: fixtureMergeMorphemeSources, GRAMMAR_MORPHEMES_URL: url },
+		});
+		await settleCatalogRevalidate();
+		assert.equal(updates, 1);
+		const meta = await (await cache.match("https://bloq.invalid/catalog-meta")).json();
+		assert.equal(meta.sha256, await digestCatalog(new TextEncoder().encode(changed)));
+		assert.notEqual(meta.sha256, sha256);
 	} finally {
 		globalThis.fetch = original;
 	}
