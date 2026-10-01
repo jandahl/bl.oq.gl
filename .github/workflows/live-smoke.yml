@@ -1,0 +1,24 @@
+name: Live smoke
+
+# Weekly probe of the pinned public API and grammarian catalog.
+# Not a PR check: an upstream outage must not turn this repo red.
+# The full live suite stays `npm run test:e2e:live`.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm run test:live-smoke
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

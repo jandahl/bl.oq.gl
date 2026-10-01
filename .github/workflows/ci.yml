@@ -4,8 +4,8 @@ name: CI
 # Fixture e2e boots against docs/fixtures/ (engine stub + mini catalog) so a
 # red build here means a regression in this repo — not an upstream outage on
 # jandahl.github.io/api.oq.gl or the grammarian GitHub Pages mirror.
-# Live upstream smoke: npm run test:live-smoke (or test:e2e:live) locally /
-# as a separate scheduled job when desired.
+# Live upstream smoke is .github/workflows/live-smoke.yml (weekly, or
+# workflow_dispatch). Do not add the full live suite to this job.
 on:
   pull_request:
   push:
