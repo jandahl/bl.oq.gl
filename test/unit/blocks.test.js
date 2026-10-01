@@ -220,10 +220,11 @@ test("buildToolbox: a real verb-mood ending (carrying inflection.subject) is exc
 	const toolbox = buildToolbox(presets, { showIds: false });
 	const category = toolbox.contents.find((c) => c.name.startsWith("Inflectional endings"));
 	assert.ok(!category.contents.some((b) => b.data === "V_IND_INTR_1SG"));
-	// The category contains one coherent picker. Object remains available as a
-	// separate value block because its presence changes valency.
-	assert.equal(category.contents.length, 1);
+	// The verb picker stays first. The object block is next to it so a Build
+	// can select a transitive ending; it is not a flat ending entry.
+	assert.equal(category.contents.length, 2);
 	assert.equal(category.contents[0].type, "morpheme_block__verb_ending_picker");
+	assert.equal(category.contents[1].type, "morpheme_block__verb_object");
 	assert.equal(category.contents[0].inputs, undefined);
 	assert.equal(category.categorystyle, "oq_inflectional_category");
 });
@@ -237,11 +238,12 @@ test("buildToolbox: structured nominal endings are replaced by the nominal picke
 	})];
 	const toolbox = buildToolbox(presets, { showIds: false });
 	const category = toolbox.contents.find((c) => c.name.startsWith("Inflectional endings"));
-	assert.equal(category.contents.length, 2);
+	assert.equal(category.contents.length, 3);
 	assert.equal(category.contents[0].type, "morpheme_block__verb_ending_picker");
 	assert.equal(category.contents[1].type, "morpheme_block__noun_ending_picker");
+	assert.equal(category.contents[2].type, "morpheme_block__verb_object");
 	assert.ok(!category.contents.some((b) => b.data === "N_ABS_SG"));
-	assert.match(category.name, /^Inflectional endings \(1 entries · 2 blocks\)$/);
+	assert.match(category.name, /^Inflectional endings \(1 entries · 3 blocks\)$/);
 });
 
 test("buildToolbox: zero-realization endings are not exposed as blocks", () => {
@@ -255,8 +257,9 @@ test("buildToolbox: zero-realization endings are not exposed as blocks", () => {
 	const toolbox = buildToolbox(presets, { showIds: false });
 	const category = toolbox.contents.find((c) => c.name.startsWith("Inflectional endings"));
 	assert.ok(category);
-	assert.equal(category.contents.length, 1);
+	assert.equal(category.contents.length, 2);
 	assert.equal(category.contents[0].type, "morpheme_block__verb_ending_picker");
+	assert.equal(category.contents[1].type, "morpheme_block__verb_object");
 });
 
 function chainConnection(owner, role) {
@@ -385,6 +388,7 @@ test("buildToolbox: hiding the pickers puts matching verb and noun endings back 
 	const hiddenPickers = filtered.contents.find((c) => c.name.startsWith("Inflectional endings"));
 	assert.deepEqual(hiddenPickers.contents.map((block) => block.data).sort(), ["N_ABS_SG", "V_IND_INTR_1SG"]);
 	assert.ok(!hiddenPickers.contents.some((block) => String(block.type).includes("picker")));
+	assert.ok(!hiddenPickers.contents.some((block) => block.type === "morpheme_block__verb_object"));
 
 	const open = buildToolbox([verb, noun], { showIds: false }).contents.find((c) => c.name.startsWith("Inflectional endings"));
 	assert.ok(open.contents.some((block) => block.type === "morpheme_block__verb_ending_picker"));
