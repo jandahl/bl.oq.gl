@@ -18,13 +18,19 @@ export function raceCatalogResponses(urls, options = {}) {
 	const fetchImpl = options.fetchImpl ?? globalThis.fetch;
 	const waitMs = options.waitMs ?? PRIMARY_CATALOG_WAIT_MS;
 	const controllers = list.map(() => new AbortController());
-	const attempts = list.map((url, index) => fetchImpl(url, {
-		cache: "no-cache",
-		signal: controllers[index].signal,
-	}).then((response) => {
-		if (!response?.ok) throw new Error(`HTTP ${response?.status ?? "error"}`);
-		return { response, url, index };
-	}));
+	const attempts = list.map((url, index) => {
+		const request = {
+			credentials: "omit",
+			signal: controllers[index].signal,
+		};
+		// Cold GET must match the index.html preload (anonymous, default cache).
+		// Revalidation passes cache: "no-cache" so a warm HTTP cache cannot hide a new catalog.
+		if (options.cache) request.cache = options.cache;
+		return fetchImpl(url, request).then((response) => {
+			if (!response?.ok) throw new Error(`HTTP ${response?.status ?? "error"}`);
+			return { response, url, index };
+		});
+	});
 	// Aborting a loser rejects its fetch. A later rejection must not surface
 	// as unhandled once another host has already won.
 	for (const attempt of attempts) attempt.catch(() => {});

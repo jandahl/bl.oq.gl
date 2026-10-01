@@ -10,6 +10,20 @@ function hangUntilAbort(signal) {
 	});
 }
 
+test("the cold race omits credentials and does not bypass the preload cache", async () => {
+	const seen = [];
+	const fetchImpl = (url, init) => {
+		seen.push({ url, init });
+		if (url === "primary") return Promise.resolve(new Response("primary", { status: 200 }));
+		return hangUntilAbort(init.signal);
+	};
+	await raceCatalogResponses(["primary", "mirror"], { fetchImpl, waitMs: 50 });
+	assert.equal(seen[0].init.credentials, "omit");
+	assert.equal(seen[0].init.cache, undefined);
+	assert.equal(seen[1].init.credentials, "omit");
+	assert.equal(seen[1].init.signal.aborted, true);
+});
+
 test("the oq-api catalog wins when it answers inside the wait, and the mirror is aborted", async () => {
 	const signals = [];
 	const fetchImpl = (url, { signal }) => {

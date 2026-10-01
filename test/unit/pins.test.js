@@ -30,4 +30,5 @@ test("index.html catalog preload matches the grammarian mirror fallback", () => 
 	const link = html.match(/<link rel="preload" href="([^"]+)" as="fetch"/);
 	assert.ok(link, "catalog preload link missing");
 	assert.equal(link[1], fallback);
+	assert.match(html, new RegExp(`<link rel="preload" href="${fallback.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" as="fetch" crossorigin="anonymous"`));
 });
