@@ -451,8 +451,11 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
 	const subjectField = block.getField("SUBJECT");
 	const validSubjects = subjectCombosFor(block, verbEndingIndex);
 	if (subjectField && validSubjects.length && !validSubjects.includes(subjectValue)) {
+		// setValue checks the cached menu. Regenerate it for this mood and
+		// transitivity or the correction no-ops and the old person sticks.
+		subjectField.getOptions(false);
 		subjectField.setValue(validSubjects[0]);
-		subjectValue = validSubjects[0];
+		subjectValue = subjectField.getValue();
 	}
 	const { person: sPerson, number: sNumber } = subjectValue
 		? parsePersonNumber(subjectValue)
@@ -683,10 +686,9 @@ function comboKey(person, number) {
  * it goes -- see resolveVerbPicker's own `if (block.rendered)` guard).
  * @param {ReturnType<typeof Blockly.inject>} workspace
  */
-function restoreVerbPickerFields(workspace, block, preset) {
+export function restoreVerbPickerFields(workspace, block, preset) {
 	const inflection = preset.seq[0].inflection;
 	block.setFieldValue(inflection.mood, "MOOD");
-	block.setFieldValue(comboKey(inflection.subject.person, inflection.subject.number), "SUBJECT");
 	block.setFieldValue(inflection.polarity ?? "positive", "POLARITY");
 	if (inflection.object) {
 		const objectBlock = workspace.newBlock(VERB_OBJECT_TYPE);
@@ -695,6 +697,15 @@ function restoreVerbPickerFields(workspace, block, preset) {
 		objectBlock.setFieldValue(comboKey(inflection.object.person, inflection.object.number), "COMBO");
 		block.getInput("OBJECT_SLOT").connection.connect(objectBlock.outputConnection);
 	}
+	// The menu generator's first run is before the field is on the block, so
+	// the cache is every subject combo and a later setValue usually works.
+	// Once something has realized the menu for the intransitive init mood
+	// (getOptions(false): opening the dropdown, or the corrective path),
+	// the cache is only that mood's subjects. Refresh after the object is
+	// connected, then set the real combo, or setFieldValue no-ops.
+	const subjectField = block.getField("SUBJECT");
+	subjectField?.getOptions(false);
+	block.setFieldValue(comboKey(inflection.subject.person, inflection.subject.number), "SUBJECT");
 	// Selector connections resolve through workspace events in normal use;
 	// force one synchronously while restoring so the variant check below sees
 	// the final coordinate immediately.
