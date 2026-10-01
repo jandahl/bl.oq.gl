@@ -93,5 +93,9 @@ test("writeState/readState: several sentences are separated with a pipe", () => 
 test("routeForState: always uses the single-page route and preserves the site base path", () => {
 	assert.equal(routeForState("/"), "/");
 	assert.equal(routeForState("/deconstruct/"), "/");
+	assert.equal(routeForState("/deconstruct"), "/");
 	assert.equal(routeForState("/bl-oq-ly/"), "/bl-oq-ly/");
+	assert.equal(routeForState("/bl.oq.gl/deconstruct"), "/bl.oq.gl/");
+	assert.equal(routeForState("/index.html"), "/index.html");
+	assert.equal(routeForState("/bl-oq-ly/index.html"), "/bl-oq-ly/index.html");
 });
