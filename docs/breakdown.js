@@ -167,3 +167,152 @@ export function renderAlternativeBreakdowns(container, alternatives, glossSummar
 	details.appendChild(list);
 	container.appendChild(details);
 }
+
+const READING_BAND_LABEL = {
+	gold: "gold",
+	hard_exact: "exact",
+	soft_exact: "soft",
+	none: "unparsed",
+};
+
+function readingBandLabel(band) {
+	return READING_BAND_LABEL[band] || band;
+}
+
+/**
+ * Sentence Deconstruct panel: one section per source sentence, a reading
+ * band per word, and a verified chain only when that word actually built.
+ * Does not touch the summary chrome or the share URL.
+ * @returns {string} readings joined for the panel summary
+ */
+export function renderSentenceBreakdown(container, plan, glossSummaryItems, opts = {}) {
+	const t = opts.t ?? ((key) => key);
+	const visibleAssembly = opts.visibleAssembly ?? ((assembly) => assembly?.text || "");
+	container.innerHTML = "";
+	if (plan.sentences.length > 1 && plan.assembly?.text) {
+		const lead = document.createElement("p");
+		lead.className = "sentence-assembly sentence-assembly-all";
+		lead.textContent = visibleAssembly(plan.assembly);
+		container.appendChild(lead);
+	}
+	const metas = [];
+	plan.sentences.forEach((sentence, s) => {
+		const section = document.createElement("section");
+		section.className = "sentence-breakdown";
+		section.dataset.wordTone = wordTone(s);
+		const head = document.createElement("header");
+		head.className = "sentence-breakdown-head";
+		const source = document.createElement("p");
+		source.className = "sentence-source";
+		source.textContent = sentence.source;
+		head.appendChild(source);
+		if (sentence.assembly?.text) {
+			const line = document.createElement("p");
+			line.className = "sentence-assembly";
+			const badge = document.createElement("span");
+			badge.className = `sentence-mode mode-${sentence.assembly.mode || "serial"}`;
+			badge.textContent = sentence.assembly.mode || "serial";
+			const reading = visibleAssembly(sentence.assembly);
+			line.append(badge, " ", reading);
+			head.appendChild(line);
+			metas.push(reading);
+		}
+		if (sentence.assemblyDa?.text && opts.showDanish) {
+			const da = document.createElement("p");
+			da.className = "sentence-assembly sentence-assembly-da";
+			da.textContent = visibleAssembly(sentence.assemblyDa);
+			head.appendChild(da);
+		}
+		section.appendChild(head);
+		sentence.words.forEach((word, i) => {
+			const article = document.createElement("article");
+			article.classList.add("word-toned", "sentence-word-breakdown");
+			article.dataset.wordTone = wordTone(i);
+			if (s === 0 && i === 0) article.id = "primary-breakdown";
+			const band = document.createElement("p");
+			band.className = `reading-band band-${word.band || "none"}`;
+			band.textContent = `${readingBandLabel(word.band)} · ${word.surface}`;
+			article.appendChild(band);
+			if (word.seq && word.built?.ok) {
+				renderBreakdown(article, word.surface, word.seq, word.built, glossSummaryItems, {
+					reverseOrder: opts.reverseOrder,
+					lang: opts.lang,
+					showOther: opts.showOther,
+					headlineGloss: opts.headlineGloss,
+				});
+			} else {
+				const heading = document.createElement("div");
+				heading.className = "breakdown-word";
+				heading.textContent = word.raw;
+				article.appendChild(heading);
+				if (word.headline && word.headline !== word.raw) {
+					const gloss = document.createElement("p");
+					gloss.className = "breakdown-translation";
+					gloss.textContent = word.headline;
+					article.appendChild(gloss);
+				}
+				if (word.compositional && word.compositional !== word.headline) {
+					const unused = document.createElement("p");
+					unused.className = "breakdown-note";
+					unused.textContent = t("closedChainUnused", { text: word.compositional });
+					article.appendChild(unused);
+				}
+				const note = document.createElement("p");
+				note.className = "breakdown-note";
+				note.textContent = word.note || t("notOnCanvas");
+				article.appendChild(note);
+			}
+			if (word.alternatives?.length) {
+				const list = document.createElement("ul");
+				list.className = "sentence-also";
+				for (const alt of word.alternatives) {
+					const item = document.createElement("li");
+					item.textContent = `${readingBandLabel(alt.band)}: ${alt.headline || alt.ids.join(" + ")}`;
+					list.appendChild(item);
+				}
+				article.appendChild(list);
+			}
+			section.appendChild(article);
+		});
+		container.appendChild(section);
+	});
+	return metas.join("  ·  ");
+}
+
+/**
+ * Single-word (or several independent words) Deconstruct panel.
+ * @returns {string} per-word row counts joined for the panel summary
+ */
+export function renderWordBreakdowns(container, parts, glossSummaryItems, opts = {}) {
+	container.innerHTML = "";
+	const metas = [];
+	for (let i = 0; i < parts.length; i++) {
+		const part = parts[i];
+		const article = document.createElement("article");
+		if (i === 0) article.id = "primary-breakdown";
+		article.classList.add("word-toned");
+		article.dataset.wordTone = wordTone(i);
+		if (parts.length > 1) article.classList.add("sentence-word-breakdown");
+		renderBreakdown(article, part.word, part.seq, part.built, glossSummaryItems, {
+			reverseOrder: opts.reverseOrder,
+			lang: opts.lang,
+			showOther: opts.showOther,
+			headlineGloss: opts.headlineGloss,
+		});
+		container.appendChild(article);
+		if (part.alternatives?.length) {
+			renderAlternativeBreakdowns(container, part.alternatives, glossSummaryItems, {
+				word: part.word,
+				reverseOrder: opts.reverseOrder,
+				lang: opts.lang,
+				showOther: opts.showOther,
+				headlineGloss: opts.headlineGloss,
+				builderHref: opts.builderHref,
+			});
+		}
+		const n = article.querySelectorAll(".breakdown-row").length;
+		const translation = article.querySelector(".breakdown-translation")?.textContent;
+		metas.push(translation ? `${n} · ${translation}` : String(n));
+	}
+	return metas.join("  ·  ");
+}

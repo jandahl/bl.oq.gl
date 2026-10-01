@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { wordTone, WORD_TONE_COUNT, renderBreakdown, renderTonedPhrases } from "../../docs/breakdown.js";
+import { wordTone, WORD_TONE_COUNT, renderBreakdown, renderTonedPhrases, renderSentenceBreakdown } from "../../docs/breakdown.js";
 
 function matches(el, sel) {
 	if (sel.startsWith(".")) return String(el.className || "").split(/\s+/).includes(sel.slice(1));
@@ -26,7 +26,7 @@ function serialize(el) {
 function installDomShim() {
 	if (typeof document !== "undefined") return;
 	globalThis.document = {
-		createElement(tag) {
+			createElement(tag) {
 			const el = {
 				tagName: tag.toUpperCase(),
 				className: "",
@@ -61,6 +61,16 @@ function installDomShim() {
 				set innerHTML(_v) {
 					this.children = [];
 					this.textContent = "";
+				},
+			};
+			el.classList = {
+				add(...names) {
+					const set = new Set(String(el.className || "").split(/\s+/).filter(Boolean));
+					for (const name of names) set.add(name);
+					el.className = [...set].join(" ");
+				},
+				contains(name) {
+					return String(el.className || "").split(/\s+/).includes(name);
 				},
 			};
 			return el;
@@ -131,4 +141,54 @@ test("renderBreakdown keeps a sibling reading band across a re-render", () => {
 	assert.equal(article.querySelectorAll(".reading-band").length, 1);
 	assert.equal(article.querySelectorAll(".breakdown-body").length, 1);
 	assert.equal(article.querySelector(".breakdown-word").textContent, "qimmeqarpunga");
+});
+
+test("renderSentenceBreakdown shows a band for a built word and does not draw a missing word as a chain", () => {
+	installDomShim();
+	const container = document.createElement("div");
+	const seq = [{ id: "qimmeq", text: "qimmeq", marker: "" }];
+	const plan = {
+		sentences: [{
+			source: "Qimmeq ajorpoq.",
+			assembly: { text: "The dog is bad.", mode: "serial" },
+			words: [
+				{
+					surface: "qimmeq",
+					raw: "qimmeq",
+					band: "hard_exact",
+					seq,
+					built: { ok: true, word: "qimmeq", approximate: false, closed: true },
+				},
+				{
+					surface: "ajorpoq",
+					raw: "ajorpoq",
+					band: "none",
+					canvasIds: [],
+					headline: "is bad",
+					note: "Catalog entry has no builder sequence.",
+				},
+			],
+		}],
+	};
+	const glossSummaryItems = (items) => items.map((item) => ({
+		text: item.text,
+		marker: "",
+		gloss: "dog",
+		id: item.id,
+	}));
+	const meta = renderSentenceBreakdown(container, plan, glossSummaryItems, {
+		t: (_key, vars) => vars?.text ?? "not-on-canvas",
+		lang: "en",
+		headlineGloss: (items) => items.map((item) => item.gloss).join(" "),
+		visibleAssembly: (assembly) => assembly.text,
+	});
+	const articles = container.querySelectorAll("article");
+	assert.equal(articles.length, 2);
+	assert.equal(articles[0].querySelector(".reading-band").textContent, "exact · qimmeq");
+	assert.ok(articles[0].querySelector(".breakdown-body"));
+	assert.equal(articles[1].querySelector(".reading-band").textContent, "unparsed · ajorpoq");
+	assert.equal(articles[1].querySelector(".breakdown-note").textContent, "Catalog entry has no builder sequence.");
+	assert.equal(articles[1].querySelector(".breakdown-row"), null);
+	assert.equal(articles[1].querySelector(".breakdown-body"), null);
+	assert.equal(meta, "The dog is bad.");
 });
