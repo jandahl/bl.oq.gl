@@ -643,7 +643,7 @@ export function renderSentencePlan(workspace, sentences, presetsById, displayOpt
 				const ids = (word.canvasIds ?? []).filter(Boolean);
 				const wordBlock = ids.length
 					? buildWordBlock(workspace, ids, presetsById, displayOptions)
-					: buildHeldWord(workspace, !prevWord ? withInitialCapital(word.surface || word.raw) : (word.surface || word.raw), word.heldLabel || "not drawn");
+					: buildHeldWord(workspace, !prevWord ? withInitialCapital(word.surface || word.raw) : (word.surface || word.raw), word.heldLabel || "heldNotDrawn");
 				if (ids.length) drawable.push(ids);
 				if (prevWord) prevWord.nextConnection.connect(wordBlock.previousConnection);
 				else sentence.getInput("WORDS").connection.connect(wordBlock.previousConnection);
@@ -660,12 +660,13 @@ export function renderSentencePlan(workspace, sentences, presetsById, displayOpt
 
 function buildHeldWord(workspace, surface, label) {
 	const container = workspace.newBlock(WORD_CONTAINER_TYPE);
-	container.bloqHeld = label || "not drawn";
+	const key = label || "heldNotDrawn";
+	container.bloqHeld = key;
 	container.initSvg();
 	container.render();
 	container.setFieldValue(surface || "…", "TITLE");
-	container.setFieldValue(container.bloqHeld, "TRANSLATION");
-	container.setTooltip(container.bloqHeld);
+	container.setFieldValue(t(key), "TRANSLATION");
+	container.setTooltip(t(key));
 	return container;
 }
 

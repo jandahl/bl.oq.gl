@@ -970,8 +970,8 @@ function materializePlan(plan) {
 function planStatusMeta(plan) {
 	const count = plan.sentences.length;
 	const modes = [...new Set(plan.sentences.map((sentence) => sentence.assembly?.mode).filter(Boolean))];
-	const modeLabel = modes.join(" + ") || "sentence";
-	return count > 1 ? `${count} sentences · ${modeLabel}` : modeLabel;
+	const modeLabel = modes.join(" + ") || t("oneSentence");
+	return count > 1 ? `${t("nSentences", { count })} · ${modeLabel}` : modeLabel;
 }
 
 async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {

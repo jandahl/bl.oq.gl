@@ -103,7 +103,7 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 		spelling.textContent = `${item.marker}${item.text}`;
 		row.appendChild(spelling);
 
-		const { moodLabel, rest } = splitMoodLabel(item.shortGloss || item.gloss || item.meaning || "(no gloss)", item.moodLabel);
+		const { moodLabel, rest } = splitMoodLabel(item.shortGloss || item.gloss || item.meaning || translate("noGloss"), item.moodLabel);
 		if (moodLabel) {
 			const badge = document.createElement("span");
 			badge.className = "breakdown-mood";
@@ -123,7 +123,7 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 	if (!buildResult.closed) {
 		const note = document.createElement("p");
 		note.className = "breakdown-note";
-		note.textContent = "Mid-derivation — this chain doesn't end in a word-final morpheme.";
+		note.textContent = translate("openDerivation");
 		host.appendChild(note);
 	}
 }
@@ -144,7 +144,7 @@ export function renderAlternativeBreakdowns(container, alternatives, glossSummar
 	details.id = "alternative-breakdowns";
 	details.className = "alternative-breakdowns";
 	const summary = document.createElement("summary");
-	summary.textContent = `Other verified breakdowns (${alternatives.length})`;
+	summary.textContent = translate("otherBreakdowns", { count: alternatives.length });
 	details.appendChild(summary);
 
 	const list = document.createElement("div");
@@ -160,7 +160,7 @@ export function renderAlternativeBreakdowns(container, alternatives, glossSummar
 			const link = document.createElement("a");
 			link.className = "breakdown-builder-link";
 			link.href = opts.builderHref(alternative.seq);
-			link.textContent = "Open this breakdown in Word Builder →";
+			link.textContent = translate("openInBuilder");
 			entry.appendChild(link);
 		}
 		list.appendChild(entry);
@@ -179,6 +179,12 @@ const READING_BAND_KEY = {
 function readingBandLabel(band) {
 	const key = READING_BAND_KEY[band];
 	return key ? translate(key) : band;
+}
+
+function localizedNote(note, tFn, vars) {
+	if (!note) return "";
+	if (!/^[A-Za-z][A-Za-z0-9]*$/.test(note)) return note;
+	return tFn(note, vars || {});
 }
 
 /**
@@ -261,7 +267,7 @@ export function renderSentenceBreakdown(container, plan, glossSummaryItems, opts
 				}
 				const note = document.createElement("p");
 				note.className = "breakdown-note";
-				note.textContent = word.note || t("notOnCanvas");
+				note.textContent = localizedNote(word.note, t, word.noteVars) || t("notOnCanvas");
 				article.appendChild(note);
 			}
 			if (word.alternatives?.length) {
