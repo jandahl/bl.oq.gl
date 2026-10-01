@@ -535,7 +535,9 @@ function rebuildWorkspace() {
 	session.workspace.dispose();
 	injectWorkspace();
 	applyToolbox();
-	if (plan.some((sentence) => sentence.words?.length)) {
+	// An empty Sentence has a source and no words. Rendering only when some
+	// sentence has words dropped that container on Classic ↔ Zelos.
+	if (plan.length) {
 		renderSentencePlan(session.workspace, plan, session.presetsById, displayOptions());
 	}
 	requestAnimationFrame(() => Blockly.svgResize(session.workspace));
