@@ -74,7 +74,8 @@ bindVerbPickerHost({ labelFor, applyChainConnections });
 //   WORD_CHAIN     — Word stacking inside a Sentence
 //   VERB_MOOD / VERB_SUBJECT / VERB_OBJECT — picker value sockets
 // Category hasPrevious/hasNext in CATEGORY_ORDER encodes: stem cannot follow,
-// particle is alone, enclitic seals the chain.
+// particle is alone. A plain enclitic does not use hasNext: false — that
+// threw when a legal enclitic followed. Its next check is ENCLITIC_FOLLOW.
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
 const ENCLITIC_FOLLOW = "ENCLITIC_FOLLOW";
 const WORD_START_CONNECTION_TYPE = "WORD_START";
@@ -308,6 +309,12 @@ export function defineMorphemeBlocks() {
 			},
 		};
 	}
+}
+
+/** Check for a wrap row's CHAIN socket. The row must keep the previous morpheme's NEXT check, or a line break would let an ordinary affix follow a plain enclitic. */
+export function wrapRowChainCheck(previousNextCheck, wordStart) {
+	if (wordStart) return WORD_START_CONNECTION_TYPE;
+	return previousNextCheck || CONNECTION_TYPE;
 }
 
 function previousCheckFor(cat) {
@@ -799,17 +806,18 @@ function fillWrappedWord(workspace, container, ids, presetsById, displayOptions)
 	let row = null;
 	let prev = null;
 	let used = 0;
-	let firstOfWord = true;
 	for (const id of ids) {
 		const block = createMorphemeBlock(workspace, id, presetsById, displayOptions);
 		if (!block) continue;
 		const label = block.getFieldValue("LABEL") || block.getFieldValue("RESOLVED") || id;
 		const est = Math.min(240, 56 + String(label).length * 7);
 		if (!row || (prev && used + est > max)) {
+			const wordStart = !prev;
+			const previousNextCheck = prev?.getInput?.("NEXT")?.connection?.getCheck?.() ?? null;
 			row = workspace.newBlock(ROW_TYPE);
 			row.initSvg();
 			row.render();
-			row.getInput("CHAIN").setCheck(firstOfWord ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE);
+			row.getInput("CHAIN").setCheck(wrapRowChainCheck(previousNextCheck, wordStart));
 			const rows = container.getInput("ROWS").connection;
 			const tail = lastStatement(rows.targetBlock());
 			if (tail) tail.nextConnection.connect(row.previousConnection);
@@ -821,7 +829,6 @@ function fillWrappedWord(workspace, container, ids, presetsById, displayOptions)
 		if (socket && block.outputConnection) socket.connect(block.outputConnection);
 		prev = block;
 		used += est;
-		firstOfWord = false;
 	}
 }
 
@@ -941,8 +948,8 @@ export function relabelBlocks(workspace, presetsById, displayOptions) {
 
 /**
  * Category-level previous/next shapes for unit tests. These are structural
- * (stem cannot follow, particle is alone, enclitic seals the chain); join
- * legality stays in buildWord().
+ * (stem cannot follow, particle is alone, a plain enclitic's next check is
+ * ENCLITIC_FOLLOW); join legality stays in buildWord().
  */
 export function structuralCategoryConnections() {
 	return CATEGORY_ORDER.map((cat) => ({
