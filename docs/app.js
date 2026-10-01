@@ -1258,9 +1258,9 @@ function applyToolbox() {
 	// Rebuilt every time from scratch (no cached "full" toolbox), since
 	// display options can change independently of the filter and both need
 	// to be reflected together. The verb ending picker has no id/gloss text
-	// to match a query, so it's excluded from a filtered view entirely
-	// (bl-oq-ly#18) rather than left showing as an always-present,
-	// unrelated "Inflectional endings (1)" category.
+	// to match a query, so the pickers are excluded from a filtered view
+	// (bl-oq-ly#18). Matching verb and noun endings are ordinary blocks
+	// again for that view; buildToolbox owns that switch.
 	session.workspace.updateToolbox(buildToolbox(filtered, displayOptions(), { includeVerbPicker: !q }));
 	closeOpenFlyout();
 }

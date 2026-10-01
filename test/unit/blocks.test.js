@@ -157,6 +157,31 @@ test("buildToolbox: zero-realization endings are not exposed as blocks", () => {
 	assert.equal(category.contents[0].type, "morpheme_block__verb_ending_picker");
 });
 
+test("buildToolbox: hiding the pickers puts matching verb and noun endings back as blocks", () => {
+	const verb = preset({
+		id: "V_IND_INTR_1SG",
+		expected: "-vunga",
+		morpheme_type: "inflectional_ending",
+		word_class: "",
+		seq: [{ inflection: { mood: "indicative", transitivity: "intransitive", subject: { person: 1, number: "sg" } } }],
+	});
+	const noun = preset({
+		id: "N_ABS_SG",
+		expected: "-q",
+		morpheme_type: "inflectional_ending",
+		lexical_facts: { morpheme_type: "inflectional_ending", case: "absolutive" },
+	});
+	const filtered = buildToolbox([verb, noun], { showIds: false }, { includeVerbPicker: false });
+	const hiddenPickers = filtered.contents.find((c) => c.name.startsWith("Inflectional endings"));
+	assert.deepEqual(hiddenPickers.contents.map((block) => block.data).sort(), ["N_ABS_SG", "V_IND_INTR_1SG"]);
+	assert.ok(!hiddenPickers.contents.some((block) => String(block.type).includes("picker")));
+
+	const open = buildToolbox([verb, noun], { showIds: false }).contents.find((c) => c.name.startsWith("Inflectional endings"));
+	assert.ok(open.contents.some((block) => block.type === "morpheme_block__verb_ending_picker"));
+	assert.ok(open.contents.some((block) => block.type === "morpheme_block__noun_ending_picker"));
+	assert.ok(!open.contents.some((block) => block.data === "V_IND_INTR_1SG" || block.data === "N_ABS_SG"));
+});
+
 test("chainFromTopBlock: walks a fake block stack via getNextBlock(), collecting each block's .data", () => {
 	const third = { type: "morpheme_block__inflection", data: "V_IND_INTR_1SG", getNextBlock: () => null };
 	const second = { type: "morpheme_block__deriv_affix", data: "N_qaq_Vb", getNextBlock: () => third };
