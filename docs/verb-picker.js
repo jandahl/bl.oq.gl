@@ -207,7 +207,7 @@ function resolveVerbPicker(block, variantOverride) {
 	const resolvedField = block.getField("RESOLVED");
 	if (resolvedField) {
 		const preset = resolvedId ? presetsById.get(resolvedId) : null;
-		const missing = !mood && !moodBlock ? "choose a mood" : !subjectValue ? "choose a subject" : t("noSuchEnding");
+		const missing = !mood && !moodBlock ? t("chooseMood") : !subjectValue ? t("chooseSubject") : t("noSuchEnding");
 		resolvedField.setValue(preset ? labelFor(preset, getDisplayOptions()) : `(${missing})`);
 	}
 	// init()'s own initial call runs before initSvg()/render() ever have --
@@ -275,7 +275,7 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 				.appendField(`${UI_INDENT}Polarity`)
 				.appendField(new FieldDependentDropdown("MOOD", polarityMapping, polarityFallback), "POLARITY");
 			this.appendDummyInput("SUBJECT_ROW")
-				.appendField(`${UI_INDENT}Person`)
+				.appendField(`${UI_INDENT}${t("verbSubject")}`)
 				.appendField(new Blockly.FieldDropdown(function () {
 					const source = this.getSourceBlock();
 					return liveSubjectOptions(subjectCombosFor(source));

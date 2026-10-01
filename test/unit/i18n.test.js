@@ -54,6 +54,9 @@ test("learner-facing band, note, sentence, and candidate strings exist in both l
 	assert.equal(t("closedReadingDoesNotBuild"), "This closed reading does not build.");
 	assert.equal(t("sentenceN", { n: 2 }), "Sentence 2");
 	assert.equal(t("evalCandidates", { count: 4 }), "4 candidates");
+	assert.equal(t("chooseMood"), "choose a mood");
+	assert.equal(t("chooseSubject"), "choose a subject");
+	assert.equal(t("verbSubject"), "Subject");
 	setLocale("da");
 	assert.equal(t("bandGold"), "guld");
 	assert.equal(t("bandExact"), "eksakt");
@@ -61,6 +64,9 @@ test("learner-facing band, note, sentence, and candidate strings exist in both l
 	assert.equal(t("bandNone"), "utolket");
 	assert.equal(t("noBuilderSequence"), "Katalogposten har ingen byggesekvens.");
 	assert.equal(t("closedReadingDoesNotBuild"), "Denne lukkede læsning kan ikke bygges.");
+	assert.equal(t("chooseMood"), "vælg en modus");
+	assert.equal(t("chooseSubject"), "vælg et subjekt");
+	assert.equal(t("verbSubject"), "Subjekt");
 	assert.equal(t("sentenceN", { n: 2 }), "Sætning 2");
 	assert.equal(t("evalCandidates", { count: 4 }), "4 kandidater");
 	assert.equal(t("completeWord"), "fuldstændigt ord");
