@@ -732,9 +732,9 @@ function restoreVerbPickerFields(workspace, block, preset) {
  *
  * The picker has no id/gloss text of its own to match against a filter
  * query, so it only appears in the unfiltered view (`includeVerbPicker`,
- * true by default) -- app.js passes false while a filter is active, so
- * searching for something unrelated doesn't leave a near-empty
- * "Inflectional endings (1)" category cluttering the results.
+ * true by default). While a filter is active the matching verb and noun
+ * endings are ordinary blocks again — hiding the picker must not hide the
+ * endings it replaced.
  */
 export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker = true } = {}) {
 	const byCategoryName = new Map();
@@ -742,7 +742,11 @@ export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker =
 	const omittedByCategory = new Map();
 	for (const preset of presets) {
 		if (isZeroEndingPreset(preset)) continue;
-		if (isVerbEndingPreset(preset) || isNounEndingPreset(preset)) {
+		// Pickers replace paradigm entries only when they are actually shown.
+		// A filtered toolbox hides the pickers (they have no gloss to match);
+		// the endings themselves still have forms and must come back as blocks.
+		const coveredByPicker = includeVerbPicker && (isVerbEndingPreset(preset) || isNounEndingPreset(preset));
+		if (coveredByPicker) {
 			omittedByCategory.set("Inflectional endings", (omittedByCategory.get("Inflectional endings") ?? 0) + 1);
 			continue;
 		}
