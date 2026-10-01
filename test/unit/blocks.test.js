@@ -44,8 +44,11 @@ function fakeNounPicker(candidateIds) {
 		setFieldValue(value, name) {
 			// Stale VARIANT menus reject an id they have not generated yet.
 			if (name === "VARIANT" && !variant.options.some((opt) => opt[1] === value)) return;
+			// Blockly runs the validator before storing the value. That
+			// resolve still sees the previous VARIANT, so it must not be
+			// the last write to block.data.
+			if (name === "VARIANT") block.nounEndingPickerState.resolve();
 			fields[name] = value;
-			if (name === "VARIANT") block.data = value;
 		},
 	};
 	return { block, fields };
