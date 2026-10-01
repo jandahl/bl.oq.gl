@@ -24,8 +24,9 @@ export function raceCatalogResponses(urls, options = {}) {
 			signal: controllers[index].signal,
 		};
 		// Cold GET must match the index.html preload (anonymous, default cache).
-		// Revalidation passes cache: "no-cache" so a warm HTTP cache cannot hide a new catalog.
+		// Revalidation passes cache: "no-cache" and may HEAD before the GET.
 		if (options.cache) request.cache = options.cache;
+		if (options.method) request.method = options.method;
 		return fetchImpl(url, request).then((response) => {
 			if (!response?.ok) throw new Error(`HTTP ${response?.status ?? "error"}`);
 			return { response, url, index };
