@@ -1,5 +1,6 @@
 const messages = {
 	en: {
+		derivationTree: "Derivation tree", orderedDerivationOnly: "Derivation order; semantic scope is shown separately.", derivedExpression: "Derived expression", semanticEvidence: "Semantic relationships", semanticUnverified: "Semantic relationships are not certified. Unresolved obligations remain below.", noSemanticEdges: "No supported semantic relationships available.",
 		interlinear: "Interlinear spans", citationForm: "Citation form", surfaceForm: "Surface", morphemeGloss: "Gloss", soundChange: "Sound change", zeroSurface: "Ø · no written span", noSurface: "Surface unavailable",
 		visualization: "Visualization", selectedWord: "Word", slotCards: "Slot cards", morphemePalette: "Morpheme palette", insertAt: "Insert at", category: "Category", allCategories: "All categories", endOfChain: "End of chain", beforeMorpheme: "Before morpheme", moveLeft: "Move left", moveRight: "Move right", remove: "Remove", showMore: "Show more", noMorphemes: "No matching morphemes", completeChain: "Complete word", openChain: "Open chain", approximateChain: "Approximate chain",
 		"app.title": "BLOQ", "theme.auto": "Theme: Auto", "theme.light": "Theme: Light", "theme.dark": "Theme: Dark", "display": "Settings", "settingsHeading": "Display and language",
@@ -53,6 +54,7 @@ const messages = {
 		"notePartOfAttested": "Part of an attested phrase, and not a catalog stem.",
 	},
 	da: {
+		derivationTree: "Afledningstræ", orderedDerivationOnly: "Afledningsrækkefølge; semantisk rækkevidde vises separat.", derivedExpression: "Afledt udtryk", semanticEvidence: "Semantiske relationer", semanticUnverified: "Semantiske relationer er ikke verificerede. Uafklarede forpligtelser vises nedenfor.", noSemanticEdges: "Ingen understøttede semantiske relationer tilgængelige.",
 		interlinear: "Interlineære spænd", citationForm: "Grundform", surfaceForm: "Overflade", morphemeGloss: "Gloss", soundChange: "Lydændring", zeroSurface: "Ø · intet skrevet spænd", noSurface: "Overflade ikke tilgængelig",
 		visualization: "Visualisering", selectedWord: "Ord", slotCards: "Morfemkort", morphemePalette: "Morfempalette", insertAt: "Indsæt ved", category: "Kategori", allCategories: "Alle kategorier", endOfChain: "Slutningen af kæden", beforeMorpheme: "Før morfem", moveLeft: "Flyt til venstre", moveRight: "Flyt til højre", remove: "Fjern", showMore: "Vis flere", noMorphemes: "Ingen matchende morfemer", completeChain: "Komplet ord", openChain: "Åben kæde", approximateChain: "Tilnærmet kæde",
 		"app.title": "BLOQ", "theme.auto": "Tema: Automatisk", "theme.light": "Tema: Lys", "theme.dark": "Tema: Mørk", "display": "Indstillinger", "settingsHeading": "Visning og sprog",

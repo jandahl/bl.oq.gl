@@ -3,6 +3,19 @@ import { bootFixtureApp } from "./fixture-boot.js";
 
 test.beforeEach(async ({ page }) => { await bootFixtureApp(page); });
 
+test("tree uses engine connections and aligns selected expression coverage", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator("#visualization-view").selectOption("tree");
+	await expect(page.locator(".derivation-node")).toHaveCount(5);
+	await expect(page.locator(".derivation-board path")).toHaveCount(4);
+	await page.locator('.derivation-node[data-node="d-1"]').click();
+	await expect(page.locator(".tree-surface .is-selected")).toHaveCount(2);
+	await page.locator(".semantic-evidence summary").click();
+	await expect(page.locator(".semantic-evidence")).toContainText("not certified");
+	await page.setViewportSize({ width: 360, height: 800 });
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test("zero-surface endings remain a column with no invented span", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
 	await page.locator("#visualization-view").selectOption("interlinear");

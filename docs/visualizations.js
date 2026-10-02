@@ -1,6 +1,7 @@
 import { wordPresentation, editChain } from "./visualization-model.js";
 import { t } from "./i18n.js";
 import { renderInterlinear } from "./interlinear.js";
+import { renderScopeTree } from "./scope-tree.js";
 
 export function element(tag, className, text) {
 	const el = document.createElement(tag);
@@ -51,7 +52,7 @@ export function mountVisualizations(host, deps) {
 	const viewLabel = element("label", "", t("visualization"));
 	const viewSelect = element("select");
 	viewSelect.id = "visualization-view";
-	for (const [value, label] of [["blockly", "Blockly"], ["cards", t("slotCards")], ["interlinear", t("interlinear")]]) {
+	for (const [value, label] of [["blockly", "Blockly"], ["cards", t("slotCards")], ["interlinear", t("interlinear")], ["tree", t("derivationTree")]]) {
 		const option = element("option", "", label); option.value = value; viewSelect.append(option);
 	}
 	viewLabel.append(viewSelect);
@@ -110,11 +111,12 @@ export function mountVisualizations(host, deps) {
 		const target = words[selected]?.word;
 		current = target?.heldLabel ? { held: target.heldLabel, ids: [] } : wordPresentation(target?.canvasIds || [], deps.getPresetsById(), deps.getCatalog(), deps.engine, options);
 		viewport.replaceChildren();
-		status.classList.toggle("is-error", Boolean(current.error));
+		status.classList.toggle("is-error", Boolean(target && current.error));
 		status.textContent = !target ? t("emptyCanvasHint") : current.held || current.error || `${current.built?.word || ""} · ${current.built?.approximate ? t("approximateChain") : current.built?.closed ? t("completeChain") : t("openChain")}`;
 		if (current.held) viewport.append(element("p", "", target?.surface || target?.raw || current.held));
 		else if (view === "cards") renderCards(viewport, current, options, edit);
 		else if (view === "interlinear") renderInterlinear(viewport, current, options);
+		else if (view === "tree") renderScopeTree(viewport, current, options);
 		palette.hidden = view !== "cards";
 		at.replaceChildren();
 		for (let i = 0; i <= current.ids.length; i++) { const option = element("option", "", i === current.ids.length ? t("endOfChain") : `${t("beforeMorpheme")} ${i + 1}`); option.value = String(i); at.append(option); }
