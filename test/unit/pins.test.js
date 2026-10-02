@@ -17,7 +17,7 @@ function stringExport(source, name) {
 
 test("index.html modulepreload is the pinned oq-api module, in CORS mode", () => {
 	const pin = stringExport(api, "OQ_API_URL");
-	assert.match(pin, /\/api\/v0\.3\.\d+\/public-api\.js$/);
+	assert.match(pin, /\/api\/v\d+\.\d+\.\d+\/public-api\.js$/);
 	const link = html.match(/<link rel="modulepreload" href="([^"]+)"([^>]*)>/);
 	assert.ok(link, "modulepreload link missing");
 	assert.equal(link[1], pin);

@@ -268,6 +268,9 @@ test("Build: verb ending exposes inline mood, polarity, and subject controls", a
 		// Polarity is explicit: the dependent field exposes the negative
 		// contemporative instead of treating it as an opaque variant.
 		block.setFieldValue("contemporative", "MOOD");
+		// Opening the subject dropdown refreshes its mood-dependent menu.
+		// Direct setFieldValue must do that explicitly in this UI harness.
+		block.getField("SUBJECT").getOptions(false);
 		block.setFieldValue("1|sg", "SUBJECT");
 		block.setFieldValue("negative", "POLARITY");
 		Blockly.Blocks[block.type].__resolve(block);

@@ -1,0 +1,4 @@
+{
+  "compilerOptions": { "allowJs": true, "checkJs": true, "noEmit": true, "target": "ES2022", "module": "ESNext", "strict": true },
+  "include": ["docs/visualization-model.js"]
+}

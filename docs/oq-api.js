@@ -12,7 +12,7 @@
 // After oq-api#337 publishes standard-examples/v1, prefer bumping this pin so
 // getStandardExamples / glossText ship from the package; until then examples.js
 // falls back to the rolling/versioned JSON URLs documented there.
-export const OQ_API_URL = "https://jandahl.github.io/api.oq.gl/api/v0.3.61/public-api.js";
+export const OQ_API_URL = "https://jandahl.github.io/api.oq.gl/api/v0.4.6/public-api.js";
 
 /**
  * @param {string} [url]
@@ -31,6 +31,8 @@ const api = await loadEngine();
 // older pins leave them undefined and examples.js uses local helpers + CDN.
 export const {
 	buildWord,
+	presentSequence,
+	resolveMorphemeSurfaces,
 	analyzeWordAsync,
 	tokenizeSentence,
 	analyzeSentence,

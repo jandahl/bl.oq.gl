@@ -63,7 +63,7 @@ export function catalogFromPayload(value, mergeMorphemeSources) {
 	);
 	if (!anyOk || failed.length) throw new Error("morpheme catalog failed to load");
 	applyCatalogCompatibility(presets);
-	return { presets, authoritative: value?.meta?.authoritative, meta: value?.meta ?? null };
+	return { presets, raw: value, authoritative: value?.meta?.authoritative, meta: value?.meta ?? null };
 }
 
 async function fetchCatalogBuffer(url, onProgress, fetchInit = {}) {

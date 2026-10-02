@@ -1,10 +1,11 @@
-import { buildWord, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, setActiveLocale } from "./oq-api.js";
+import { buildWord, presentSequence, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, setActiveLocale } from "./oq-api.js";
+import { mountVisualizations } from "./visualizations.js";
 import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
 	bindVerbPickerCatalog, bindNounPickerCatalog, reresolveBoundVerbPickers, reresolveBoundNounPickers,
-	presetMatchesQuery, canvasTree, setViewLayout, getViewLayout, nounStemBlock, planFromCanvas,
+	presetMatchesQuery, labelFor, canvasTree, setViewLayout, getViewLayout, nounStemBlock, planFromCanvas,
 } from "./blocks.js";
 import { sameIdTree } from "./id-tree.js";
 import {
@@ -124,6 +125,8 @@ let prefersDarkQuery;
 let DISPLAY_MQ;
 
 const session = createSession();
+let rawCatalog = null;
+let visualizations = null;
 let paletteVisible = true;
 let blocklyThemes = null;
 let selectedBlocklyTheme = "classic";
@@ -867,6 +870,7 @@ function refreshBuild() {
 		planMatches,
 	});
 	announceCanvasChains();
+	visualizations?.refresh();
 
 	if (result.usePlan) {
 		paintCanvasLabels(result);
@@ -1256,6 +1260,7 @@ async function loadCatalogAndBlocks() {
 	const catalog = await loadCatalog({
 		onProgress: setLoadingProgress,
 		onUpdated: (next) => {
+			rawCatalog = next.raw;
 			session.presets = next.presets;
 			session.presetsById = new Map(session.presets.map((p) => [p.id, p]));
 			// The picker block types stay registered. Point them at the new
@@ -1280,6 +1285,7 @@ async function loadCatalogAndBlocks() {
 		},
 	});
 	session.presets = catalog.presets;
+	rawCatalog = catalog.raw;
 	session.presetsById = new Map(session.presets.map((p) => [p.id, p]));
 
 	defineMorphemeBlocks();
@@ -1324,6 +1330,33 @@ function mountWorkspace() {
 	applyLayout();
 	bindWindowEvents();
 	bindUiEvents();
+	visualizations = mountVisualizations(document.getElementById("visualizations"), {
+		getPlan: () => snapshotCanvas(session.workspace),
+		getPresets: () => session.presets,
+		getPresetsById: () => session.presetsById,
+		getCatalog: () => rawCatalog,
+		getOptions: displayOptions,
+		engine: { buildWord, presentSequence }, matches: presetMatchesQuery, label: labelFor,
+		setBlocklyVisible: (visible) => {
+			blocklyDiv.hidden = !visible;
+			document.querySelector(".palette-controls").hidden = !visible;
+			if (visible) requestAnimationFrame(() => Blockly.svgResize(session.workspace));
+		},
+		onChange: (plan) => {
+			// Keep an invalid proposal in the card editor. Blockly connection
+			// shapes cannot represent every invalid chain without dropping items.
+			if (plan.some((sentence) => sentence.words.some((word) => {
+				if (word.heldLabel || !word.canvasIds?.length) return false;
+				const seq = seqForChain(word.canvasIds);
+				return !seq || !buildWord(seq).ok;
+			}))) return false;
+			cancelDeconstruct(session); clearAnalysisCaches(session);
+			renderSentencePlan(session.workspace, plan, session.presetsById, displayOptions());
+			applyBuildShare(refreshBuild());
+			return true;
+		},
+	});
+	visualizations.refresh();
 	setStatus(t("loadedMorphemes", { count: session.presets.length }), "");
 	paletteToggleBtn.setAttribute("aria-controls", "blockly-div");
 	syncPaletteToggle();

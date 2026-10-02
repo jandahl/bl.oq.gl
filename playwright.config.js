@@ -11,6 +11,7 @@ export const fixtureTestMatch = /fixture.*\.spec\.js/;
 
 // These need the pinned public API or the real catalog. PR CI does not run them.
 export const liveSpecFiles = [
+	"visualizations-live.spec.js",
 	"app.spec.js",
 	"labelFor-catalog.spec.js",
 	"workshop-ux.spec.js",
@@ -27,7 +28,9 @@ export default defineConfig({
 	testDir: "./test/e2e",
 	globalSetup: live ? "./test/e2e/global-setup.js" : undefined,
 	fullyParallel: !live,
-	workers: live ? 1 : undefined,
+	// The Python test server has a small connection backlog. Bound parallel
+	// page startups so module requests do not time out on high-core hosts.
+	workers: live ? 1 : 2,
 	forbidOnly: !!process.env.CI,
 	retries: live ? 0 : (process.env.CI ? 1 : 0),
 	maxFailures: live ? 1 : undefined,

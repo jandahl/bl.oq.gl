@@ -10,15 +10,17 @@
 		"test:e2e": "playwright test --project=fixture",
 		"test:prepush": "npm run lint && npm run test:unit",
 		"test": "npm run test:unit && npm run test:e2e",
-		"serve": "python3 -m http.server 8000 --bind 127.0.0.1 --directory docs",
+		"serve": "python3 tools/serve.py",
 		"test:e2e:live": "BLOQ_LIVE=1 playwright test --project=live",
-		"test:live-smoke": "BLOQ_LIVE=1 playwright test --project=live test/e2e/app.spec.js -g \"catalog loads\""
+		"test:live-smoke": "BLOQ_LIVE=1 playwright test --project=live test/e2e/app.spec.js -g \"catalog loads\"",
+		"typecheck": "tsc -p tsconfig.json"
 	},
 	"devDependencies": {
 		"@blockly/field-dependent-dropdown": "5.0.10",
 		"@playwright/test": "1.62.1",
 		"blockly": "12.5.1",
 		"esbuild": "0.28.2",
-		"eslint": "^9.13.0"
+		"eslint": "^9.13.0",
+		"typescript": "^7.0.2"
 	}
 }
