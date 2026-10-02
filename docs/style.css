@@ -915,6 +915,15 @@ footer {
 footer p { margin: 0; }
 
 /* Alternative presentations share the engine and the existing canvas state. */
+.interlinear-scroll { max-width: 100%; overflow-x: auto; }
+.interlinear-table { border-collapse: collapse; width: 100%; background: var(--panel-bg); }
+.interlinear-table caption { text-align: left; padding: .5rem 0; }
+.interlinear-table th, .interlinear-table td { text-align: left; vertical-align: top; padding: .7rem; border-bottom: 1px solid var(--border); min-width: 6rem; overflow-wrap: anywhere; }
+.interlinear-table th { font-weight: 500; }
+.interlinear-table .is-selected { background: color-mix(in srgb, var(--accent) 12%, var(--panel-bg)); }
+.interlinear-table del { color: var(--error); }
+.viz-id { display: block; margin-top: .4rem; overflow-wrap: anywhere; }
+.card-palette[hidden] { display: none; }
 #blockly-div[hidden], .palette-controls[hidden], .visualization-panel[hidden] { display: none !important; }
 .visualization-toolbar { display: flex; flex-wrap: wrap; gap: .75rem; margin: .7rem 0; }
 .visualization-toolbar label { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
