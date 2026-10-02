@@ -1,5 +1,6 @@
 const messages = {
 	en: {
+		interlinear: "Interlinear spans", citationForm: "Citation form", surfaceForm: "Surface", morphemeGloss: "Gloss", soundChange: "Sound change", zeroSurface: "Ø · no written span", noSurface: "Surface unavailable",
 		visualization: "Visualization", selectedWord: "Word", slotCards: "Slot cards", morphemePalette: "Morpheme palette", insertAt: "Insert at", category: "Category", allCategories: "All categories", endOfChain: "End of chain", beforeMorpheme: "Before morpheme", moveLeft: "Move left", moveRight: "Move right", remove: "Remove", showMore: "Show more", noMorphemes: "No matching morphemes", completeChain: "Complete word", openChain: "Open chain", approximateChain: "Approximate chain",
 		"app.title": "BLOQ", "theme.auto": "Theme: Auto", "theme.light": "Theme: Light", "theme.dark": "Theme: Dark", "display": "Settings", "settingsHeading": "Display and language",
 		"subtitle": "A block-based learning aid for building and taking apart Kalaallisut words and short sentences. Prototype — nothing here is authoritative.", "analyzeHeading": "Analyze", "buildHeading": "Build a word", "buildInstruction": "Choose a category, then drag a block onto the canvas — or try an example below.",
@@ -52,6 +53,7 @@ const messages = {
 		"notePartOfAttested": "Part of an attested phrase, and not a catalog stem.",
 	},
 	da: {
+		interlinear: "Interlineære spænd", citationForm: "Grundform", surfaceForm: "Overflade", morphemeGloss: "Gloss", soundChange: "Lydændring", zeroSurface: "Ø · intet skrevet spænd", noSurface: "Overflade ikke tilgængelig",
 		visualization: "Visualisering", selectedWord: "Ord", slotCards: "Morfemkort", morphemePalette: "Morfempalette", insertAt: "Indsæt ved", category: "Kategori", allCategories: "Alle kategorier", endOfChain: "Slutningen af kæden", beforeMorpheme: "Før morfem", moveLeft: "Flyt til venstre", moveRight: "Flyt til højre", remove: "Fjern", showMore: "Vis flere", noMorphemes: "Ingen matchende morfemer", completeChain: "Komplet ord", openChain: "Åben kæde", approximateChain: "Tilnærmet kæde",
 		"app.title": "BLOQ", "theme.auto": "Tema: Automatisk", "theme.light": "Tema: Lys", "theme.dark": "Tema: Mørk", "display": "Indstillinger", "settingsHeading": "Visning og sprog",
 		"subtitle": "Et blokbaseret læringsværktøj til at bygge og analysere kalaallisut-ord og korte sætninger. Prototype — intet her er autoritativt.", "analyzeHeading": "Analysér", "buildHeading": "Byg et ord", "buildInstruction": "Vælg en kategori, og træk en blok over på lærredet — eller prøv et eksempel nedenfor.",
