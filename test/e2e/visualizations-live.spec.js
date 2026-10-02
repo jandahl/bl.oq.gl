@@ -1,5 +1,24 @@
 import { test, expect } from "@playwright/test";
 
+test("stepper displays engine-built prefixes and preserves the stage across languages", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator("#visualization-view").selectOption("stepper");
+	await expect(page.locator(".step-surface")).toHaveText("qimmeqarpunga");
+	await page.locator('[data-stage="0"]').click();
+	await expect(page.locator(".step-surface")).toHaveText("qimmeq");
+	await page.locator('[data-stage="1"]').click();
+	const expected = await page.evaluate(async () => {
+		const { buildWord } = await import("/oq-api.js");
+		const catalog = await (await import("/catalog.js")).loadCatalog();
+		return buildWord(["qimmeq", "N_qaq_Vb"].flatMap((id) => catalog.presets.find((p) => p.id === id).seq));
+	});
+	await expect(page.locator(".step-surface")).toHaveText(expected.word);
+	await expect(page.locator(".step-status")).toHaveText(expected.closed ? "Complete word" : "Open chain");
+	await page.locator('#opt-lang [data-value="da"]').click();
+	await expect(page.locator('[data-stage="1"]')).toHaveAttribute("aria-pressed", "true");
+	await expect(page.locator(".step-meaning")).toContainText("hund");
+});
+
 test("invalid graph proposals retain every morpheme and Clear discards the draft", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	await page.locator("#visualization-view").selectOption("ports");
