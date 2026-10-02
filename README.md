@@ -26,10 +26,20 @@ The app is an MVP and is not linked from oq's main application.
 
 ## Data and architecture
 
-The visualization picker keeps Blockly available and adds slot cards with an
-independent searchable palette. Card edits update the same sentence plans and
-share links. Labels and subsequent views use oq-api 0.4.6 `presentSequence`;
-the original catalog payload is retained alongside its engine presets.
+The visualization picker keeps Blockly available and offers:
+
+- Slot cards with an independent searchable palette and ordered editing.
+- Interlinear tiers for citation forms, realized spans, glosses and sound changes.
+- A connected derivation tree with aligned leaves and separate semantic evidence.
+- An editable node/port path with explicit class metadata and ending features.
+- A derivation stepper that builds each original prefix through the engine.
+
+Edits update the same sentence plans and share links. Invalid proposals remain
+visible in the alternative editor instead of losing morphemes through Blockly
+connections. Presentation data comes from oq-api 0.4.6 `presentSequence`; the
+original compatible catalog payload is retained alongside its engine presets.
+Zero forms, approximate/open states and unresolved semantic obligations remain
+explicit. Ordered derivation is never presented as verified semantic scope.
 
 `npm run typecheck` checks the new pure visualization model incrementally.
 For Python 3.14 browser checks, create `.venv-python3.14` with

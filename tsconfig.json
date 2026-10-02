@@ -1,4 +1,4 @@
 {
   "compilerOptions": { "allowJs": true, "checkJs": true, "noEmit": true, "target": "ES2022", "module": "ESNext", "strict": true },
-  "include": ["docs/visualization-model.js", "docs/tree-layout.js", "docs/port-model.js"]
+  "include": ["docs/visualization-model.js", "docs/tree-layout.js", "docs/port-model.js", "docs/step-model.js"]
 }

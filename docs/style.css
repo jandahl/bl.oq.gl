@@ -915,6 +915,11 @@ footer {
 footer p { margin: 0; }
 
 /* Alternative presentations share the engine and the existing canvas state. */
+.step-stages { display: flex; flex-wrap: wrap; gap: .4rem; }
+#visualizations .step-stages [aria-pressed=true] { background: var(--accent); color: var(--panel-bg); }
+.step-result { margin: .8rem 0; padding: 1rem; background: var(--panel-bg); border: 1px solid var(--border); border-radius: 6px; }
+.step-surface { font-size: 1.6rem; overflow-wrap: anywhere; }
+.step-meaning { overflow-wrap: anywhere; }
 .port-path { display: flex; align-items: stretch; gap: 2rem; padding: .8rem .4rem; list-style: none; overflow-x: auto; }
 .port-node { position: relative; flex: 1 0 14rem; max-width: 22rem; background: var(--panel-bg); padding: .8rem; border: 1px solid var(--border); border-radius: 6px; }
 .port-node + .port-node::before { content: ""; position: absolute; top: 50%; left: -2rem; width: 2rem; height: 1px; background: var(--accent); }

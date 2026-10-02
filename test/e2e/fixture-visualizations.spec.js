@@ -3,6 +3,21 @@ import { bootFixtureApp } from "./fixture-boot.js";
 
 test.beforeEach(async ({ page }) => { await bootFixtureApp(page); });
 
+test("stepper retains zero stages and supports keyboard navigation", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
+	await page.locator("#visualization-view").selectOption("stepper");
+	await expect(page.locator("[data-stage]")).toHaveCount(2);
+	await expect(page.locator("[data-stage]").last()).toContainText("Ø");
+	await page.getByRole("button", { name: "Previous stage", exact: true }).focus();
+	await page.keyboard.press("Enter");
+	await expect(page.locator("[data-stage]").first()).toHaveAttribute("aria-pressed", "true");
+	await expect(page.getByRole("button", { name: "Previous stage", exact: true })).toBeDisabled();
+	await page.getByRole("button", { name: "Next stage", exact: true }).click();
+	await expect(page.locator("[data-stage]").last()).toHaveAttribute("aria-pressed", "true");
+	await page.setViewportSize({ width: 360, height: 800 });
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test("node graph edits and selection share the card/Blockly chain", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	await page.locator("#visualization-view").selectOption("ports");
