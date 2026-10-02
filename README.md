@@ -26,6 +26,16 @@ The app is an MVP and is not linked from oq's main application.
 
 ## Data and architecture
 
+The visualization picker keeps Blockly available and adds slot cards with an
+independent searchable palette. Card edits update the same sentence plans and
+share links. Labels and subsequent views use oq-api 0.4.6 `presentSequence`;
+the original catalog payload is retained alongside its engine presets.
+
+`npm run typecheck` checks the new pure visualization model incrementally.
+For Python 3.14 browser checks, create `.venv-python3.14` with
+`/opt/homebrew/bin/python3.14 -m venv .venv-python3.14`, then run tests with
+`PATH="$PWD/.venv-python3.14/bin:$PATH" npm run test:e2e` (or `test:e2e:live`).
+
 `docs/oq-api.js` pins the oq-api release. The app uses that module's exported
 `GRAMMAR_MORPHEMES_URL`, so the engine and catalog stay on a compatible
 release pair. The current catalog is grammarian's ID-first

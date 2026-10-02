@@ -1,4 +1,6 @@
 node_modules/
+.venv-python3.14/
+__pycache__/
 test-results/
 playwright-report/
 playwright.local.config.js

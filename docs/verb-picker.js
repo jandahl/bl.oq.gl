@@ -160,6 +160,9 @@ function resolveVerbPicker(block, variantOverride) {
 	let subjectValue = block.getFieldValue("SUBJECT") ?? subjectBlock?.getFieldValue("COMBO");
 	const subjectField = block.getField("SUBJECT");
 	const validSubjects = subjectCombosFor(block);
+	// Refresh after every mood change so subsequent setValue calls see the
+	// current coordinate menu rather than the previous mood's cached choices.
+	subjectField?.getOptions(false);
 	if (subjectField && validSubjects.length && !validSubjects.includes(subjectValue)) {
 		// setValue checks the cached menu. Regenerate it for this mood and
 		// transitivity or the correction no-ops and the old person sticks.

@@ -8,7 +8,7 @@
 	<link rel="apple-touch-icon" href="./assets/bloq-b-outside-master.png" />
 	<link rel="stylesheet" href="./style.css" />
 	<link rel="preload" href="./vendor/blockly.js" as="script" />
-	<link rel="modulepreload" href="https://jandahl.github.io/api.oq.gl/api/v0.3.61/public-api.js" crossorigin="anonymous" />
+	<link rel="modulepreload" href="https://jandahl.github.io/api.oq.gl/api/v0.4.6/public-api.js" crossorigin="anonymous" />
 	<link rel="preload" href="https://jandahl.github.io/oq-grammarian/v2/grammar/morphemes-by-id.json" as="fetch" crossorigin="anonymous" />
 </head>
 <body>
@@ -122,6 +122,7 @@
 				<p class="section-instruction" data-i18n="exampleDescription">Deconstructs a word or sentence and drops the closed chains onto the canvas.</p>
 			</section>
 
+			<div id="visualizations"></div>
 			<div class="palette-controls">
 				<button id="palette-toggle" type="button" aria-expanded="true" aria-controls="blockly-div">Hide palette</button>
 				<div class="clearable" id="morpheme-filter-wrap">

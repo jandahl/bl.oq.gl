@@ -913,3 +913,21 @@ footer {
 	color: color-mix(in srgb, var(--fg) 55%, transparent);
 }
 footer p { margin: 0; }
+
+/* Alternative presentations share the engine and the existing canvas state. */
+#blockly-div[hidden], .palette-controls[hidden], .visualization-panel[hidden] { display: none !important; }
+.visualization-toolbar { display: flex; flex-wrap: wrap; gap: .75rem; margin: .7rem 0; }
+.visualization-toolbar label { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.visualization-toolbar select, .visualization-toolbar input { font: inherit; background: var(--panel-bg); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: .4rem; max-width: 100%; min-width: 0; }
+.visualization-viewport { min-width: 0; }
+.slot-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .75rem; }
+.slot-card { background: var(--panel-bg); border: 1px solid var(--border); border-radius: 6px; padding: .8rem; display: grid; gap: .5rem; overflow-wrap: anywhere; }
+.slot-card strong { font-size: 1.2rem; }
+.viz-secondary { color: color-mix(in srgb, var(--fg) 72%, transparent); font-size: .85rem; }
+.viz-actions, .palette-entries { display: flex; flex-wrap: wrap; gap: .4rem; }
+#visualizations button { font: inherit; color: var(--fg); background: var(--panel-bg); border: 1px solid var(--border); border-radius: 4px; padding: .45rem .65rem; }
+#visualizations button:disabled { opacity: .5; }
+#visualizations button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card-palette { padding: .7rem 0; margin-top: .75rem; border-top: 1px solid var(--border); }
+.visualization-status.is-error { color: var(--error); }
+@media (pointer: coarse) { #visualizations button, #visualizations select { min-height: 44px; } }

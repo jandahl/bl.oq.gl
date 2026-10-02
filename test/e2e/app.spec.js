@@ -268,6 +268,9 @@ test("Build: verb ending exposes inline mood, polarity, and subject controls", a
 		// Polarity is explicit: the dependent field exposes the negative
 		// contemporative instead of treating it as an opaque variant.
 		block.setFieldValue("contemporative", "MOOD");
+		// Opening the subject dropdown refreshes its mood-dependent menu.
+		// Direct setFieldValue must do that explicitly in this UI harness.
+		block.getField("SUBJECT").getOptions(false);
 		block.setFieldValue("1|sg", "SUBJECT");
 		block.setFieldValue("negative", "POLARITY");
 		Blockly.Blocks[block.type].__resolve(block);
@@ -410,6 +413,9 @@ test("Build: live catalog exposes a nominal ending picker that resolves a real e
 		block.render();
 		const initial = { type: block.type, data: block.data, case: block.getFieldValue("CASE"), number: block.getFieldValue("NUMBER") };
 		block.setFieldValue("ergative", "CASE");
+		// The current engine excludes the unpossessed generic plural from
+		// buildable presets. Exercise a supported coordinate, not that gap.
+		block.setFieldValue("2SG", "POSSESSOR");
 		block.setFieldValue("PL", "NUMBER");
 		const changed = { data: block.data, case: block.getFieldValue("CASE"), number: block.getFieldValue("NUMBER") };
 		block.dispose(false);

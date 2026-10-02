@@ -55,6 +55,26 @@ export function mergeMorphemeSources(results) {
 
 export const GRAMMAR_MORPHEMES_URL = FIXTURE_CATALOG_URL;
 
+// Fixture-only contract adapter: labels are IDs and surfaces concatenate.
+// It intentionally makes no linguistic correctness claims.
+export function presentSequence(seq, _catalog, options = {}) {
+	let start = 0;
+	const nodes = [];
+	const edges = [];
+	seq.forEach((item, seqIndex) => {
+		const text = String(item.text || "").replace(/^-/, "");
+		const surface = options.word === undefined ? null : { j: seqIndex, citationText: text, marker: "", surfaceStart: start, surfaceEnd: start + text.length, surfaceText: text, changedRanges: [] };
+		start += text.length;
+		const label = { gloss: item.id, stemIn: "", stemOut: item.id, semanticStep: { safe: false }, inflection: item.inflection };
+		nodes.push({ id: `m-${seqIndex}`, kind: "morpheme", seqIndex, morpheme_id: item.id, zero_surface: text === "", surface, labels: { en: label, da: label } });
+		if (seqIndex > 0) {
+			nodes.push({ id: `d-${seqIndex}`, kind: "ordered_derivation", seqIndex, labels: { en: label, da: label } });
+			edges.push({ parent: `d-${seqIndex}`, operand: seqIndex === 1 ? "m-0" : `d-${seqIndex - 1}`, relation: "host" }, { parent: `d-${seqIndex}`, operand: `m-${seqIndex}`, relation: "affix" });
+		}
+	});
+	return { schema_version: "sequence-presentation/v1", nodes, derivation: { root: seq.length > 1 ? `d-${seq.length - 1}` : seq.length ? "m-0" : null, status: "ordered_only", edges }, semantics: { status: "unresolved", verified: false, edges: [] }, obligations: [] };
+}
+
 export function buildWord(seq) {
 	if (!Array.isArray(seq) || !seq.length) {
 		return { ok: false, reason: "empty sequence", errorAt: -1, word: "", closed: false, approximate: false };
