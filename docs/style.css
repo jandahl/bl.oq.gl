@@ -915,6 +915,18 @@ footer {
 footer p { margin: 0; }
 
 /* Alternative presentations share the engine and the existing canvas state. */
+.port-path { display: flex; align-items: stretch; gap: 2rem; padding: .8rem .4rem; list-style: none; overflow-x: auto; }
+.port-node { position: relative; flex: 1 0 14rem; max-width: 22rem; background: var(--panel-bg); padding: .8rem; border: 1px solid var(--border); border-radius: 6px; }
+.port-node + .port-node::before { content: ""; position: absolute; top: 50%; left: -2rem; width: 2rem; height: 1px; background: var(--accent); }
+#visualizations [data-select-node] { width: 100%; display: grid; gap: .4rem; text-align: left; border: 0; }
+#visualizations [data-select-node][aria-pressed=true] { outline: 2px solid var(--accent); }
+.port-labels { display: flex; justify-content: space-between; gap: .4rem; margin: .7rem 0; }
+.port-anchor { position: absolute; top: calc(50% - 5px); width: 10px; height: 10px; border: 2px solid var(--accent); border-radius: 50%; background: var(--panel-bg); }
+.port-anchor.incoming { left: -6px; }
+.port-anchor.outgoing { right: -6px; }
+.port-features { display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1rem; }
+.port-features dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .port-path { flex-direction: column; gap: 1.5rem; } .port-node { flex: auto; max-width: none; } .port-node + .port-node::before { top: -1.5rem; left: 50%; width: 1px; height: 1.5rem; } .port-anchor.incoming { top: -6px; left: calc(50% - 5px); } .port-anchor.outgoing { top: auto; bottom: -6px; left: calc(50% - 5px); } }
 .tree-scroll { overflow: auto; max-width: 100%; padding: .4rem; }
 .derivation-board { position: relative; }
 .derivation-board svg { width: 100%; height: 100%; position: absolute; inset: 0; }

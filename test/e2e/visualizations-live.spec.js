@@ -1,5 +1,26 @@
 import { test, expect } from "@playwright/test";
 
+test("invalid graph proposals retain every morpheme and Clear discards the draft", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator("#visualization-view").selectOption("ports");
+	await page.locator(".port-node").first().getByRole("button", { name: "Move right", exact: true }).click();
+	await expect(page.locator(".port-node")).toHaveCount(3);
+	await expect(page.locator(".visualization-status.is-error")).toBeVisible();
+	await page.locator("#clear-canvas-btn").click();
+	await expect(page.locator(".port-node")).toHaveCount(0);
+	await expect(page.locator(".visualization-status")).not.toHaveClass(/is-error/);
+});
+
+test("live port graph shows engine class shifts and ending features", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator("#visualization-view").selectOption("ports");
+	await expect(page.locator(".port-node").nth(1)).toContainText("In: N");
+	await expect(page.locator(".port-node").nth(1)).toContainText("Out: V");
+	await page.locator("[data-select-node]").last().click();
+	await expect(page.locator(".port-detail")).toContainText("indicative");
+	await expect(page.locator(".port-detail")).toContainText("Person: 1");
+});
+
 test("live tree retains ordered derivation and unverified semantic evidence", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	await page.locator("#visualization-view").selectOption("tree");

@@ -3,6 +3,21 @@ import { bootFixtureApp } from "./fixture-boot.js";
 
 test.beforeEach(async ({ page }) => { await bootFixtureApp(page); });
 
+test("node graph edits and selection share the card/Blockly chain", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator("#visualization-view").selectOption("ports");
+	await expect(page.locator(".port-node")).toHaveCount(3);
+	await page.locator("[data-select-node]").last().click();
+	await expect(page.locator(".port-detail")).toContainText("V_IND_INTR_1SG");
+	await page.locator(".port-node").last().getByRole("button", { name: "Remove", exact: true }).click();
+	await expect(page.locator(".port-node")).toHaveCount(2);
+	await page.locator("#visualization-view").selectOption("cards");
+	await expect(page.locator(".slot-card")).toHaveCount(2);
+	await page.setViewportSize({ width: 360, height: 800 });
+	await page.locator("#visualization-view").selectOption("ports");
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test("tree uses engine connections and aligns selected expression coverage", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	await page.locator("#visualization-view").selectOption("tree");
