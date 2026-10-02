@@ -723,6 +723,7 @@ async function copyShareLink() {
 
 function clearCanvas() {
 	if (!session.workspace) return;
+	visualizations?.discardDraft();
 	// Bump the run id before dropping share state. A Deconstruct that is
 	// awaiting analyzeWordAsync must see the new id and return before it
 	// calls renderSentencePlan or syncURL.

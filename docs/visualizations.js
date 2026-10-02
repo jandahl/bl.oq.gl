@@ -129,5 +129,5 @@ export function mountVisualizations(host, deps) {
 	filter.addEventListener("input", () => { limit = 24; renderPalette(); });
 	categories.addEventListener("change", () => { limit = 24; renderPalette(); });
 	at.addEventListener("change", () => { insertionIndex = Number(at.value); });
-	return { refresh };
+	return { refresh, discardDraft: () => { pendingPlan = null; signature = ""; } };
 }
