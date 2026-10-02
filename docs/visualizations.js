@@ -2,6 +2,7 @@ import { wordPresentation, editChain } from "./visualization-model.js";
 import { t } from "./i18n.js";
 import { renderInterlinear } from "./interlinear.js";
 import { renderScopeTree } from "./scope-tree.js";
+import { renderPortGraph } from "./port-graph.js";
 
 export function element(tag, className, text) {
 	const el = document.createElement(tag);
@@ -52,7 +53,7 @@ export function mountVisualizations(host, deps) {
 	const viewLabel = element("label", "", t("visualization"));
 	const viewSelect = element("select");
 	viewSelect.id = "visualization-view";
-	for (const [value, label] of [["blockly", "Blockly"], ["cards", t("slotCards")], ["interlinear", t("interlinear")], ["tree", t("derivationTree")]]) {
+	for (const [value, label] of [["blockly", "Blockly"], ["cards", t("slotCards")], ["interlinear", t("interlinear")], ["tree", t("derivationTree")], ["ports", t("portGraph")]]) {
 		const option = element("option", "", label); option.value = value; viewSelect.append(option);
 	}
 	viewLabel.append(viewSelect);
@@ -117,7 +118,8 @@ export function mountVisualizations(host, deps) {
 		else if (view === "cards") renderCards(viewport, current, options, edit);
 		else if (view === "interlinear") renderInterlinear(viewport, current, options);
 		else if (view === "tree") renderScopeTree(viewport, current, options);
-		palette.hidden = view !== "cards";
+		else if (view === "ports") renderPortGraph(viewport, current, options, edit);
+		palette.hidden = view !== "cards" && view !== "ports";
 		at.replaceChildren();
 		for (let i = 0; i <= current.ids.length; i++) { const option = element("option", "", i === current.ids.length ? t("endOfChain") : `${t("beforeMorpheme")} ${i + 1}`); option.value = String(i); at.append(option); }
 		at.value = String(insertionIndex == null ? current.ids.length : Math.min(insertionIndex, current.ids.length));

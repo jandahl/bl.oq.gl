@@ -1346,11 +1346,16 @@ function mountWorkspace() {
 		onChange: (plan) => {
 			// Keep an invalid proposal in the card editor. Blockly connection
 			// shapes cannot represent every invalid chain without dropping items.
-			if (plan.some((sentence) => sentence.words.some((word) => {
-				if (word.heldLabel || !word.canvasIds?.length) return false;
+			for (const sentence of plan) for (const word of sentence.words) {
+				if (word.heldLabel || !word.canvasIds?.length) continue;
 				const seq = seqForChain(word.canvasIds);
-				return !seq || !buildWord(seq).ok;
-			}))) return false;
+				const built = seq ? buildWord(seq) : { ok: false, reason: "Missing morpheme" };
+				if (!built.ok) {
+					applyStatus({ kind: "error", words: null, detail: built.reason || "Invalid sequence", meta: "", assertive: true });
+					updateReadingLine(null);
+					return false;
+				}
+			}
 			cancelDeconstruct(session); clearAnalysisCaches(session);
 			renderSentencePlan(session.workspace, plan, session.presetsById, displayOptions());
 			applyBuildShare(refreshBuild());
