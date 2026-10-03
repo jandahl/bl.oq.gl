@@ -290,7 +290,7 @@ test("removing the last editable word preserves a held sentence word", async ({ 
 
 test("history replacement discards drafts even when the canvas IDs are unchanged", async ({ page }) => {
 	await rejectedDraft(page);
-	await page.evaluate(() => { history.pushState({}, "", "?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG"); globalThis.dispatchEvent(new globalThis.PopStateEvent("popstate")); });
+	await page.evaluate(() => { history.pushState({}, "", "?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG&view=cards"); globalThis.dispatchEvent(new globalThis.PopStateEvent("popstate")); });
 	await expect(page.locator(".slot-card .viz-form").first()).toHaveText("qimmeq");
 	await expect(page.locator(".visualization-status")).not.toHaveClass(/is-error/);
 });
@@ -374,4 +374,34 @@ test("node selection filters the palette and inserts after the selected slot", a
 	await page.locator("[data-select-node]").nth(2).click();
 	await expect(page.locator("#card-palette-category")).toHaveValue("derivational_affix");
 	await expect(page.locator("#card-insert-at")).toHaveValue("3");
+});
+
+test("visualization URLs restore on reload and browser history without losing the chain", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG&view=ports");
+	await expect(page.locator('#visualization-view [data-value="ports"]')).toHaveAttribute("aria-checked", "true");
+	await expect(page.locator(".port-node")).toHaveCount(3);
+	await page.locator('#visualization-view [data-value="stepper"]').click();
+	await expect(page).toHaveURL(/view=stepper$/);
+	await page.reload();
+	await expect(page.locator("[data-stage]")).toHaveCount(3);
+	await page.goBack();
+	await expect(page.locator(".port-node")).toHaveCount(3);
+	await page.goForward();
+	await expect(page.locator("[data-stage]")).toHaveCount(3);
+	await page.locator('#visualization-view [data-value="blockly"]').click();
+	await expect(page).not.toHaveURL(/view=/);
+	await expect(page).toHaveURL(/chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG$/);
+});
+
+test("view-only and invalid visualization links use safe empty-canvas defaults", async ({ page }) => {
+	await page.goto("/?view=cards");
+	await expect(page.locator('#visualization-view [data-value="cards"]')).toHaveAttribute("aria-checked", "true");
+	await expect(page.locator(".visualization-status")).toContainText("Drag a morpheme");
+	await page.locator('#visualization-view [data-value="ports"]').click();
+	await expect(page).toHaveURL(/\?view=ports$/);
+	await page.locator("#clear-canvas-btn").click();
+	await expect(page).toHaveURL(/\?view=ports$/);
+	await page.goto("/?view=unknown");
+	await expect(page.locator('#visualization-view [data-value="blockly"]')).toHaveAttribute("aria-checked", "true");
+	await expect(page.locator("#blockly-div")).toBeVisible();
 });

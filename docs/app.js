@@ -644,6 +644,7 @@ function currentShareState() {
 	const word = session.lastDeconstructWord || wordInput.value.trim();
 	return {
 		mode: session.mode,
+		view: visualizations?.getView() || "blockly",
 		word,
 		chain: words.length === 1 ? words[0] : [],
 		words,
@@ -714,7 +715,7 @@ function syncURL({ push = false } = {}) {
 	});
 }
 
-/** Applies a {mode, word, chain} state (from router.js's readState(),
+/** Applies a {mode, word, chain, view} state (from router.js's readState(),
  * whether from the initial load or a popstate) to the live app -- the
  * inverse of currentShareState(). Restores the canvas chain and the
  * analyzed word together; `mode` is accepted for older links but no
@@ -722,6 +723,7 @@ function syncURL({ push = false } = {}) {
  * caller already has it, or is about to set it). */
 function applyShareState(state) {
 	visualizations?.discardDraft();
+	visualizations?.setView(state.view);
 	const sentences = state.sentences?.length
 		? state.sentences
 		: ((state.words && state.words.length) ? [state.words] : (state.chain.length ? [state.chain] : []));
@@ -905,7 +907,7 @@ function breakdownView() {
 		headlineGloss,
 		showDanish: opts.lang === "both",
 		visibleAssembly,
-		builderHref: (seq) => `${routeForState(location.pathname)}${writeState({ chain: seq.map((item) => item.id).filter(Boolean) })}`,
+		builderHref: (seq) => `${routeForState(location.pathname)}${writeState({ view: visualizations?.getView(), chain: seq.map((item) => item.id).filter(Boolean) })}`,
 	};
 }
 
@@ -1307,6 +1309,7 @@ function mountWorkspace() {
 		getPresetsById: () => session.presetsById,
 		getCatalog: () => rawCatalog,
 		getOptions: displayOptions,
+		onViewChange: () => syncURL({ push: true }),
 		engine: { buildWord, presentSequence, glossSummaryItems }, matches: presetMatchesQuery, label: labelFor,
 		setBlocklyVisible: (visible) => {
 			blocklyDiv.hidden = !visible;
@@ -1342,6 +1345,7 @@ function mountWorkspace() {
 		applyToolbox();
 	}
 	const initialState = readState(location.search);
+	visualizations.setView(initialState.view);
 	if (initialState.word || initialState.chain.length > 0 || initialState.words?.length) applyShareState(initialState);
 	requestAnimationFrame(() => { if (session.workspace) Blockly.svgResize(session.workspace); });
 }
