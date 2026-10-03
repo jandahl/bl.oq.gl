@@ -55,3 +55,16 @@ test("no-op edits and held words retain their assembly evidence", () => {
 	assert.deepEqual(editPlanChain(plan, 0, 0, 0, "left"), plan);
 	assert.deepEqual(editPlanChain(plan, 0, 1, 0, "insert", "a"), plan);
 });
+
+test("engine template glosses retain occurrence and language identity without changing evidence", () => {
+	const word = wordPresentation(["a"], new Map([["a", { seq: [{ id: "a" }, { id: "a" }] }]]), {}, {
+		buildWord: () => ({ ok: true, word: "aa", closed: true }),
+		presentSequence: () => ({ nodes: [0, 1].map((seqIndex) => ({ seqIndex, labels: { en: { gloss: "filled en" }, da: { gloss: "filled da" } } })), semantics: { verified: false } }),
+		glossSummaryItems: (_seq, { lang }) => [1, 0].map((seqIndex) => ({ seqIndex, rawShortGloss: `${lang} template ${seqIndex} ___` })),
+	});
+	assert.equal(word.graph.nodes[0].labels.en.templateGloss, "en template 0 ___");
+	assert.equal(word.graph.nodes[1].labels.da.templateGloss, "da template 1 ___");
+	assert.equal(word.graph.nodes[1].labels.en.gloss, "filled en");
+	assert.equal(word.built.word, "aa");
+	assert.equal(word.graph.semantics.verified, false);
+});

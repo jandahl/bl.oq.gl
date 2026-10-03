@@ -1,5 +1,6 @@
 const messages = {
 	en: {
+		fillBlanks: "Fill gloss blanks with earlier meanings", noun: "Noun", verb: "Verb",
 		derivationStepper: "Derivation stepper", derivationStages: "Derivation stages", previousStage: "Previous stage", nextStage: "Next stage", stagePosition: "Stage {n} of {total}", invalidStage: "Invalid stage", meaningUnresolved: "Meaning step unresolved; not a certified interpretation.",
 		portGraph: "Node and port graph", portGraphInstruction: "One ordered path per word. Class labels come from engine metadata; ? means unavailable. The engine checks joins.", inputPort: "In", outputPort: "Out", mood: "Mood", subject: "Subject", object: "Object", person: "Person", number: "Number", transitivity: "Transitivity",
 		derivationTree: "Derivation tree", orderedDerivationOnly: "Derivation order; semantic scope is shown separately.", derivedExpression: "Derived expression", semanticEvidence: "Semantic relationships", semanticUnverified: "Semantic relationships are not certified. Unresolved obligations remain below.", noSemanticEdges: "No supported semantic relationships available.",
@@ -56,6 +57,7 @@ const messages = {
 		"notePartOfAttested": "Part of an attested phrase, and not a catalog stem.",
 	},
 	da: {
+		fillBlanks: "Udfyld glosernes tomme felter med tidligere betydninger", noun: "Navneord", verb: "Udsagnsord",
 		derivationStepper: "Afledning trin for trin", derivationStages: "Afledningstrin", previousStage: "Forrige trin", nextStage: "Næste trin", stagePosition: "Trin {n} af {total}", invalidStage: "Ugyldigt trin", meaningUnresolved: "Betydningstrin uafklaret; ikke en verificeret fortolkning.",
 		portGraph: "Node- og portgraf", portGraphInstruction: "Én ordnet sti pr. ord. Klasselabels kommer fra motorens metadata; ? betyder ikke tilgængelig. Motoren kontrollerer sammenføjninger.", inputPort: "Ind", outputPort: "Ud", mood: "Modus", subject: "Subjekt", object: "Objekt", person: "Person", number: "Antal", transitivity: "Transitivitet",
 		derivationTree: "Afledningstræ", orderedDerivationOnly: "Afledningsrækkefølge; semantisk rækkevidde vises separat.", derivedExpression: "Afledt udtryk", semanticEvidence: "Semantiske relationer", semanticUnverified: "Semantiske relationer er ikke verificerede. Uafklarede forpligtelser vises nedenfor.", noSemanticEdges: "Ingen understøttede semantiske relationer tilgængelige.",

@@ -1,3 +1,5 @@
+import { enhanceSegmented } from "./segmented.js";
+import { paletteColours } from "./theme.js";
 import { wordPresentation, editPlanChain, normalizeEditablePlan } from "./visualization-model.js";
 import { t, getLocale, applyLocale } from "./i18n.js";
 import { renderInterlinear } from "./interlinear.js";
@@ -20,7 +22,7 @@ export function action(text, run, disabled = false) {
 }
 export function nodeGloss(node, options) {
 	const langs = options.lang === "both" ? ["en", "da"] : [options.lang || "en"];
-	return langs.map((lang) => node.labels?.[lang]?.gloss).filter(Boolean).join(" / ");
+	return langs.map((lang) => options.fillBlanks ? node.labels?.[lang]?.gloss : node.labels?.[lang]?.templateGloss ?? node.labels?.[lang]?.gloss).filter(Boolean).join(" / ");
 }
 
 export function morphemeForm(node, item) {
@@ -69,17 +71,25 @@ export function mountVisualizations(host, deps) {
 	let current = null;
 	let limit = 24;
 	let insertionIndex = null;
+	let selectedNode = null;
+	let selectedChain = "";
 	let pendingPlan = null;
 	let pendingSource = "";
 	let pendingError = "";
 	const chooser = element("div", "visualization-toolbar");
-	const viewLabel = element("label"); viewLabel.append(localized("span", "visualization"));
-	const viewSelect = element("select");
+	const viewLabel = element("div", "visualization-choice");
+	const heading = localized("span", "visualization"); heading.id = "visualization-label";
+	viewLabel.append(heading);
+	const viewSelect = element("div", "segmented visualization-segments");
 	viewSelect.id = "visualization-view";
+	viewSelect.setAttribute("role", "radiogroup"); viewSelect.setAttribute("aria-labelledby", heading.id);
 	for (const [value, key] of [["blockly", null], ["cards", "slotCards"], ["interlinear", "interlinear"], ["tree", "derivationTree"], ["ports", "portGraph"], ["stepper", "derivationStepper"]]) {
-		const option = key ? localized("option", key) : element("option", "", "Blockly"); option.value = value; viewSelect.append(option);
+		const button = action("", () => {}); button.dataset.value = value;
+		button.setAttribute("role", "radio"); button.setAttribute("aria-checked", String(value === "blockly"));
+		button.append(viewThumbnail(value), key ? localized("span", key) : element("span", "", "Blockly"));
+		viewSelect.append(button);
 	}
-	viewLabel.append(viewSelect);
+	enhanceSegmented(viewSelect); viewLabel.append(viewSelect);
 	const wordLabel = element("label"); wordLabel.append(localized("span", "selectedWord"));
 	const wordSelect = element("select"); wordSelect.id = "visualization-word"; wordLabel.append(wordSelect);
 	chooser.append(viewLabel, wordLabel);
@@ -122,7 +132,11 @@ export function mountVisualizations(host, deps) {
 		const outcome = deps.onChange(pendingPlan);
 		if (outcome?.error) pendingError = outcome.error;
 		else discardDraft();
-		insertionIndex = null;
+		if (selectedNode != null) {
+			selectedNode = operation === "insert" ? index : operation === "left" ? index - 1 : operation === "right" ? index + 1 : operation === "remove" ? null : selectedNode;
+			selectedChain = JSON.stringify(targets().words[selected]?.word.canvasIds || []);
+		}
+		insertionIndex = selectedNode == null ? null : selectedNode + 1;
 		signature = ""; refresh();
 		if (restoreFocus) {
 			const fallback = current.held ? wordSelect : palette.open ? filter : palette.querySelector("summary");
@@ -141,7 +155,12 @@ export function mountVisualizations(host, deps) {
 		const list = deps.getPresets().filter((p) => (!categories.value || p.morpheme_type === categories.value) && deps.matches(p, filter.value.trim().toLowerCase()));
 		for (const preset of list.slice(0, limit)) {
 			const button = action(deps.label(preset, deps.getOptions()), () => edit(Number(at.value), "insert", preset.id), Boolean(current?.held));
-			button.dataset.presetId = preset.id; entries.append(button);
+			button.dataset.presetId = preset.id;
+			for (const theme of ["light", "dark"]) {
+				const colors = paletteColours(preset, theme);
+				for (const key of ["fill", "border", "text"]) if (colors[key]) button.style.setProperty(`--morpheme-${theme}-${key}`, colors[key]);
+			}
+			entries.append(button);
 		}
 		if (list.length > limit) entries.append(action(t("showMore"), () => { limit += 24; renderPalette(); }));
 		if (!list.length) entries.append(element("p", "", t("noMorphemes")));
@@ -175,6 +194,8 @@ export function mountVisualizations(host, deps) {
 		wordSelect.value = String(selected); wordSelect.disabled = !words.length;
 		if (view === "blockly") return;
 		const target = words[selected]?.word;
+		const chain = JSON.stringify(target?.canvasIds || []);
+		if (selectedChain !== chain) { selectedNode = null; insertionIndex = null; selectedChain = chain; }
 		current = target?.heldLabel ? { held: target.heldLabel, ids: [] } : wordPresentation(target?.canvasIds || [], deps.getPresetsById(), deps.getCatalog(), deps.engine, options);
 		viewport.replaceChildren();
 		status.classList.toggle("is-error", Boolean(target && current.error));
@@ -183,7 +204,13 @@ export function mountVisualizations(host, deps) {
 		else if (view === "cards") renderCards(viewport, current, options, edit);
 		else if (view === "interlinear") renderInterlinear(viewport, current, options);
 		else if (view === "tree") renderScopeTree(viewport, current, options);
-		else if (view === "ports") renderPortGraph(viewport, current, options, edit);
+		else if (view === "ports") renderPortGraph(viewport, current, options, edit, (index) => {
+			if (current.seq.length !== current.ids.length) return;
+			selectedNode = index; insertionIndex = index + 1;
+			at.value = String(insertionIndex);
+			categories.value = deps.getPresetsById().get(current.ids[index])?.morpheme_type || "";
+			filter.value = ""; limit = 24; palette.open = true; renderPalette();
+		}, selectedNode);
 		else if (view === "stepper") renderStepper(viewport, current, options, deps.engine);
 		palette.hidden = view !== "cards" && view !== "ports";
 		at.replaceChildren();
@@ -198,10 +225,38 @@ export function mountVisualizations(host, deps) {
 		view = viewSelect.value; panel.hidden = view === "blockly";
 		deps.setBlocklyVisible(view === "blockly"); signature = ""; refresh();
 	});
-	wordSelect.addEventListener("change", () => { selected = Number(wordSelect.value); signature = ""; refresh(); });
+	wordSelect.addEventListener("change", () => { selected = Number(wordSelect.value); selectedNode = null; insertionIndex = null; selectedChain = ""; signature = ""; refresh(); });
 	filter.addEventListener("input", () => { limit = 24; renderPalette(); });
 	categories.addEventListener("change", () => { limit = 24; renderPalette(); });
 	at.addEventListener("change", () => { insertionIndex = Number(at.value); });
 	function discardDraft() { pendingPlan = null; pendingSource = ""; pendingError = ""; signature = ""; }
 	return { refresh, discardDraft, getDraftError: () => pendingPlan && view !== "blockly" ? pendingError : "" };
+}
+
+function viewThumbnail(view) {
+	const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+	svg.setAttribute("viewBox", "0 0 100 48"); svg.setAttribute("aria-hidden", "true");
+	const draw = (tag, attributes) => {
+		const shape = document.createElementNS(svg.namespaceURI, tag);
+		for (const [key, value] of Object.entries(attributes)) shape.setAttribute(key, String(value));
+		svg.append(shape);
+	};
+	const box = (x, y, width, height) => draw("rect", { x, y, width, height, rx: 3 });
+	const line = (x1, y1, x2, y2) => draw("line", { x1, y1, x2, y2 });
+	if (view === "blockly") {
+		for (let i = 0; i < 3; i++) draw("path", { d: `M30 ${3 + i * 14} h12 v3 h10 v-3 h18 v12 H52 v3 H42 v-3 H30 Z` });
+	} else if (view === "cards") {
+		for (let i = 0; i < 3; i++) { box(3 + i * 33, 5, 28, 38); line(8 + i * 33, 17, 25 + i * 33, 17); line(8 + i * 33, 27, 25 + i * 33, 27); }
+	} else if (view === "interlinear") {
+		for (let i = 0; i < 3; i++) for (let row = 0; row < 3; row++) line(4 + i * 33, 10 + row * 13, 28 + i * 33, 10 + row * 13);
+	} else if (view === "tree") {
+		line(50, 12, 25, 32); line(50, 12, 75, 32); box(39, 2, 22, 12); box(14, 32, 22, 12); box(64, 32, 22, 12);
+	} else if (view === "ports") {
+		line(10, 24, 90, 24);
+		for (let i = 0; i < 3; i++) { box(3 + i * 35, 12, 24, 24); draw("circle", { cx: 27 + i * 35, cy: 24, r: 2 }); }
+	} else {
+		for (let i = 0; i < 3; i++) box(4 + i * 33, 3, 25, 12);
+		box(4, 23, 91, 21); line(13, 33, 80, 33);
+	}
+	return svg;
 }

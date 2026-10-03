@@ -4,7 +4,7 @@ test("tree and stepper labels honor display modes with live engine glosses", asy
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	await page.locator("#display-toggle").click();
 	for (const [view, selector] of [["tree", '.derivation-node[data-node="m-0"]'], ["stepper", '[data-stage="0"]']]) {
-		await page.locator("#visualization-view").selectOption(view);
+		await page.locator(`#visualization-view [data-value="${view}"]`).click();
 		await page.locator('#opt-spelling [data-value="gloss-only"]').click();
 		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(0);
 		await expect(page.locator(`${selector} .viz-gloss`)).toContainText("dog");
@@ -20,7 +20,7 @@ test("tree and stepper labels honor display modes with live engine glosses", asy
 
 test("a new analysis replaces an invalid draft and subsequent edits use the new word", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await page.locator(".slot-card").first().getByRole("button", { name: "Move right", exact: true }).click();
 	await expect(page.locator(".visualization-status.is-error")).toBeVisible();
 	await page.locator("#word-input").fill("nerivunga");
@@ -35,10 +35,10 @@ test("a new analysis replaces an invalid draft and subsequent edits use the new 
 
 test("cards and ports honor form/gloss modes using real engine labels", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await page.locator("#display-toggle").click();
 	for (const [view, selector] of [["cards", ".slot-card"], ["ports", "[data-select-node]"]]) {
-		await page.locator("#visualization-view").selectOption(view);
+		await page.locator(`#visualization-view [data-value="${view}"]`).click();
 		await page.locator('#opt-spelling [data-value="gloss-only"]').click();
 		await expect(page.locator(selector).first()).toContainText("dog");
 		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(0);
@@ -53,7 +53,7 @@ test("cards and ports honor form/gloss modes using real engine labels", async ({
 
 test("stepper displays engine-built prefixes and preserves the stage across languages", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator("#visualization-view").selectOption("stepper");
+	await page.locator('#visualization-view [data-value="stepper"]').click();
 	await expect(page.locator(".step-surface")).toHaveText("qimmeqarpunga");
 	await page.locator('[data-stage="0"]').click();
 	await expect(page.locator(".step-surface")).toHaveText("qimmeq");
@@ -67,12 +67,16 @@ test("stepper displays engine-built prefixes and preserves the stage across lang
 	await expect(page.locator(".step-status")).toHaveText(expected.closed ? "Complete word" : "Open chain");
 	await page.locator('#opt-lang [data-value="da"]').click();
 	await expect(page.locator('[data-stage="1"]')).toHaveAttribute("aria-pressed", "true");
+	await expect(page.locator(".step-meaning")).toContainText("___");
+	await page.locator("#display-toggle").click();
+	await page.locator("#opt-fill-blanks").check();
 	await expect(page.locator(".step-meaning")).toContainText("hund");
+	await expect(page.locator('[data-stage="1"]')).toHaveAttribute("aria-pressed", "true");
 });
 
 test("invalid graph proposals retain every morpheme and Clear discards the draft", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator("#visualization-view").selectOption("ports");
+	await page.locator('#visualization-view [data-value="ports"]').click();
 	await page.locator(".port-node").first().getByRole("button", { name: "Move right", exact: true }).click();
 	await expect(page.locator(".port-node")).toHaveCount(3);
 	await expect(page.locator(".visualization-status.is-error")).toBeVisible();
@@ -83,9 +87,9 @@ test("invalid graph proposals retain every morpheme and Clear discards the draft
 
 test("live port graph shows engine class shifts and ending features", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator("#visualization-view").selectOption("ports");
-	await expect(page.locator(".port-node").nth(1)).toContainText("In: N");
-	await expect(page.locator(".port-node").nth(1)).toContainText("Out: V");
+	await page.locator('#visualization-view [data-value="ports"]').click();
+	await expect(page.locator(".port-node").nth(1)).toContainText("In: Noun");
+	await expect(page.locator(".port-node").nth(1)).toContainText("Out: Verb");
 	await page.locator("[data-select-node]").last().click();
 	await expect(page.locator(".port-detail")).toContainText("indicative");
 	await expect(page.locator(".port-detail")).toContainText("Person: 1");
@@ -93,7 +97,7 @@ test("live port graph shows engine class shifts and ending features", async ({ p
 
 test("live tree retains ordered derivation and unverified semantic evidence", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator("#visualization-view").selectOption("tree");
+	await page.locator('#visualization-view [data-value="tree"]').click();
 	await expect(page.locator(".derivation-node")).toHaveCount(5);
 	await expect(page.locator(".tree-surface span")).toHaveText(["qimme", "qar", "punga"]);
 	await page.locator('.derivation-node[data-node="d-1"]').click();
@@ -104,7 +108,7 @@ test("live tree retains ordered derivation and unverified semantic evidence", as
 
 test("interlinear tiers use engine surface spans and citation forms", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator("#visualization-view").selectOption("interlinear");
+	await page.locator('#visualization-view [data-value="interlinear"]').click();
 	const rows = page.locator(".interlinear-table tbody tr");
 	await expect(rows.nth(1).locator("td")).toHaveText(["qimme", "qar", "punga"]);
 	await expect(rows.nth(0).locator("td").last()).toContainText("vunga");
@@ -114,10 +118,53 @@ test("interlinear tiers use engine surface spans and citation forms", async ({ p
 test("engine-backed slot cards use actual surface and bilingual labels", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	await expect(page.locator("#loading-modal")).toBeHidden({ timeout: 20_000 });
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await expect(page.locator(".slot-card")).toHaveCount(3);
 	await expect(page.locator(".visualization-status")).toContainText("qimmeqarpunga");
 	await expect(page.locator(".slot-card").first()).toContainText("dog");
 	await page.locator('#opt-lang [data-value="da"]').click();
 	await expect(page.locator(".slot-card").first()).toContainText("hund");
+});
+
+test("unfilled engine templates are default, optional accumulated meanings persist", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator('#visualization-view [data-value="ports"]').click();
+	const gloss = page.locator(".port-node .viz-gloss").nth(1);
+	await expect(gloss).toContainText("___");
+	await expect(gloss).not.toContainText("dog");
+	await page.locator("#display-toggle").click();
+	await expect(page.locator("#opt-fill-blanks")).not.toBeChecked();
+	await page.locator("#opt-fill-blanks").check();
+	await expect(gloss).toContainText("dog");
+	await page.reload();
+	await page.locator('#visualization-view [data-value="ports"]').click();
+	await expect(gloss).toContainText("dog");
+	await page.locator("#display-toggle").click();
+	await page.locator("#opt-fill-blanks").uncheck();
+	await expect(gloss).toContainText("___");
+	await page.locator("#word-input").fill("qimmeqarpunga");
+	await page.locator("#word-input").press("Enter");
+	await expect(page.locator(".breakdown-row").filter({ hasText: "qaq" }).locator(".breakdown-gloss")).toContainText("___");
+	await page.locator("#opt-fill-blanks").check();
+	await expect(page.locator(".breakdown-row").filter({ hasText: "qaq" }).locator(".breakdown-gloss")).toContainText("dog");
+});
+
+test("palette colours match the pinned engine for light and dark themes", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator('#visualization-view [data-value="cards"]').click();
+	await page.locator("#card-palette-filter").fill("qimmeq");
+	const colourMatch = () => page.evaluate(async () => {
+		const { getWordClassColors, WORD_CLASS_THEMES } = await import("/oq-api.js");
+		const dark = document.documentElement.dataset.theme === "dark";
+		const expected = getWordClassColors(["nominal_root"], dark ? WORD_CLASS_THEMES.default : WORD_CLASS_THEMES.light);
+		const sample = document.createElement("span"); sample.style.backgroundColor = expected.fill; document.body.append(sample);
+		const actual = window.getComputedStyle(document.querySelector('[data-preset-id="qimmeq"]')).backgroundColor;
+		const matches = actual === window.getComputedStyle(sample).backgroundColor; sample.remove(); return matches;
+	});
+	await page.emulateMedia({ colorScheme: "light" });
+	expect(await colourMatch()).toBe(true);
+	await page.locator("#theme-toggle").click();
+	// Auto -> light -> dark.
+	await page.locator("#theme-toggle").click();
+	expect(await colourMatch()).toBe(true);
 });

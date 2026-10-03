@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => { await bootFixtureApp(page); });
 for (const [view, selector] of [["tree", '.derivation-node[data-node^="m-"]'], ["stepper", "[data-stage]"]]) {
 	test(`${view} label modes retain zero nodes and engine result displays`, async ({ page }) => {
 		await page.goto("/?chain=qimmeq%2CN_ABS_SG");
-		await page.locator("#visualization-view").selectOption(view);
+		await page.locator(`#visualization-view [data-value="${view}"]`).click();
 		if (view === "stepper") await page.locator('[data-stage="0"]').click();
 		await page.locator("#display-toggle").click();
 		await page.locator('#opt-spelling [data-value="gloss-only"]').click();
@@ -42,7 +42,7 @@ test("editing a sentence clears its assembly and preserves held words and other 
 	const preserved = await page.evaluate(async () => (await import("/blocks.js")).planFromCanvas(globalThis.Blockly.getMainWorkspace()));
 	expect(preserved[0].assembly).toBe("fixture assembly");
 	expect(preserved[1].assembly).toBe("other assembly");
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await page.locator(".slot-card").last().getByRole("button", { name: "Remove", exact: true }).click();
 	const state = await page.evaluate(async () => {
 		const blocks = await import("/blocks.js"); const ws = globalThis.Blockly.getMainWorkspace();
@@ -75,7 +75,7 @@ for (const removed of ["morpheme", "held word"]) {
 
 test("stepper retains zero stages and supports keyboard navigation", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
-	await page.locator("#visualization-view").selectOption("stepper");
+	await page.locator('#visualization-view [data-value="stepper"]').click();
 	await expect(page.locator("[data-stage]")).toHaveCount(2);
 	await expect(page.locator("[data-stage]").last()).toContainText("Ø");
 	await page.getByRole("button", { name: "Previous stage", exact: true }).focus();
@@ -90,22 +90,22 @@ test("stepper retains zero stages and supports keyboard navigation", async ({ pa
 
 test("node graph edits and selection share the card/Blockly chain", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator("#visualization-view").selectOption("ports");
+	await page.locator('#visualization-view [data-value="ports"]').click();
 	await expect(page.locator(".port-node")).toHaveCount(3);
 	await page.locator("[data-select-node]").last().click();
 	await expect(page.locator(".port-detail")).toContainText("V_IND_INTR_1SG");
 	await page.locator(".port-node").last().getByRole("button", { name: "Remove", exact: true }).click();
 	await expect(page.locator(".port-node")).toHaveCount(2);
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await expect(page.locator(".slot-card")).toHaveCount(2);
 	await page.setViewportSize({ width: 360, height: 800 });
-	await page.locator("#visualization-view").selectOption("ports");
+	await page.locator('#visualization-view [data-value="ports"]').click();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test("tree uses engine connections and aligns selected expression coverage", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator("#visualization-view").selectOption("tree");
+	await page.locator('#visualization-view [data-value="tree"]').click();
 	await expect(page.locator(".derivation-node")).toHaveCount(5);
 	await expect(page.locator(".derivation-board path")).toHaveCount(4);
 	await page.locator('.derivation-node[data-node="d-1"]').click();
@@ -118,14 +118,14 @@ test("tree uses engine connections and aligns selected expression coverage", asy
 
 test("zero-surface endings remain a column with no invented span", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
-	await page.locator("#visualization-view").selectOption("interlinear");
+	await page.locator('#visualization-view [data-value="interlinear"]').click();
 	await expect(page.locator(".interlinear-table button").last()).toHaveText("Ø");
 	await expect(page.locator(".interlinear-table tbody tr").nth(1).locator("td").last()).toContainText("no written span");
 });
 
 test("interlinear selection highlights aligned tiers and supports narrow layouts", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator("#visualization-view").selectOption("interlinear");
+	await page.locator('#visualization-view [data-value="interlinear"]').click();
 	await expect(page.locator(".interlinear-table tbody tr")).toHaveCount(4);
 	await page.locator(".interlinear-table button").nth(1).click();
 	await expect(page.locator(".interlinear-table td.is-selected")).toHaveCount(4);
@@ -134,15 +134,15 @@ test("interlinear selection highlights aligned tiers and supports narrow layouts
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 test("slot palette builds, removes and shares the same chain as Blockly", async ({ page }) => {
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await expect(page.locator("#blockly-div")).toBeHidden();
 	await page.locator("#card-palette-filter").fill("qimmeq");
 	await page.locator(".palette-entries button").first().click();
 	await expect(page.locator(".slot-card")).toHaveCount(1);
 	await expect(page).toHaveURL(/chain=qimmeq/);
-	await page.locator("#visualization-view").selectOption("blockly");
+	await page.locator('#visualization-view [data-value="blockly"]').click();
 	await expect(page.locator("#blockly-div")).toBeVisible();
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await page.locator(".slot-card").getByRole("button", { name: "Remove", exact: true }).click();
 	await expect(page.locator(".slot-card")).toHaveCount(0);
 	await expect(page.locator(".palette-entries button").first()).toBeEnabled();
@@ -157,7 +157,7 @@ test("slot palette builds, removes and shares the same chain as Blockly", async 
 
 test("card insertion position and movement preserve order on a narrow screen", async ({ page }) => {
 	await page.setViewportSize({ width: 360, height: 800 });
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await page.locator("#card-palette-filter").fill("qimmeq");
 	await page.locator(".palette-entries button").first().click();
 	await page.locator("#card-palette-filter").fill("N_qaq_Vb");
@@ -173,7 +173,7 @@ test("card insertion position and movement preserve order on a narrow screen", a
 
 test("failed Deconstruct clears cards without replacing the analysis error", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await page.locator("#word-input").fill("unknownword");
 	await page.locator("#word-input").press("Enter");
 	await expect(page.locator("#status-line")).toContainText("No verified breakdown");
@@ -188,7 +188,7 @@ test("failed Deconstruct clears cards without replacing the analysis error", asy
 for (const [view, selector] of [["cards", ".slot-card"], ["ports", ".port-node"]]) {
 	test(`${view} edits preserve keyboard focus through moves and removal`, async ({ page }) => {
 		await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-		await page.locator("#visualization-view").selectOption(view);
+		await page.locator(`#visualization-view [data-value="${view}"]`).click();
 		await page.locator(selector).nth(1).getByRole("button", { name: "Move right", exact: true }).focus();
 		await page.keyboard.press("Enter");
 		await expect(page.locator(selector).last().getByRole("button", { name: "Move left", exact: true })).toBeFocused();
@@ -204,15 +204,15 @@ for (const [view, selector] of [["cards", ".slot-card"], ["ports", ".port-node"]
 
 test("UI language refreshes static controls, actions, palette and stage labels", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await page.locator("#display-toggle").click();
 	await page.locator('#opt-ui-lang [data-value="da"]').click();
 	await expect(page.locator('[data-i18n="visualization"]')).toHaveText("Visualisering");
-	await expect(page.locator("#visualization-view option[value=cards]")).toHaveText("Morfemkort");
+	await expect(page.locator("#visualization-view [data-value=cards] span")).toHaveText("Morfemkort");
 	await expect(page.locator(".card-palette summary")).toHaveText("Morfempalette");
 	await expect(page.locator(".slot-card").first().getByRole("button", { name: "Fjern", exact: true })).toBeVisible();
 	await expect(page.locator("#card-insert-at option").last()).toHaveText("Slutningen af kæden");
-	await page.locator("#visualization-view").selectOption("stepper");
+	await page.locator('#visualization-view [data-value="stepper"]').click();
 	await page.locator('[data-stage="0"]').click();
 	await page.locator('#opt-ui-lang [data-value="en"]').click();
 	await expect(page.getByRole("button", { name: "Next stage", exact: true })).toBeVisible();
@@ -221,7 +221,7 @@ test("UI language refreshes static controls, actions, palette and stage labels",
 
 test("zero card forms and word names hide IDs unless explicitly enabled", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await expect(page.locator(".slot-card .viz-form").last()).toHaveText("Ø");
 	await expect(page.locator("#visualization-word")).toHaveText("1 · qimmeq");
 	await expect(page.locator(".slot-card code")).toHaveCount(0);
@@ -244,7 +244,7 @@ async function rejectedDraft(page, chain = "qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG")
 		await route.fulfill({ response, body });
 	});
 	await page.goto(`/?chain=${chain}`);
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await page.locator(".slot-card").first().getByRole("button", { name: "Move right", exact: true }).click();
 	await expect(page.locator(".visualization-status.is-error")).toBeVisible();
 }
@@ -280,7 +280,7 @@ test("removing the last editable word preserves a held sentence word", async ({ 
 		const catalog = await loadCatalog();
 		renderSentencePlan(globalThis.Blockly.getMainWorkspace(), [{ source: "source", words: [{ canvasIds: ["qimmeq"] }, { surface: "Piita", heldLabel: "heldName" }] }], new Map(catalog.presets.map((p) => [p.id, p])), {});
 	});
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await page.locator(".slot-card").getByRole("button", { name: "Remove", exact: true }).click();
 	await expect(page.locator("#visualization-word option")).toHaveCount(1);
 	await expect(page.locator("#visualization-word")).toContainText("Piita");
@@ -300,9 +300,9 @@ test("Blockly edits invalidate a draft while display options preserve it", async
 	await page.locator('#opt-lang [data-value="da"]').click();
 	await expect(page.locator(".visualization-status.is-error")).toBeVisible();
 	await expect(page.locator("#status-line")).toContainText("invalid sequence");
-	await page.locator("#visualization-view").selectOption("blockly");
+	await page.locator('#visualization-view [data-value="blockly"]').click();
 	await page.evaluate(() => globalThis.Blockly.getMainWorkspace().clear());
-	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator('#visualization-view [data-value="cards"]').click();
 	await expect(page.locator(".slot-card")).toHaveCount(0);
 	await expect(page.locator(".palette-entries button").first()).toBeEnabled();
 });
@@ -311,7 +311,7 @@ test("card and port labels honor display modes without dropping zero forms", asy
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
 	await page.locator("#display-toggle").click();
 	for (const [view, selector] of [["cards", ".slot-card"], ["ports", "[data-select-node]"]]) {
-		await page.locator("#visualization-view").selectOption(view);
+		await page.locator(`#visualization-view [data-value="${view}"]`).click();
 		await page.locator('#opt-spelling [data-value="gloss-only"]').click();
 		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(0);
 		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(2);
@@ -333,4 +333,45 @@ test("a rejected sentence draft keeps its error when another word is selected", 
 	await page.locator(".slot-card").first().getByRole("button", { name: "Move right", exact: true }).click();
 	await expect(page.locator("#status-line")).not.toContainText("invalid sequence");
 	await expect(page.locator(".visualization-status")).not.toHaveClass(/is-error/);
+});
+
+test("thumbnail view selector supports keyboard selection and narrow screens", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	const chooser = page.getByRole("radiogroup", { name: "Visualization", exact: true });
+	await expect(chooser.getByRole("radio")).toHaveCount(6);
+	await expect(chooser.locator("svg[aria-hidden=true]")).toHaveCount(6);
+	const blockly = chooser.getByRole("radio", { name: "Blockly", exact: true });
+	await blockly.focus(); await blockly.press("ArrowRight");
+	await expect(chooser.getByRole("radio", { name: "Slot cards", exact: true })).toBeFocused();
+	await expect(page.locator(".slot-card")).toHaveCount(3);
+	await page.keyboard.press("End");
+	await expect(chooser.getByRole("radio", { name: "Derivation stepper", exact: true })).toHaveAttribute("aria-checked", "true");
+	expect(await chooser.evaluate((root) => window.getComputedStyle(root.querySelector('[aria-checked="true"]')).backgroundColor !== window.getComputedStyle(root.querySelector('[aria-checked="false"]')).backgroundColor)).toBe(true);
+	await page.setViewportSize({ width: 360, height: 800 });
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("node selection filters the palette and inserts after the selected slot", async ({ page }) => {
+	// Reject this synthetic two-root proposal so it stays in the draft editor;
+	// the concatenating fixture engine otherwise accepts every nonempty chain.
+	await page.route("**/fixtures/engine-stub.js", async (route) => {
+		const response = await route.fetch();
+		const body = (await response.text()).replace('item.id === "BAD"', 'item.id === "BAD" || (item.id === "illu" && seq.some((part) => part.id === "qimmeq"))');
+		await route.fulfill({ response, body });
+	});
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator('#visualization-view [data-value="ports"]').click();
+	await page.locator("[data-select-node]").first().click();
+	await expect(page.locator("#card-palette-category")).toHaveValue("stem");
+	await expect(page.locator("#card-insert-at")).toHaveValue("1");
+	await expect(page.locator('[data-preset-id="N_qaq_Vb"]')).toHaveCount(0);
+	await page.locator('[data-preset-id="illu"]').click();
+	await expect(page.locator(".port-node .viz-form")).toHaveText(["qimmeq", "illu", "-qaq", "-vunga"]);
+	await expect(page.locator("[data-select-node]").nth(1)).toHaveAttribute("aria-pressed", "true");
+	await expect(page.locator("#card-insert-at")).toHaveValue("2");
+	await expect(page.locator(".port-out").first()).toHaveCSS("text-align", "right");
+	await expect(page.locator(".port-in").first()).toHaveCSS("text-align", "left");
+	await page.locator("[data-select-node]").nth(2).click();
+	await expect(page.locator("#card-palette-category")).toHaveValue("derivational_affix");
+	await expect(page.locator("#card-insert-at")).toHaveValue("3");
 });

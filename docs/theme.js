@@ -117,3 +117,14 @@ export function buildBlocklyThemes() {
 
 	return { classic, zelos, light: classic.light, dark: classic.dark };
 }
+
+// The same API category paths colour Blockly and the button palettes.
+export function paletteColours(preset, theme) {
+	const type = preset.morpheme_type;
+	let style = "oq_neutral";
+	if (type === "stem") style = preset.word_class === "N" ? "oq_nominal" : preset.word_class === "V" ? "oq_verbal" : style;
+	else if (["inflectional_ending", "sentential_affix"].includes(type)) style = "oq_inflectional";
+	else if (type?.includes("enclitic")) style = "oq_enclitic";
+	else if (type?.startsWith("derivational")) style = "oq_derivational";
+	return getWordClassColors(OQ_STYLE_PATHS[style], theme === "dark" ? WORD_CLASS_THEMES.default : WORD_CLASS_THEMES.light);
+}

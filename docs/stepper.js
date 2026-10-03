@@ -38,7 +38,7 @@ export function renderStepper(host, word, options, engine) {
 		result.append(element("strong", "step-surface", built.word), element("p", "step-status", built.approximate ? t("approximateChain") : built.closed ? t("completeChain") : t("openChain")));
 		for (const lang of options.lang === "both" ? ["en", "da"] : [options.lang || "en"]) {
 			const label = node?.labels?.[lang];
-			const meaning = label?.stemOut || label?.gloss;
+			const meaning = options.fillBlanks ? label?.stemOut || label?.gloss : label?.templateGloss ?? label?.gloss;
 			if (meaning) result.append(element("p", "step-meaning", `${lang.toUpperCase()} · ${meaning}`));
 			if (label?.semanticStep?.safe === false) result.append(element("p", "viz-secondary", t("meaningUnresolved")));
 		}
