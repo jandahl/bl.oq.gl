@@ -970,18 +970,18 @@ footer p { margin: 0; }
 @media (pointer: coarse) { #visualizations button, #visualizations select { min-height: 44px; } }
 
 /* Morpheme cards use the engine's theme-specific colour triples. */
-#visualizations .palette-entries [data-preset-id] {
+#visualizations .api-morpheme-colours {
 	background: var(--morpheme-light-fill, var(--panel-bg));
 	border-color: var(--morpheme-light-border, var(--border));
 	color: var(--morpheme-light-text, var(--fg));
 }
-html[data-theme="dark"] #visualizations .palette-entries [data-preset-id] {
+html[data-theme="dark"] #visualizations .api-morpheme-colours {
 	background: var(--morpheme-dark-fill, var(--panel-bg));
 	border-color: var(--morpheme-dark-border, var(--border));
 	color: var(--morpheme-dark-text, var(--fg));
 }
 @media (prefers-color-scheme: dark) {
-	html:not([data-theme="light"]) #visualizations .palette-entries [data-preset-id] {
+	html:not([data-theme="light"]) #visualizations .api-morpheme-colours {
 		background: var(--morpheme-dark-fill, var(--panel-bg));
 		border-color: var(--morpheme-dark-border, var(--border));
 		color: var(--morpheme-dark-text, var(--fg));
@@ -996,3 +996,8 @@ html[data-theme="dark"] #visualizations .palette-entries [data-preset-id] {
 .port-out { grid-column: 2; text-align: right; }
 
 #visualizations .visualization-segments [aria-checked="true"] { background: var(--accent); color: #fff; }
+
+/* The node's label button belongs to its morpheme card; edit buttons stay
+   visually separate. Preserve the existing selection outline. */
+#visualizations .port-node [data-select-node] { background: transparent; color: inherit; }
+#visualizations .api-morpheme-colours .viz-secondary { color: inherit; opacity: .75; }

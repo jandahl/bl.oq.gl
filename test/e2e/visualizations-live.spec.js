@@ -149,22 +149,44 @@ test("unfilled engine templates are default, optional accumulated meanings persi
 	await expect(page.locator(".breakdown-row").filter({ hasText: "qaq" }).locator(".breakdown-gloss")).toContainText("dog");
 });
 
-test("palette colours match the pinned engine for light and dark themes", async ({ page }) => {
-	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
-	await page.locator('#visualization-view [data-value="cards"]').click();
-	await page.locator("#card-palette-filter").fill("qimmeq");
-	const colourMatch = () => page.evaluate(async () => {
-		const { getWordClassColors, WORD_CLASS_THEMES } = await import("/oq-api.js");
-		const dark = document.documentElement.dataset.theme === "dark";
-		const expected = getWordClassColors(["nominal_root"], dark ? WORD_CLASS_THEMES.default : WORD_CLASS_THEMES.light);
-		const sample = document.createElement("span"); sample.style.backgroundColor = expected.fill; document.body.append(sample);
-		const actual = window.getComputedStyle(document.querySelector('[data-preset-id="qimmeq"]')).backgroundColor;
-		const matches = actual === window.getComputedStyle(sample).backgroundColor; sample.remove(); return matches;
-	});
+test("word cards and palettes match API colour triples across explicit and automatic themes", async ({ page }) => {
 	await page.emulateMedia({ colorScheme: "light" });
-	expect(await colourMatch()).toBe(true);
-	await page.locator("#theme-toggle").click();
-	// Auto -> light -> dark.
-	await page.locator("#theme-toggle").click();
-	expect(await colourMatch()).toBe(true);
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	const verifyViews = async () => {
+		for (const view of ["cards", "ports"]) {
+			await page.locator(`#visualization-view [data-value="${view}"]`).click();
+			if (view === "ports") await page.locator("[data-select-node]").first().click();
+			await page.locator("#card-palette-filter").fill("qimmeq");
+			const failures = await page.evaluate(async (view) => {
+				const { getWordClassColors, WORD_CLASS_THEMES } = await import("/oq-api.js");
+				const theme = document.documentElement.dataset.theme;
+				const dark = theme === "dark" || (!theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
+				const cards = [...document.querySelectorAll(view === "cards" ? ".slot-card" : ".port-node")];
+				const paths = ["nominal_root", "derivational_affix", "inflectional_affix"];
+				const failures = [];
+				for (const [index, path] of paths.entries()) {
+					const expected = getWordClassColors([path], dark ? WORD_CLASS_THEMES.default : WORD_CLASS_THEMES.light);
+					const sample = document.createElement("span");
+					sample.style.backgroundColor = expected.fill; sample.style.color = expected.text; sample.style.border = `1px solid ${expected.border}`;
+					document.body.append(sample);
+					const elements = index === 0 ? [cards[index], document.querySelector('[data-preset-id="qimmeq"]')] : [cards[index]];
+					for (const element of elements) for (const key of ["backgroundColor", "borderTopColor", "color"]) {
+						if (window.getComputedStyle(element)[key] !== window.getComputedStyle(sample)[key]) failures.push(`${view} ${path} ${key}`);
+					}
+					if (view === "ports" && window.getComputedStyle(cards[index].querySelector("[data-select-node]")).color !== window.getComputedStyle(sample).color) failures.push(`port label ${path}`);
+					sample.remove();
+				}
+				return failures;
+			}, view);
+			expect(failures).toEqual([]);
+		}
+	};
+	await verifyViews();
+	await page.locator("#theme-toggle").click(); // explicit light
+	await verifyViews();
+	await page.locator("#theme-toggle").click(); // explicit dark
+	await verifyViews();
+	await page.locator("#theme-toggle").click(); // auto with a dark OS preference
+	await page.emulateMedia({ colorScheme: "dark" });
+	await verifyViews();
 });

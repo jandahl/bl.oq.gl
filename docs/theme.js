@@ -128,3 +128,13 @@ export function paletteColours(preset, theme) {
 	else if (type?.startsWith("derivational")) style = "oq_derivational";
 	return getWordClassColors(OQ_STYLE_PATHS[style], theme === "dark" ? WORD_CLASS_THEMES.default : WORD_CLASS_THEMES.light);
 }
+
+export function applyMorphemeColours(host, preset) {
+	host.classList.add("api-morpheme-colours");
+	for (const theme of ["light", "dark"]) {
+		const colours = paletteColours(preset || {}, theme);
+		for (const key of ["fill", "border", "text"]) {
+			if (colours[key]) host.style.setProperty(`--morpheme-${theme}-${key}`, colours[key]);
+		}
+	}
+}
