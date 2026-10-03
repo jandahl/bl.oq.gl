@@ -23,3 +23,11 @@ export function editChain(ids, index, action, id = "") {
 	if (to >= 0 && to < next.length && index >= 0 && index < next.length) [next[index], next[to]] = [next[to], next[index]];
 	return next;
 }
+
+/** Empty editor slots are not held analyses. Preserve genuine held words
+ * and pre-existing empty sentence containers.
+ * @param {{words?: {heldLabel?: string, canvasIds?: string[]}[], [key: string]: any}[]} plan */
+export function normalizeEditablePlan(plan) {
+	return plan.map((sentence) => ({ ...sentence, words: (sentence.words || []).filter((word) => word.heldLabel || word.canvasIds?.length) }))
+		.filter((sentence, index) => sentence.words.length || !plan[index].words?.length);
+}

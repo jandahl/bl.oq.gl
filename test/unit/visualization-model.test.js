@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { wordPresentation, editChain } from "../../docs/visualization-model.js";
+import { wordPresentation, editChain, normalizeEditablePlan } from "../../docs/visualization-model.js";
 
 test("missing IDs fail before engine calls and remain visible", () => {
 	const engine = { buildWord() { throw new Error("must not call"); }, presentSequence() { throw new Error("must not call"); } };
@@ -29,4 +29,13 @@ test("card edits are ordered, immutable and bounded", () => {
 	assert.deepEqual(editChain(ids, 0, "left"), ids);
 	assert.deepEqual(editChain(ids, -1, "remove"), ids);
 	assert.deepEqual(ids, ["a", "b"]);
+});
+test("removing empty editor slots preserves held words and sentence metadata", () => {
+	const held = { surface: "Piita", heldLabel: "heldOpaqueName" };
+	const plan = [{ source: "source", assembly: "assembly", words: [{ canvasIds: [] }, held, { canvasIds: ["a"] }] }, { words: [{ canvasIds: [] }] }];
+	assert.deepEqual(normalizeEditablePlan(plan), [{ source: "source", assembly: "assembly", words: [held, { canvasIds: ["a"] }] }]);
+	assert.equal(plan[0].words.length, 3);
+});
+test("normalizing edits preserves a pre-existing empty sentence container", () => {
+	assert.deepEqual(normalizeEditablePlan([{ source: "empty sentence", words: [] }]), [{ source: "empty sentence", words: [] }]);
 });

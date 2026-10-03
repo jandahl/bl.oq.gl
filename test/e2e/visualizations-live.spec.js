@@ -1,5 +1,38 @@
 import { test, expect } from "@playwright/test";
 
+test("a new analysis replaces an invalid draft and subsequent edits use the new word", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator(".slot-card").first().getByRole("button", { name: "Move right", exact: true }).click();
+	await expect(page.locator(".visualization-status.is-error")).toBeVisible();
+	await page.locator("#word-input").fill("nerivunga");
+	await page.locator("#word-input").press("Enter");
+	await expect(page.locator(".slot-card")).toHaveCount(2);
+	await expect(page.locator(".visualization-status")).toContainText("nerivunga");
+	await expect(page.locator("#visualization-word")).toHaveText("1 · nerivunga");
+	await page.locator(".slot-card").last().getByRole("button", { name: "Remove", exact: true }).click();
+	await expect(page).toHaveURL(/chain=neri$/);
+	await expect(page.locator(".slot-card .viz-form")).toHaveText("neri");
+});
+
+test("cards and ports honor form/gloss modes using real engine labels", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator("#display-toggle").click();
+	for (const [view, selector] of [["cards", ".slot-card"], ["ports", "[data-select-node]"]]) {
+		await page.locator("#visualization-view").selectOption(view);
+		await page.locator('#opt-spelling [data-value="gloss-only"]').click();
+		await expect(page.locator(selector).first()).toContainText("dog");
+		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(0);
+		await page.locator('#opt-spelling [data-value="spelling-only"]').click();
+		await expect(page.locator(`${selector} .viz-form`).first()).toHaveText("qimmeq");
+		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(0);
+		await page.locator('#opt-spelling [data-value="both"]').click();
+		await expect(page.locator(selector).first()).toContainText("qimmeq");
+		await expect(page.locator(selector).first()).toContainText("dog");
+	}
+});
+
 test("stepper displays engine-built prefixes and preserves the stage across languages", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	await page.locator("#visualization-view").selectOption("stepper");
