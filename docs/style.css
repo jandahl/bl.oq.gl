@@ -916,6 +916,7 @@ footer p { margin: 0; }
 
 /* Alternative presentations share the engine and the existing canvas state. */
 .step-stages { display: flex; flex-wrap: wrap; gap: .4rem; }
+.step-stages button { display: flex; flex-direction: column; align-items: flex-start; gap: .25rem; text-align: left; }
 #visualizations .step-stages [aria-pressed=true] { background: var(--accent); color: var(--panel-bg); }
 .step-result { margin: .8rem 0; padding: 1rem; background: var(--panel-bg); border: 1px solid var(--border); border-radius: 6px; }
 .step-surface { font-size: 1.6rem; overflow-wrap: anywhere; }

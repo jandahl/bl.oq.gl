@@ -1,5 +1,5 @@
 import { layoutDerivation } from "./tree-layout.js";
-import { element, action, nodeGloss } from "./visualizations.js";
+import { element, action, nodeGloss, appendMorphemeLabel } from "./visualizations.js";
 import { t } from "./i18n.js";
 
 export function renderScopeTree(host, word, options) {
@@ -27,17 +27,23 @@ export function renderScopeTree(host, word, options) {
 	const morphemes = graph.nodes.filter((node) => node.kind === "morpheme");
 	for (const node of morphemes) { const span = element("span", "", node.zero_surface ? "Ø" : node.surface?.surfaceText ?? "?"); span.dataset.node = node.id; surface.append(span); }
 	const detail = element("p", "viz-secondary"); detail.setAttribute("aria-live", "polite");
+	function labelNode(host, node) {
+		if (node.kind === "morpheme") appendMorphemeLabel(host, node, word.seq[node.seqIndex], options);
+		else {
+			host.append(element("strong", "", t("derivedExpression")));
+			if (options.spellingMode !== "spelling-only") host.append(element("span", "viz-gloss", nodeGloss(node, options)));
+		}
+	}
 	for (const placed of layout.nodes.slice().sort((a, b) => a.depth - b.depth || a.x - b.x)) {
 		const node = graph.nodes.find((node) => node.id === placed.id);
-		const label = node.kind === "morpheme" ? (node.zero_surface ? "Ø" : `${node.surface?.marker || ""}${node.surface?.citationText || word.seq[node.seqIndex]?.text || node.morpheme_id}`) : t("derivedExpression");
 		const button = action("", () => {
 			board.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.node === node.id)));
 			surface.querySelectorAll("span").forEach((span) => span.classList.toggle("is-selected", placed.leaves.includes(span.dataset.node)));
-			detail.textContent = `${label} · ${nodeGloss(node, options)}`;
+			detail.replaceChildren(); labelNode(detail, node);
 		});
 		button.className = "derivation-node"; button.dataset.node = node.id; button.setAttribute("aria-pressed", "false");
 		button.style.left = `${placed.x - 95}px`; button.style.top = `${placed.y}px`;
-		button.append(element("strong", "", label), element("span", "", nodeGloss(node, options)));
+		labelNode(button, node);
 		if (options.showIds) button.append(element("code", "viz-id", node.id));
 		board.append(button);
 	}

@@ -1,4 +1,4 @@
-import { wordPresentation, editChain, normalizeEditablePlan } from "./visualization-model.js";
+import { wordPresentation, editPlanChain, normalizeEditablePlan } from "./visualization-model.js";
 import { t, getLocale, applyLocale } from "./i18n.js";
 import { renderInterlinear } from "./interlinear.js";
 import { renderScopeTree } from "./scope-tree.js";
@@ -116,9 +116,8 @@ export function mountVisualizations(host, deps) {
 		if (target?.word.heldLabel) return;
 		if (!target && operation !== "insert") { signature = ""; refresh(); return; }
 		if (!target) plan.push({ words: [{ canvasIds: [id] }] });
-		else plan[target.s].words[target.w].canvasIds = editChain(target.word.canvasIds || [], index, operation, id);
 		pendingSource = JSON.stringify(deps.getPlan());
-		pendingPlan = normalizeEditablePlan(plan);
+		pendingPlan = normalizeEditablePlan(target ? editPlanChain(plan, target.s, target.w, index, operation, id) : plan);
 		pendingError = "";
 		const outcome = deps.onChange(pendingPlan);
 		if (outcome?.error) pendingError = outcome.error;

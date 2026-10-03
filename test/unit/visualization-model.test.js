@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { wordPresentation, editChain, normalizeEditablePlan } from "../../docs/visualization-model.js";
+import { wordPresentation, editChain, editPlanChain, normalizeEditablePlan } from "../../docs/visualization-model.js";
 
 test("missing IDs fail before engine calls and remain visible", () => {
 	const engine = { buildWord() { throw new Error("must not call"); }, presentSequence() { throw new Error("must not call"); } };
@@ -38,4 +38,20 @@ test("removing empty editor slots preserves held words and sentence metadata", (
 });
 test("normalizing edits preserves a pre-existing empty sentence container", () => {
 	assert.deepEqual(normalizeEditablePlan([{ source: "empty sentence", words: [] }]), [{ source: "empty sentence", words: [] }]);
+});
+test("editing one word invalidates only its sentence assembly and preserves neighbors", () => {
+	const held = { surface: "Piita", heldLabel: "heldName" };
+	const plan = [{ source: "source", assembly: "old assembly", words: [{ canvasIds: ["a", "b"] }, held, { canvasIds: ["c"] }] }, { assembly: "other assembly", words: [{ canvasIds: ["d"] }] }];
+	const next = editPlanChain(plan, 0, 0, 1, "remove");
+	assert.equal(next[0].assembly, undefined);
+	assert.equal(next[0].source, "source");
+	assert.deepEqual(next[0].words, [{ canvasIds: ["a"] }, held, { canvasIds: ["c"] }]);
+	assert.equal(next[1], plan[1]);
+	assert.equal(plan[0].assembly, "old assembly");
+	assert.deepEqual(plan[0].words[0].canvasIds, ["a", "b"]);
+});
+test("no-op edits and held words retain their assembly evidence", () => {
+	const plan = [{ assembly: "evidence", words: [{ canvasIds: ["a"] }, { heldLabel: "heldName", surface: "Piita" }] }];
+	assert.deepEqual(editPlanChain(plan, 0, 0, 0, "left"), plan);
+	assert.deepEqual(editPlanChain(plan, 0, 1, 0, "insert", "a"), plan);
 });
