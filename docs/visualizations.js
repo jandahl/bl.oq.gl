@@ -1,3 +1,4 @@
+import { normalizeView } from "./router.js";
 import { enhanceSegmented } from "./segmented.js";
 import { applyMorphemeColours } from "./theme.js";
 import { wordPresentation, editPlanChain, normalizeEditablePlan } from "./visualization-model.js";
@@ -220,15 +221,20 @@ export function mountVisualizations(host, deps) {
 		renderPalette();
 	}
 	viewSelect.addEventListener("change", () => {
-		view = viewSelect.value; panel.hidden = view === "blockly";
-		deps.setBlocklyVisible(view === "blockly"); signature = ""; refresh();
+		setView(viewSelect.value);
+		deps.onViewChange?.();
 	});
 	wordSelect.addEventListener("change", () => { selected = Number(wordSelect.value); selectedNode = null; insertionIndex = null; selectedChain = ""; signature = ""; refresh(); });
 	filter.addEventListener("input", () => { limit = 24; renderPalette(); });
 	categories.addEventListener("change", () => { limit = 24; renderPalette(); });
 	at.addEventListener("change", () => { insertionIndex = Number(at.value); });
 	function discardDraft() { pendingPlan = null; pendingSource = ""; pendingError = ""; signature = ""; }
-	return { refresh, discardDraft, getDraftError: () => pendingPlan && view !== "blockly" ? pendingError : "" };
+	function setView(value) {
+		view = normalizeView(value); viewSelect.value = view;
+		panel.hidden = view === "blockly"; deps.setBlocklyVisible(view === "blockly");
+		signature = ""; refresh();
+	}
+	return { refresh, discardDraft, setView, getView: () => view, getDraftError: () => pendingPlan && view !== "blockly" ? pendingError : "" };
 }
 
 function viewThumbnail(view) {

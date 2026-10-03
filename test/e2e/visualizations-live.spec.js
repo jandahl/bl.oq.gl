@@ -29,7 +29,7 @@ test("a new analysis replaces an invalid draft and subsequent edits use the new 
 	await expect(page.locator(".visualization-status")).toContainText("nerivunga");
 	await expect(page.locator("#visualization-word")).toHaveText("1 · nerivunga");
 	await page.locator(".slot-card").last().getByRole("button", { name: "Remove", exact: true }).click();
-	await expect(page).toHaveURL(/chain=neri$/);
+	await expect(page).toHaveURL(/chain=neri&view=cards$/);
 	await expect(page.locator(".slot-card .viz-form")).toHaveText("neri");
 });
 
@@ -67,10 +67,13 @@ test("stepper displays engine-built prefixes and preserves the stage across lang
 	await expect(page.locator(".step-status")).toHaveText(expected.closed ? "Complete word" : "Open chain");
 	await page.locator('#opt-lang [data-value="da"]').click();
 	await expect(page.locator('[data-stage="1"]')).toHaveAttribute("aria-pressed", "true");
-	await expect(page.locator(".step-meaning")).toContainText("___");
+	await expect(page.locator(".step-meaning")).toContainText("hund");
 	await page.locator("#display-toggle").click();
 	await page.locator("#opt-fill-blanks").check();
 	await expect(page.locator(".step-meaning")).toContainText("hund");
+	await page.locator("#opt-fill-blanks").uncheck();
+	await expect(page.locator(".step-meaning")).toContainText("hund");
+	await expect(page.locator('[data-stage="1"] .viz-gloss')).toContainText("hund");
 	await expect(page.locator('[data-stage="1"]')).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -189,4 +192,16 @@ test("word cards and palettes match API colour triples across explicit and autom
 	await page.locator("#theme-toggle").click(); // auto with a dark OS preference
 	await page.emulateMedia({ colorScheme: "dark" });
 	await verifyViews();
+});
+
+test("Deconstruct links retain the routed visualization without leaking a Build chain", async ({ page }) => {
+	await page.goto("/?w=qimmeqarpunga&view=stepper");
+	await expect(page.locator(".step-surface")).toHaveText("qimmeqarpunga");
+	await expect(page.locator(".step-meaning")).toContainText("dog");
+	await page.locator('#visualization-view [data-value="ports"]').click();
+	await expect(page).toHaveURL(/\?w=qimmeqarpunga&view=ports$/);
+	await page.reload();
+	await expect(page.locator(".port-node")).toHaveCount(3);
+	await expect(page.locator('#visualization-view [data-value="ports"]')).toHaveAttribute("aria-checked", "true");
+	await expect(page).not.toHaveURL(/chain=/);
 });

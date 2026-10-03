@@ -8,6 +8,8 @@
 // an automatic Deconstruct result does not leak its morpheme IDs into the
 // copied link.
 //
+// `view` restores the selected visualization; Blockly is the omitted default.
+//
 // `chain` is one sentence of words (morpheme ids comma-joined, words
 // semicolon-joined). Several sentences on the canvas use `|` between those
 // groups: `qimmeq;nerivoq|illu`. Deconstruct of running text still shares
@@ -25,8 +27,13 @@
 // Node-testable, same discipline as gloss.js/verb-endings.js -- app.js owns
 // the actual history.pushState/replaceState calls and the popstate listener.
 
+const VISUALIZATION_VIEWS = ["blockly", "cards", "interlinear", "tree", "ports", "stepper"];
+export function normalizeView(view) {
+	return VISUALIZATION_VIEWS.includes(view) ? view : "blockly";
+}
+
 /**
- * Reads {mode, word, chain, words, sentences} out of a URLSearchParams-
+ * Reads {mode, word, chain, words, sentences, view} out of a URLSearchParams-
  * compatible search string (e.g. `location.search`). Anything missing or
  * invalid falls back to a safe default rather than throwing -- a
  * hand-edited or stale link should degrade gracefully, not break the app
@@ -34,7 +41,7 @@
  * `chain` is the first word of the first sentence (legacy single stack).
  * `words` is the first sentence. `sentences` is every sentence.
  * @param {string} search
- * @returns {{ mode: "build"|"deconstruct", word: string, chain: string[], words: string[][], sentences: string[][][] }}
+ * @returns {{ mode: "build"|"deconstruct", word: string, chain: string[], words: string[][], sentences: string[][][], view: string }}
  */
 function parseWords(chainRaw) {
 	if (!chainRaw) return [];
@@ -59,6 +66,7 @@ export function readState(search) {
 	const sentences = parseSentences(chainRaw);
 	const words = sentences[0] ?? [];
 	return {
+		view: normalizeView(params.get("view")),
 		mode: mode === "deconstruct" || params.has("w") ? "deconstruct" : "build",
 		word,
 		chain: words[0] ?? [],
@@ -69,14 +77,14 @@ export function readState(search) {
 
 /**
  * Builds the query string (leading "?", or "" for entirely-default/empty
- * state) for {mode, word, chain, words, sentences}. Omits a param at its
+ * state) for {mode, word, chain, words, sentences, view}. Omits a param at its
  * default/empty value so an untouched app still links to a bare path.
  * The active mode owns its state: Deconstruct uses the short `w` key,
  * while Build uses `chain`; inactive-mode state is never emitted.
- * @param {{ mode?: string, word?: string, chain?: string[], words?: string[][], sentences?: string[][][] }} [state]
+ * @param {{ mode?: string, word?: string, chain?: string[], words?: string[][], sentences?: string[][][], view?: string }} [state]
  * @returns {string}
  */
-export function writeState({ mode, word, chain, words, sentences } = {}) {
+export function writeState({ mode, word, chain, words, sentences, view } = {}) {
 	const params = new URLSearchParams();
 	if (mode === "deconstruct") {
 		if (word) params.set("w", word);
@@ -89,6 +97,7 @@ export function writeState({ mode, word, chain, words, sentences } = {}) {
 			.filter(Boolean);
 		if (encoded.length) params.set("chain", encoded.join("|"));
 	}
+	if (normalizeView(view) !== "blockly") params.set("view", view);
 	const qs = params.toString();
 	return qs ? `?${qs}` : "";
 }
