@@ -31,3 +31,17 @@ export function normalizeEditablePlan(plan) {
 	return plan.map((sentence) => ({ ...sentence, words: (sentence.words || []).filter((word) => word.heldLabel || word.canvasIds?.length) }))
 		.filter((sentence, index) => sentence.words.length || !plan[index].words?.length);
 }
+
+/** A chain edit invalidates assembly evidence for its sentence, not siblings.
+ * @param {any[]} plan @param {number} s @param {number} w @param {number} index
+ * @param {'insert'|'remove'|'left'|'right'} operation @param {string} [id] */
+export function editPlanChain(plan, s, w, index, operation, id) {
+	const next = plan.slice();
+	const sentence = plan[s], word = sentence?.words?.[w];
+	if (!word || word.heldLabel) return next;
+	const ids = editChain(word.canvasIds || [], index, operation, id);
+	const words = sentence.words.slice(); words[w] = { ...word, canvasIds: ids };
+	next[s] = { ...sentence, words };
+	if (JSON.stringify(ids) !== JSON.stringify(word.canvasIds || [])) delete next[s].assembly;
+	return next;
+}

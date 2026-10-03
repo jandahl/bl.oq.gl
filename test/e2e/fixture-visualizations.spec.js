@@ -3,6 +3,76 @@ import { bootFixtureApp } from "./fixture-boot.js";
 
 test.beforeEach(async ({ page }) => { await bootFixtureApp(page); });
 
+for (const [view, selector] of [["tree", '.derivation-node[data-node^="m-"]'], ["stepper", "[data-stage]"]]) {
+	test(`${view} label modes retain zero nodes and engine result displays`, async ({ page }) => {
+		await page.goto("/?chain=qimmeq%2CN_ABS_SG");
+		await page.locator("#visualization-view").selectOption(view);
+		if (view === "stepper") await page.locator('[data-stage="0"]').click();
+		await page.locator("#display-toggle").click();
+		await page.locator('#opt-spelling [data-value="gloss-only"]').click();
+		await expect(page.locator(selector)).toHaveCount(2);
+		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(0);
+		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(2);
+		await page.locator('#opt-spelling [data-value="spelling-only"]').click();
+		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(0);
+		await expect(page.locator(`${selector} .viz-form`).last()).toHaveText("Ø");
+		if (view === "stepper") {
+			await expect(page.locator('[data-stage="0"]')).toHaveAttribute("aria-pressed", "true");
+			await expect(page.locator(".step-surface")).toHaveText("qimmeq");
+		} else await expect(page.locator(".tree-surface span").last()).toHaveText("Ø");
+		await page.locator('#opt-spelling [data-value="both"]').click();
+		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(2);
+		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(2);
+		await page.setViewportSize({ width: 360, height: 800 });
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+	});
+}
+
+test("editing a sentence clears its assembly and preserves held words and other sentences", async ({ page }) => {
+	await page.evaluate(async () => {
+		const { renderSentencePlan } = await import("/blocks.js");
+		const catalog = await (await import("/catalog.js")).loadCatalog();
+		// Synthetic fixture labels, not attested sentence examples.
+		renderSentencePlan(globalThis.Blockly.getMainWorkspace(), [
+			{ source: "fixture source", assembly: "fixture assembly", words: [{ canvasIds: ["qimmeq", "N_ABS_SG"] }, { surface: "Piita", heldLabel: "heldName" }, { canvasIds: ["neri", "V_IND_INTR_3SG"] }] },
+			{ source: "other fixture", assembly: "other assembly", words: [{ canvasIds: ["illu", "N_ABS_SG"] }] },
+		], new Map(catalog.presets.map((p) => [p.id, p])), {});
+	});
+	await page.locator("#opt-layout [data-value=horizontal]").click();
+	const preserved = await page.evaluate(async () => (await import("/blocks.js")).planFromCanvas(globalThis.Blockly.getMainWorkspace()));
+	expect(preserved[0].assembly).toBe("fixture assembly");
+	expect(preserved[1].assembly).toBe("other assembly");
+	await page.locator("#visualization-view").selectOption("cards");
+	await page.locator(".slot-card").last().getByRole("button", { name: "Remove", exact: true }).click();
+	const state = await page.evaluate(async () => {
+		const blocks = await import("/blocks.js"); const ws = globalThis.Blockly.getMainWorkspace();
+		return { plan: blocks.planFromCanvas(ws), translations: blocks.canvasTree(ws).sentences.map((s) => s.block.getFieldValue("TRANSLATION")) };
+	});
+	expect(state.plan[0].assembly).toBeUndefined();
+	expect(state.plan[0].words).toMatchObject([{ canvasIds: ["qimmeq"] }, { surface: "Piita", heldLabel: "heldName" }, { canvasIds: ["neri", "V_IND_INTR_3SG"] }]);
+	expect(state.plan[1].assembly).toBe("other assembly");
+	expect(state.translations[0]).not.toBe("fixture assembly");
+	expect(state.translations[1]).toBe("other assembly");
+});
+
+for (const removed of ["morpheme", "held word"]) {
+	test(`layout changes cannot revive assembly after removing a ${removed}`, async ({ page }) => {
+		await page.evaluate(async (removed) => {
+			const { renderSentencePlan } = await import("/blocks.js");
+			const catalog = await (await import("/catalog.js")).loadCatalog();
+			renderSentencePlan(globalThis.Blockly.getMainWorkspace(), [{ source: "fixture source", assembly: "fixture assembly", words: [{ canvasIds: ["qimmeq", "N_ABS_SG"] }, { surface: "Piita", heldLabel: "heldName" }] }], new Map(catalog.presets.map((p) => [p.id, p])), {});
+			globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((b) => removed === "morpheme" ? b.data === "N_ABS_SG" : b.bloqHeld === "heldName").dispose(false);
+		}, removed);
+		await page.locator("#opt-layout [data-value=horizontal]").click();
+		const state = await page.evaluate(async () => {
+			const blocks = await import("/blocks.js"); const ws = globalThis.Blockly.getMainWorkspace();
+			return { plan: blocks.planFromCanvas(ws), translation: blocks.canvasTree(ws).sentences[0].block.getFieldValue("TRANSLATION") };
+		});
+		expect(state.plan[0].assembly).toBeUndefined();
+		expect(state.translation).not.toBe("fixture assembly");
+	});
+}
+
 test("stepper retains zero stages and supports keyboard navigation", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
 	await page.locator("#visualization-view").selectOption("stepper");

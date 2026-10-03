@@ -1,5 +1,23 @@
 import { test, expect } from "@playwright/test";
 
+test("tree and stepper labels honor display modes with live engine glosses", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await page.locator("#display-toggle").click();
+	for (const [view, selector] of [["tree", '.derivation-node[data-node="m-0"]'], ["stepper", '[data-stage="0"]']]) {
+		await page.locator("#visualization-view").selectOption(view);
+		await page.locator('#opt-spelling [data-value="gloss-only"]').click();
+		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(0);
+		await expect(page.locator(`${selector} .viz-gloss`)).toContainText("dog");
+		await page.locator('#opt-spelling [data-value="spelling-only"]').click();
+		await expect(page.locator(`${selector} .viz-form`)).toHaveText("qimmeq");
+		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(0);
+		await page.locator('#opt-spelling [data-value="both"]').click();
+		await expect(page.locator(`${selector} .viz-form`)).toHaveText("qimmeq");
+		await expect(page.locator(`${selector} .viz-gloss`)).toContainText("dog");
+	}
+	await expect(page.locator(".step-surface")).toHaveText("qimmeqarpunga");
+});
+
 test("a new analysis replaces an invalid draft and subsequent edits use the new word", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	await page.locator("#visualization-view").selectOption("cards");

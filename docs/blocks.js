@@ -634,7 +634,8 @@ export function planFromCanvas(workspace) {
 			source: sentenceBlock
 				? (sentenceBlock.bloqSource || sentenceBlock.getFieldValue?.("TITLE") || "Sentence")
 				: block?.bloqSource,
-			assembly: block?.bloqAssembly,
+			// Never re-stamp stale assembly onto a layout/theme rebuild.
+			assembly: assemblyKeyMatches(block, sentence.words.filter((word) => !word.held).map((word) => word.ids), sentence.words) ? block.bloqAssembly : undefined,
 			words: sentence.words.map((word) => {
 				if (word.held) {
 					return { surface: word.block?.getFieldValue?.("TITLE") || "…", heldLabel: word.held };
@@ -813,7 +814,7 @@ export function renderSentencePlan(workspace, sentences, presetsById, displayOpt
 				else sentence.getInput("WORDS").connection.connect(wordBlock.previousConnection);
 				prevWord = wordBlock;
 			}
-			stampAssembly(sentence, drawable, item.assembly || "");
+			stampAssembly(sentence, drawable, item.assembly || "", collectChainedWords(sentence.getInputTargetBlock("WORDS")));
 			if (item.assembly) sentence.setFieldValue(item.assembly, "TRANSLATION");
 			sentence.render();
 			const height = sentence.getHeightWidth?.().height ?? 80;
@@ -844,15 +845,21 @@ function connectWords(workspace, sentence, words, presetsById, displayOptions) {
 	}
 }
 
-function stampAssembly(block, words, assembly) {
+function heldAssemblyKey(words) {
+	return (words || []).flatMap((word, index) => word.held ? [{ index, held: word.held, surface: word.block?.getFieldValue?.("TITLE") }] : []);
+}
+
+function stampAssembly(block, words, assembly, allWords) {
 	if (!block || !assembly) return;
 	block.bloqAssembly = assembly;
 	block.bloqAssemblyKey = (words ?? []).map((ids) => ids.slice());
+	block.bloqAssemblyHeldKey = heldAssemblyKey(allWords);
 }
 
-function assemblyKeyMatches(block, words) {
+function assemblyKeyMatches(block, words, allWords) {
 	const key = block?.bloqAssemblyKey;
 	if (!block?.bloqAssembly || !Array.isArray(key)) return false;
+	if (JSON.stringify(block.bloqAssemblyHeldKey || []) !== JSON.stringify(heldAssemblyKey(allWords))) return false;
 	return sameIdTree([key], [words ?? []]);
 }
 
@@ -1005,7 +1012,7 @@ export function labelContainers(workspace, builtWords, translations = []) {
 			const owned = words.map((block) => builtWords[indexByBlock.get(block)]);
 			const builtSurface = owned.map((result) => result?.word).filter(Boolean).join(" ");
 			const drawableIds = sentence.words.filter((word) => !word.held).map((word) => word.ids);
-			const assembled = assemblyKeyMatches(top, drawableIds) ? top.bloqAssembly : null;
+			const assembled = assemblyKeyMatches(top, drawableIds, sentence.words) ? top.bloqAssembly : null;
 			const surface = assembled && top.bloqSource ? top.bloqSource : (builtSurface || top.bloqSource || "Sentence");
 			top.setFieldValue(surface === "Sentence" ? surface : withInitialCapital(surface), "TITLE");
 			const translation = assembled ?? words

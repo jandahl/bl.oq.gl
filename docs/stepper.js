@@ -1,5 +1,5 @@
 import { derivationStages } from "./step-model.js";
-import { element, action } from "./visualizations.js";
+import { element, action, appendMorphemeLabel } from "./visualizations.js";
 import { t } from "./i18n.js";
 
 const selections = new WeakMap();
@@ -18,8 +18,9 @@ export function renderStepper(host, word, options, engine) {
 	controls.append(previous, next);
 	const buttons = stages.map((stage, index) => {
 		const node = word.graph?.nodes.find((node) => node.kind === "morpheme" && node.seqIndex === index);
-		const form = node?.zero_surface || stage.item.text === "" ? "Ø" : `${node?.surface?.marker || ""}${node?.surface?.citationText || stage.item.text || stage.item.id}`;
-		const button = action(`${index + 1} · ${form}`, () => select(index));
+		const button = action("", () => select(index));
+		button.append(element("span", "", `${index + 1} ·`));
+		appendMorphemeLabel(button, node, stage.item, options);
 		button.dataset.stage = String(index); strip.append(button); return button;
 	});
 	function select(index) {

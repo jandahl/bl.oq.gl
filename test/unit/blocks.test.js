@@ -639,6 +639,19 @@ test("planFromCanvas keeps a one-word Sentence and an empty Sentence", () => {
 	assert.deepEqual(round[1].words, []);
 });
 
+test("canvas snapshots discard assembly after its chain changes", () => {
+	const presets = new Map(["qimmeq", "illu"].map((id) => [id, preset({ id, morpheme_type: "stem", word_class: "N", expected: id })]));
+	const workspace = chainWorkspace();
+	renderSentencePlan(workspace, [{ source: "fixture source", assembly: "fixture assembly", words: [{ canvasIds: ["qimmeq"] }] }], presets, {});
+	assert.equal(planFromCanvas(workspace)[0].assembly, "fixture assembly");
+	nounStemBlock(canvasTree(workspace).sentences[0].words[0].block).data = "illu";
+	const snapshot = planFromCanvas(workspace);
+	assert.equal(snapshot[0].assembly, undefined);
+	renderSentencePlan(workspace, snapshot, presets, {});
+	labelContainers(workspace, [{ ok: true, word: "illu" }], ["fixture word gloss"]);
+	assert.equal(workspace.getTopBlocks()[0].getFieldValue("TRANSLATION"), "fixture word gloss");
+});
+
 test("planFromCanvas leaves a lone Word on the simple path", () => {
 	const stem = preset({ id: "qimmeq", morpheme_type: "stem", word_class: "N", expected: "qimmeq" });
 	const presetsById = new Map([["qimmeq", stem]]);

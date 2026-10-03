@@ -41,6 +41,11 @@ original compatible catalog payload is retained alongside its engine presets.
 Zero forms, approximate/open states and unresolved semantic obligations remain
 explicit. Ordered derivation is never presented as verified semantic scope.
 
+Form/gloss settings apply to card, port, tree-morpheme and step-button labels.
+Engine-built surfaces, step results, interlinear tiers and semantic evidence
+remain available as result displays. Editing a word invalidates the assembled
+gloss for that sentence; other sentences and held words are preserved.
+
 `npm run typecheck` checks the new pure visualization model incrementally.
 For Python 3.14 browser checks, create `.venv-python3.14` with
 `/opt/homebrew/bin/python3.14 -m venv .venv-python3.14`, then run tests with
