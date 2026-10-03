@@ -1,5 +1,5 @@
 import { enhanceSegmented } from "./segmented.js";
-import { paletteColours } from "./theme.js";
+import { applyMorphemeColours } from "./theme.js";
 import { wordPresentation, editPlanChain, normalizeEditablePlan } from "./visualization-model.js";
 import { t, getLocale, applyLocale } from "./i18n.js";
 import { renderInterlinear } from "./interlinear.js";
@@ -47,11 +47,12 @@ function localized(tag, key) {
 	const el = element(tag, "", t(key)); el.dataset.i18n = key; return el;
 }
 
-function renderCards(host, word, options, edit) {
+function renderCards(host, word, options, edit, presets) {
 	const row = element("div", "slot-cards");
 	word.ids.forEach((id, index) => {
 		const node = word.graph?.nodes.find((node) => node.kind === "morpheme" && node.seqIndex === index);
 		const card = element("article", "slot-card");
+		applyMorphemeColours(card, presets.get(id));
 		card.append(element("span", "viz-secondary", String(index + 1)));
 		appendMorphemeLabel(card, node, word.seq[index], options);
 		if (options.showIds) card.append(element("code", "", id));
@@ -156,10 +157,7 @@ export function mountVisualizations(host, deps) {
 		for (const preset of list.slice(0, limit)) {
 			const button = action(deps.label(preset, deps.getOptions()), () => edit(Number(at.value), "insert", preset.id), Boolean(current?.held));
 			button.dataset.presetId = preset.id;
-			for (const theme of ["light", "dark"]) {
-				const colors = paletteColours(preset, theme);
-				for (const key of ["fill", "border", "text"]) if (colors[key]) button.style.setProperty(`--morpheme-${theme}-${key}`, colors[key]);
-			}
+			applyMorphemeColours(button, preset);
 			entries.append(button);
 		}
 		if (list.length > limit) entries.append(action(t("showMore"), () => { limit += 24; renderPalette(); }));
@@ -201,7 +199,7 @@ export function mountVisualizations(host, deps) {
 		status.classList.toggle("is-error", Boolean(target && current.error));
 		status.textContent = !target ? t("emptyCanvasHint") : (current.held ? t(current.held) : current.error) || `${current.built?.word || ""} · ${current.built?.approximate ? t("approximateChain") : current.built?.closed ? t("completeChain") : t("openChain")}`;
 		if (current.held) viewport.append(element("p", "", target?.surface || target?.raw || current.held));
-		else if (view === "cards") renderCards(viewport, current, options, edit);
+		else if (view === "cards") renderCards(viewport, current, options, edit, deps.getPresetsById());
 		else if (view === "interlinear") renderInterlinear(viewport, current, options);
 		else if (view === "tree") renderScopeTree(viewport, current, options);
 		else if (view === "ports") renderPortGraph(viewport, current, options, edit, (index) => {
@@ -210,7 +208,7 @@ export function mountVisualizations(host, deps) {
 			at.value = String(insertionIndex);
 			categories.value = deps.getPresetsById().get(current.ids[index])?.morpheme_type || "";
 			filter.value = ""; limit = 24; palette.open = true; renderPalette();
-		}, selectedNode);
+		}, selectedNode, deps.getPresetsById());
 		else if (view === "stepper") renderStepper(viewport, current, options, deps.engine);
 		palette.hidden = view !== "cards" && view !== "ports";
 		at.replaceChildren();

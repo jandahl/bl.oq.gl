@@ -1,8 +1,9 @@
+import { applyMorphemeColours } from "./theme.js";
 import { element, action, nodeGloss, appendMorphemeLabel, editControls } from "./visualizations.js";
 import { classPorts } from "./port-model.js";
 import { t } from "./i18n.js";
 
-export function renderPortGraph(host, word, options, edit, onSelect = () => {}, selectedNode = null) {
+export function renderPortGraph(host, word, options, edit, onSelect = () => {}, selectedNode = null, presets = new Map()) {
 	const nodes = word.graph?.nodes.filter((node) => node.kind === "morpheme") || [];
 	if (!nodes.length) return;
 	host.append(element("p", "viz-secondary", t("portGraphInstruction")));
@@ -22,6 +23,7 @@ export function renderPortGraph(host, word, options, edit, onSelect = () => {}, 
 	};
 	for (const [index, node] of nodes.entries()) {
 		const li = element("li", "port-node");
+		applyMorphemeColours(li, presets.get(node.morpheme_id) || word.seq[node.seqIndex]);
 		const ports = classPorts(word.seq[node.seqIndex]);
 		const select = action("", () => { path.querySelectorAll("[data-select-node]").forEach((b) => b.setAttribute("aria-pressed", String(b === select))); fields(node); onSelect(index); });
 		select.dataset.selectNode = node.id; select.setAttribute("aria-pressed", String(index === selectedNode));
