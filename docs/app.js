@@ -762,6 +762,7 @@ function syncURL({ push = false } = {}) {
  * longer switches a hidden panel. Never itself touches the URL (the
  * caller already has it, or is about to set it). */
 function applyShareState(state) {
+	visualizations?.discardDraft();
 	const sentences = state.sentences?.length
 		? state.sentences
 		: ((state.words && state.words.length) ? [state.words] : (state.chain.length ? [state.chain] : []));
@@ -872,6 +873,12 @@ function refreshBuild() {
 	});
 	announceCanvasChains();
 	visualizations?.refresh();
+	const draftError = visualizations?.getDraftError();
+	if (draftError) {
+		applyStatus({ kind: "error", words: null, detail: draftError, meta: "", assertive: true });
+		updateReadingLine(null);
+		return result;
+	}
 
 	if (result.usePlan) {
 		paintCanvasLabels(result);
@@ -1083,6 +1090,8 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 }
 
 async function runDeconstruct({ skipCanvas = false } = {}) {
+	visualizations?.discardDraft();
+	visualizations?.refresh();
 	const surface = wordInput.value.trim();
 	cancelDeconstruct(session);
 	if (!surface) {
@@ -1159,6 +1168,7 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 				// Do not refreshBuild here: its empty-canvas hint would replace
 				// the error status painted just below.
 				renderSentencePlan(session.workspace, [], session.presetsById, displayOptions());
+				visualizations?.refresh();
 				updateReadingLine(null);
 			}
 		}
@@ -1344,6 +1354,7 @@ function mountWorkspace() {
 			if (visible) requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 		},
 		onChange: (plan) => {
+			cancelDeconstruct(session);
 			// Keep an invalid proposal in the card editor. Blockly connection
 			// shapes cannot represent every invalid chain without dropping items.
 			for (const sentence of plan) for (const word of sentence.words) {
@@ -1353,10 +1364,10 @@ function mountWorkspace() {
 				if (!built.ok) {
 					applyStatus({ kind: "error", words: null, detail: built.reason || "Invalid sequence", meta: "", assertive: true });
 					updateReadingLine(null);
-					return false;
+					return { error: built.reason || "Invalid sequence" };
 				}
 			}
-			cancelDeconstruct(session); clearAnalysisCaches(session);
+			clearAnalysisCaches(session);
 			renderSentencePlan(session.workspace, plan, session.presetsById, displayOptions());
 			applyBuildShare(refreshBuild());
 			return true;
