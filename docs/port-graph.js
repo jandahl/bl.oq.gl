@@ -2,7 +2,7 @@ import { element, action, nodeGloss, appendMorphemeLabel, editControls } from ".
 import { classPorts } from "./port-model.js";
 import { t } from "./i18n.js";
 
-export function renderPortGraph(host, word, options, edit) {
+export function renderPortGraph(host, word, options, edit, onSelect = () => {}, selectedNode = null) {
 	const nodes = word.graph?.nodes.filter((node) => node.kind === "morpheme") || [];
 	if (!nodes.length) return;
 	host.append(element("p", "viz-secondary", t("portGraphInstruction")));
@@ -23,15 +23,16 @@ export function renderPortGraph(host, word, options, edit) {
 	for (const [index, node] of nodes.entries()) {
 		const li = element("li", "port-node");
 		const ports = classPorts(word.seq[node.seqIndex]);
-		const select = action("", () => { path.querySelectorAll("[data-select-node]").forEach((b) => b.setAttribute("aria-pressed", String(b === select))); fields(node); });
-		select.dataset.selectNode = node.id; select.setAttribute("aria-pressed", "false");
+		const select = action("", () => { path.querySelectorAll("[data-select-node]").forEach((b) => b.setAttribute("aria-pressed", String(b === select))); fields(node); onSelect(index); });
+		select.dataset.selectNode = node.id; select.setAttribute("aria-pressed", String(index === selectedNode));
+		if (index === selectedNode) fields(node);
 		appendMorphemeLabel(select, node, word.seq[node.seqIndex], options);
 		li.append(select);
 		if (index > 0) { const anchor = element("span", "port-anchor incoming"); anchor.setAttribute("aria-hidden", "true"); li.append(anchor); }
 		if (index < nodes.length - 1) { const anchor = element("span", "port-anchor outgoing"); anchor.setAttribute("aria-hidden", "true"); li.append(anchor); }
 		const portLabels = element("div", "port-labels");
-		if (index > 0) portLabels.append(element("span", "port-in", `${t("inputPort")}: ${ports.input || "?"}`));
-		if (index < nodes.length - 1 || !word.built?.closed) portLabels.append(element("span", "port-out", `${t("outputPort")}: ${ports.output || "?"}`));
+		if (index > 0) portLabels.append(element("span", "port-in", `${t("inputPort")}: ${className(ports.input)}`));
+		if (index < nodes.length - 1 || !word.built?.closed) portLabels.append(element("span", "port-out", `${t("outputPort")}: ${className(ports.output)}`));
 		li.append(portLabels);
 		// The card edit model is indexed by catalog slots. Engine occurrences
 		// from compound presets can be inspected but never mis-edit a slot.
@@ -40,3 +41,5 @@ export function renderPortGraph(host, word, options, edit) {
 	}
 	host.append(path, detail);
 }
+
+function className(value) { return value === "N" ? t("noun") : value === "V" ? t("verb") : value || "?"; }

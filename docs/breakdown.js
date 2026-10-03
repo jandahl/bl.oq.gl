@@ -1,6 +1,6 @@
 // Renders a Deconstruct result as oq's own Deconstruct view does: a
 // composed, full-sentence translation, then a per-morpheme row breakdown
-// below it (declared/citation spelling + a short, blank-filled gloss) —
+// below it (declared/citation spelling + a short gloss with optional blank filling) —
 // rather than raw morpheme ids in a block stack (bl-oq-ly#4: ids like
 // "N_qaq_Vb" mean nothing to a learner). Deliberately plain HTML, not
 // Blockly: the read-only case has no drag/snap interaction to justify
@@ -103,7 +103,7 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 		spelling.textContent = `${item.marker}${item.text}`;
 		row.appendChild(spelling);
 
-		const { moodLabel, rest } = splitMoodLabel(item.shortGloss || item.gloss || item.meaning || translate("noGloss"), item.moodLabel);
+		const { moodLabel, rest } = splitMoodLabel((opts.fillBlanks ? item.shortGloss : item.rawShortGloss ?? item.shortGloss) || item.gloss || item.meaning || translate("noGloss"), item.moodLabel);
 		if (moodLabel) {
 			const badge = document.createElement("span");
 			badge.className = "breakdown-mood";
@@ -244,6 +244,7 @@ export function renderSentenceBreakdown(container, plan, glossSummaryItems, opts
 			if (word.seq && word.built?.ok) {
 				renderBreakdown(article, word.surface, word.seq, word.built, glossSummaryItems, {
 					reverseOrder: opts.reverseOrder,
+					fillBlanks: opts.fillBlanks,
 					lang: opts.lang,
 					showOther: opts.showOther,
 					headlineGloss: opts.headlineGloss,
@@ -304,6 +305,7 @@ export function renderWordBreakdowns(container, parts, glossSummaryItems, opts =
 		if (parts.length > 1) article.classList.add("sentence-word-breakdown");
 		renderBreakdown(article, part.word, part.seq, part.built, glossSummaryItems, {
 			reverseOrder: opts.reverseOrder,
+			fillBlanks: opts.fillBlanks,
 			lang: opts.lang,
 			showOther: opts.showOther,
 			headlineGloss: opts.headlineGloss,
@@ -314,6 +316,7 @@ export function renderWordBreakdowns(container, parts, glossSummaryItems, opts =
 			renderAlternativeBreakdowns(container, part.alternatives, glossSummaryItems, {
 				word: part.word,
 				reverseOrder: opts.reverseOrder,
+				fillBlanks: opts.fillBlanks,
 				lang: opts.lang,
 				showOther: opts.showOther,
 				headlineGloss: opts.headlineGloss,

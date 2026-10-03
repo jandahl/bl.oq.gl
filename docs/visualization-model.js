@@ -1,6 +1,6 @@
 // @ts-check
 // Engine data in; presentation data out. Never repair a missing catalog ID.
-/** @param {string[]} ids @param {Map<string, any>} presets @param {any} catalog @param {{buildWord: Function, presentSequence: Function}} engine @param {any} [engineOptions] */
+/** @param {string[]} ids @param {Map<string, any>} presets @param {any} catalog @param {{buildWord: Function, presentSequence: Function, glossSummaryItems?: Function}} engine @param {any} [engineOptions] */
 export function wordPresentation(ids, presets, catalog, engine, engineOptions = {}) {
 	const missing = ids.filter((id) => !presets.has(id));
 	if (missing.length) return { ids, missing, seq: [], built: null, graph: null, error: `Missing morphemes: ${missing.join(", ")}` };
@@ -8,6 +8,15 @@ export function wordPresentation(ids, presets, catalog, engine, engineOptions = 
 	try {
 		const built = engine.buildWord(seq);
 		const graph = engine.presentSequence(seq, catalog, { ...(built.ok ? { word: built.word } : {}), engineOptions });
+		// Templates and accumulated meanings both come from the pinned engine.
+		// Keep both: switching presentation must never alter Build evidence.
+		if (engine.glossSummaryItems) for (const lang of ["en", "da"]) {
+			const rows = engine.glossSummaryItems(seq, { ...engineOptions, lang, includeGlossless: true });
+			for (const node of graph.nodes) {
+				const row = rows.find((/** @type {any} */ row) => row.seqIndex === node.seqIndex);
+				if (node.labels?.[lang] && row) node.labels[lang].templateGloss = row.rawShortGloss ?? row.shortGloss ?? row.gloss;
+			}
+		}
 		return { ids, missing, seq, built, graph, error: built.ok ? "" : built.reason || "Invalid sequence" };
 	} catch (error) {
 		return { ids, missing, seq, built: null, graph: null, error: error instanceof Error ? error.message : String(error) };

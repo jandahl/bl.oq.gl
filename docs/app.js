@@ -20,56 +20,7 @@ import { isSentenceInput, planFromLattice, withInitialCapital, assemblyReading }
 import { loadExamplesCatalog, mountExamplesPanel } from "./examples.js";
 import { setLocale, applyLocale, t } from "./i18n.js";
 
-/** Radiogroup of [role=radio][data-value] buttons that behaves like a <select>
- *  (.value getter/setter + change events) so displayOptions() stays unchanged. */
-function enhanceSegmented(root) {
-	const buttons = () => [...root.querySelectorAll('[role="radio"]')];
-	const apply = (value) => {
-		for (const btn of buttons()) {
-			const selected = btn.dataset.value === value;
-			btn.setAttribute("aria-checked", selected ? "true" : "false");
-			btn.tabIndex = selected ? 0 : -1;
-		}
-		root.dataset.value = value;
-	};
-	Object.defineProperty(root, "value", {
-		configurable: true,
-		get() {
-			return root.dataset.value
-				|| buttons().find((b) => b.getAttribute("aria-checked") === "true")?.dataset.value
-				|| "";
-		},
-		set(value) { apply(value); },
-	});
-	root.addEventListener("click", (event) => {
-		const btn = event.target.closest('[role="radio"]');
-		if (!btn || !root.contains(btn)) return;
-		if (root.value === btn.dataset.value) return;
-		root.value = btn.dataset.value;
-		root.dispatchEvent(new Event("change", { bubbles: true }));
-	});
-	root.addEventListener("keydown", (event) => {
-		const current = event.target.closest('[role="radio"]');
-		if (!current || !root.contains(current)) return;
-		const options = buttons();
-		const index = options.indexOf(current);
-		const nextIndex = event.key === "ArrowRight" || event.key === "ArrowDown" ? (index + 1) % options.length
-			: event.key === "ArrowLeft" || event.key === "ArrowUp" ? (index - 1 + options.length) % options.length
-			: event.key === "Home" ? 0
-			: event.key === "End" ? options.length - 1
-			: -1;
-		if (nextIndex < 0) return;
-		event.preventDefault();
-		const next = options[nextIndex];
-		next.focus();
-		if (root.value !== next.dataset.value) {
-			root.value = next.dataset.value;
-			root.dispatchEvent(new Event("change", { bubbles: true }));
-		}
-	});
-	apply(root.value);
-	return root;
-}
+import { enhanceSegmented } from "./segmented.js";
 
 function bindClearable(input, button) {
 	const sync = () => { button.hidden = !input.value; };
@@ -110,6 +61,7 @@ let workedExamplesModal;
 /** @type {ReturnType<typeof mountExamplesPanel> | null} */
 let examplesPanel = null;
 let showIdsCheckbox;
+let fillBlanksCheckbox;
 let showMoodCheckbox;
 let readingOrderCheckbox;
 let langSelect;
@@ -159,6 +111,7 @@ function bindDom() {
 	blocklyThemeSelect = enhanceSegmented(document.getElementById("blockly-theme-select"));
 	examplesFrame = document.getElementById("example-words");
 	workedExamplesModal = document.getElementById("worked-examples-modal");
+	fillBlanksCheckbox = document.getElementById("opt-fill-blanks");
 	showIdsCheckbox = document.getElementById("opt-show-ids");
 	showMoodCheckbox = document.getElementById("opt-show-mood");
 	readingOrderCheckbox = document.getElementById("opt-reading-order");
@@ -219,6 +172,7 @@ function displayOptions() {
 	const lang = langSelect.value;
 	return {
 		showIds: showIdsCheckbox.checked,
+		fillBlanks: fillBlanksCheckbox.checked,
 		lang,
 		showOther: lang === "both",
 		spellingMode: spellingSelect.value,
@@ -302,6 +256,11 @@ async function loadAndMountExamples() {
 }
 
 function initDisplayOptions() {
+	fillBlanksCheckbox.checked = stored("bloq:fill-blanks") === "true";
+	fillBlanksCheckbox.addEventListener("change", () => {
+		storePreference("bloq:fill-blanks", null, String(fillBlanksCheckbox.checked));
+		onDisplayOptionChange();
+	});
 	uiLangSelect.value = stored("bloq:ui-lang", "bl-oq-ly:ui-lang") === "da" ? "da" : "en";
 	showIdsCheckbox.checked = stored(SHOW_IDS_KEY_RENAMED, SHOW_IDS_KEY) === "true";
 	showMoodCheckbox.checked = stored(SHOW_MOOD_KEY_RENAMED, SHOW_MOOD_KEY) === "true"; // default off
@@ -937,6 +896,7 @@ function breakdownView() {
 	return {
 		t,
 		reverseOrder: opts.readLastFirst,
+		fillBlanks: opts.fillBlanks,
 		...gloss,
 		presentationPreferences: {
 			numberPreference: gloss.numberPreference,
@@ -1347,7 +1307,7 @@ function mountWorkspace() {
 		getPresetsById: () => session.presetsById,
 		getCatalog: () => rawCatalog,
 		getOptions: displayOptions,
-		engine: { buildWord, presentSequence }, matches: presetMatchesQuery, label: labelFor,
+		engine: { buildWord, presentSequence, glossSummaryItems }, matches: presetMatchesQuery, label: labelFor,
 		setBlocklyVisible: (visible) => {
 			blocklyDiv.hidden = !visible;
 			document.querySelector(".palette-controls").hidden = !visible;
