@@ -1,9 +1,10 @@
 import { derivationStages } from "./step-model.js";
 import { element, action, appendMorphemeLabel } from "./visualizations.js";
+import { applyMorphemeColours } from "./theme.js";
 import { t } from "./i18n.js";
 
 const selections = new WeakMap();
-export function renderStepper(host, word, options, engine) {
+export function renderStepper(host, word, options, engine, presetsById = new Map()) {
 	// Each stage explains the accumulated result, regardless of other views.
 	options = { ...options, fillBlanks: true };
 	const stages = derivationStages(word.seq, engine.buildWord);
@@ -23,6 +24,7 @@ export function renderStepper(host, word, options, engine) {
 		const button = action("", () => select(index));
 		button.append(element("span", "", `${index + 1} ·`));
 		appendMorphemeLabel(button, node, stage.item, options);
+		applyMorphemeColours(button, presetsById.get(stage.item.id));
 		button.dataset.stage = String(index); strip.append(button); return button;
 	});
 	function select(index) {

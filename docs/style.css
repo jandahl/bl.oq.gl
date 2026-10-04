@@ -917,7 +917,7 @@ footer p { margin: 0; }
 /* Alternative presentations share the engine and the existing canvas state. */
 .step-stages { display: flex; flex-wrap: wrap; gap: .4rem; }
 .step-stages button { display: flex; flex-direction: column; align-items: flex-start; gap: .25rem; text-align: left; }
-#visualizations .step-stages [aria-pressed=true] { background: var(--accent); color: var(--panel-bg); }
+#visualizations .step-stages [aria-pressed=true] { outline: 2px solid var(--accent); outline-offset: 2px; }
 .step-result { margin: .8rem 0; padding: 1rem; background: var(--panel-bg); border: 1px solid var(--border); border-radius: 6px; }
 .step-surface { font-size: 1.6rem; overflow-wrap: anywhere; }
 .step-meaning { overflow-wrap: anywhere; }
@@ -941,14 +941,14 @@ footer p { margin: 0; }
 #visualizations .derivation-node[aria-pressed=true] { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tree-surface { display: flex; flex-wrap: wrap; gap: .3rem; margin: .7rem 0; }
 .tree-surface span { font-family: monospace; padding: .4rem .6rem; background: var(--panel-bg); border-bottom: 2px solid transparent; }
-.tree-surface .is-selected { border-color: var(--accent); }
+.tree-surface .is-selected { box-shadow: inset 0 -2px var(--accent); }
 .semantic-evidence { border-top: 1px solid var(--border); padding: .6rem 0; }
 .interlinear-scroll { max-width: 100%; overflow-x: auto; }
 .interlinear-table { border-collapse: collapse; width: 100%; background: var(--panel-bg); }
 .interlinear-table caption { text-align: left; padding: .5rem 0; }
 .interlinear-table th, .interlinear-table td { text-align: left; vertical-align: top; padding: .7rem; border-bottom: 1px solid var(--border); min-width: 6rem; overflow-wrap: anywhere; }
 .interlinear-table th { font-weight: 500; }
-.interlinear-table .is-selected { background: color-mix(in srgb, var(--accent) 12%, var(--panel-bg)); }
+.interlinear-table .is-selected { box-shadow: inset 0 0 0 2px var(--accent); }
 .interlinear-table del { color: var(--error); }
 .viz-id { display: block; margin-top: .4rem; overflow-wrap: anywhere; }
 .card-palette[hidden] { display: none; }
