@@ -17,7 +17,10 @@ export function renderAnalysisLanes(host, readings, selectedIds, options, deps) 
 	const selectedIndex = readings.findIndex((reading) => JSON.stringify((reading.seq || []).map((item) => item.id)) === active);
 	readings.forEach((reading, index) => {
 		const ids = (reading.seq || []).map((item) => item.id);
+		const missing = ids.filter((id) => !id || !deps.getPresetsById().has(id));
+		const inspectionOnly = missing.length || !reading.built?.ok || !reading.built.closed || reading.built.approximate || reading.band === "approximate";
 		const button = action("", () => {
+			if (inspectionOnly) return;
 			const result = deps.selectAnalysisReading?.(reading) ?? { error: t("analysisLaneSelectUnavailable") };
 			if (result?.error) {
 				const error = list.querySelector(".analysis-lanes-error") || element("p", "analysis-lanes-error is-error");
@@ -32,6 +35,7 @@ export function renderAnalysisLanes(host, readings, selectedIds, options, deps) 
 		});
 		button.className = "analysis-lane";
 		button.setAttribute("role", "radio");
+		button.setAttribute("aria-disabled", String(Boolean(inspectionOnly)));
 		const isSelected = JSON.stringify(ids) === active;
 		button.setAttribute("aria-checked", String(isSelected));
 		button.tabIndex = index === (selectedIndex < 0 ? 0 : selectedIndex) ? 0 : -1;
@@ -82,6 +86,9 @@ export function renderAnalysisLanes(host, readings, selectedIds, options, deps) 
 		}
 		if (reading.built?.ok && !reading.built.closed) button.append(element("p", "analysis-lane-note", t("openChain")));
 		if (reading.built?.approximate) button.append(element("p", "analysis-lane-note", t("approximateChain")));
+		if (inspectionOnly) button.append(element("p", "analysis-lane-note", missing.length
+			? t("analysisLaneInspectionMissing", { ids: missing.map((id) => id || "?").join(", ") })
+			: t("analysisLaneInspectionOnly")));
 		button.append(rows);
 		list.append(button);
 	});

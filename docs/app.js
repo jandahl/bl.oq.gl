@@ -1345,6 +1345,7 @@ function mountWorkspace() {
 			const seq = ids.flatMap((id) => session.presetsById.get(id).seq);
 			const built = buildWord(seq);
 			if (!built.ok) return { error: t("analysisLaneCanvasUnsupported") };
+			if (!built.closed || built.approximate || reading.band === "approximate") return { error: t("analysisLaneInspectionOnly") };
 			const previousPlan = session.workspace ? snapshotCanvas(session.workspace) : null;
 			if (session.workspace) {
 				renderSentencePlan(session.workspace, [{ words: [{ canvasIds: ids, presentation: nounPresentationValue() }] }], session.presetsById, displayOptions());

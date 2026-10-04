@@ -3,9 +3,21 @@ import { applyMorphemeColours } from "./theme.js";
 import { action, element } from "./visualizations.js";
 import { moodDisplayLabel } from "./verb-endings.js";
 import { t } from "./i18n.js";
+import { inflectionExamples } from "./exploration-examples.js";
 
 export function renderInflectionGrid(host, options, deps) {
 	const picker = element("section", "inflection-stem-picker");
+	picker.append(element("p", "exploration-purpose", t("inflectionPurpose")), element("p", "viz-secondary", t("inflectionHowTo")));
+	const examples = element("div", "exploration-examples");
+	examples.append(element("strong", "", t("builtExamples")));
+	for (const example of inflectionExamples(deps.getPresetsById(), deps.engine.buildWord)) {
+		const button = action(`${example.forms.join(" / ")} — ${t(example.wordClass === "N" ? "inflectionExampleNoun" : "inflectionExampleVerb")}`, () => {
+			stemId = example.id; deps.setInflectionStem(stemId); search.value = ""; render();
+		});
+		button.dataset.inflectionExample = example.id;
+		examples.append(button);
+	}
+	picker.append(examples);
 	const searchLabel = element("label", ""); searchLabel.append(element("span", "", t("inflectionStemSearch")));
 	const search = element("input"); search.type = "search"; search.autocomplete = "off"; searchLabel.append(search);
 	const choices = element("div", "inflection-stem-results");
@@ -33,15 +45,16 @@ export function renderInflectionGrid(host, options, deps) {
 			status.textContent = t("inflectionNoStructuredData"); return;
 		}
 		status.textContent = t("inflectionValidationNote");
-		for (const group of groups) tableHost.append(renderGroup(group, stem, deps, options));
+		groups.forEach((group, index) => tableHost.append(renderGroup(group, stem, deps, options, index === 0)));
 	}
 	search.addEventListener("input", render);
 	render(); host.append(picker);
 }
 
-function renderGroup(group, stem, deps, options) {
-	const section = element("section", "inflection-group");
-	section.append(element("h3", "", groupLabel(group.features, stem.word_class)));
+function renderGroup(group, stem, deps, options, open = false) {
+	const section = element("details", "inflection-group");
+	section.open = open;
+	section.append(element("summary", "", groupLabel(group.features, stem.word_class)));
 	const table = element("table", "inflection-grid");
 	table.append(element("caption", "", t("inflectionGridCaption")));
 	const head = element("thead"); const header = element("tr");
@@ -77,7 +90,7 @@ function renderGroup(group, stem, deps, options) {
 }
 
 function groupLabel([first, second], wordClass) {
-	return wordClass === "N" ? t(first) : `${t(first)} · ${t(second)}`;
+	return wordClass === "N" ? t(first) : `${t(first === "transitive" ? "inflectionWithObject" : "inflectionWithoutObject")} · ${t(second)}`;
 }
 function rowLabel(row, wordClass, deps) {
 	if (wordClass === "N") return row[0] == null ? t("noPossessor") : personLabel(row[0], row[1], deps);

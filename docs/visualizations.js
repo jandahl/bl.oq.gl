@@ -173,6 +173,8 @@ export function mountVisualizations(host, deps) {
 		const { words } = targets();
 		selected = Math.min(selected, Math.max(0, words.length - 1));
 		const options = deps.getOptions();
+		wordLabel.hidden = view === "inflection";
+		status.hidden = view === "inflection";
 		const nextSignature = JSON.stringify([words.map((v) => v.word), options, getLocale(), selected, view, deps.getPresets().length]);
 		if (signature === nextSignature) return;
 		signature = nextSignature;
@@ -201,10 +203,11 @@ export function mountVisualizations(host, deps) {
 		if (selectedChain !== chain) { selectedNode = null; insertionIndex = null; selectedChain = chain; }
 		current = target?.heldLabel ? { held: target.heldLabel, ids: [] } : wordPresentation(target?.canvasIds || [], deps.getPresetsById(), deps.getCatalog(), deps.engine, options);
 		viewport.replaceChildren();
-		viewport.append(element("p", "viz-secondary visualization-hint", t(VIEW_HINTS[view] || "")));
+		if (VIEW_HINTS[view]) viewport.append(element("p", "viz-secondary visualization-hint", t(VIEW_HINTS[view])));
 		status.classList.toggle("is-error", Boolean(target && current.error));
 		status.textContent = !target ? t("emptyCanvasHint") : (current.held ? t(current.held) : current.error) || `${current.built?.word || ""} · ${current.built?.approximate ? t("approximateChain") : current.built?.closed ? t("completeChain") : t("openChain")}`;
-		if (current.held) viewport.append(element("p", "", target?.surface || target?.raw || current.held));
+		if (view === "inflection") renderInflectionGrid(viewport, options, deps);
+		else if (current.held) viewport.append(element("p", "", target?.surface || target?.raw || current.held));
 		else if (view === "cards") renderCards(viewport, current, options, edit, deps.getPresetsById());
 		else if (view === "interlinear") renderInterlinear(viewport, current, options, deps.getPresetsById());
 		else if (view === "tree") renderScopeTree(viewport, current, options, deps.getPresetsById(), deps.engine);
@@ -218,7 +221,6 @@ export function mountVisualizations(host, deps) {
 		else if (view === "stepper") renderStepper(viewport, current, options, deps.engine, deps.getPresetsById());
 		else if (view === "ribbon") renderSurfaceRibbon(viewport, current, options);
 		else if (view === "contrast") renderChainContrast(viewport, current, options, deps);
-		else if (view === "inflection") renderInflectionGrid(viewport, options, deps);
 		else if (view === "lanes") renderAnalysisLanes(viewport, deps.getAnalysisReadings?.() || [], current?.ids || [], options, deps);
 		palette.hidden = view !== "cards" && view !== "ports";
 		at.replaceChildren();
@@ -251,8 +253,6 @@ const VIEW_HINTS = {
 	tree: "derivationTreeUse",
 	stepper: "derivationStepperUse",
 	ribbon: "surfaceRibbonUse",
-	contrast: "chainContrastUse",
-	inflection: "inflectionGridUse",
 	lanes: "analysisLanesUse",
 };
 
