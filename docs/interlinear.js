@@ -1,7 +1,8 @@
 import { element, action, nodeGloss } from "./visualizations.js";
+import { applyMorphemeColours } from "./theme.js";
 import { t } from "./i18n.js";
 
-export function renderInterlinear(host, word, options) {
+export function renderInterlinear(host, word, options, presetsById = new Map()) {
 	const nodes = word.graph?.nodes.filter((node) => node.kind === "morpheme") || [];
 	if (!nodes.length) return;
 	const table = element("table", "interlinear-table");
@@ -13,11 +14,13 @@ export function renderInterlinear(host, word, options) {
 	const buttons = [];
 	nodes.forEach((node) => {
 		const cells = rows.map(() => element("td"));
+		cells.forEach((cell) => applyMorphemeColours(cell, presetsById.get(node.morpheme_id)));
 		const form = node.zero_surface ? "Ø" : `${node.surface?.marker || ""}${node.surface?.citationText || word.seq[node.seqIndex]?.text || node.morpheme_id || "?"}`;
 		const button = action(form, () => {
 			buttons.forEach((item) => { const active = item.node === node; item.button.setAttribute("aria-pressed", String(active)); item.cells.forEach((cell) => cell.classList.toggle("is-selected", active)); });
 			detail.textContent = `${form} · ${nodeGloss(node, options)}${options.showIds ? ` · ${node.morpheme_id}` : ""}`;
 		});
+		applyMorphemeColours(button, presetsById.get(node.morpheme_id));
 		button.setAttribute("aria-pressed", "false"); cells[0].append(button);
 		cells[1].textContent = node.zero_surface ? t("zeroSurface") : node.surface?.surfaceText ?? t("noSurface");
 		cells[2].textContent = nodeGloss(node, options) || t("noGloss");

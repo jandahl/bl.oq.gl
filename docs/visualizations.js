@@ -201,12 +201,13 @@ export function mountVisualizations(host, deps) {
 		if (selectedChain !== chain) { selectedNode = null; insertionIndex = null; selectedChain = chain; }
 		current = target?.heldLabel ? { held: target.heldLabel, ids: [] } : wordPresentation(target?.canvasIds || [], deps.getPresetsById(), deps.getCatalog(), deps.engine, options);
 		viewport.replaceChildren();
+		viewport.append(element("p", "viz-secondary visualization-hint", t(VIEW_HINTS[view] || "")));
 		status.classList.toggle("is-error", Boolean(target && current.error));
 		status.textContent = !target ? t("emptyCanvasHint") : (current.held ? t(current.held) : current.error) || `${current.built?.word || ""} · ${current.built?.approximate ? t("approximateChain") : current.built?.closed ? t("completeChain") : t("openChain")}`;
 		if (current.held) viewport.append(element("p", "", target?.surface || target?.raw || current.held));
 		else if (view === "cards") renderCards(viewport, current, options, edit, deps.getPresetsById());
-		else if (view === "interlinear") renderInterlinear(viewport, current, options);
-		else if (view === "tree") renderScopeTree(viewport, current, options);
+		else if (view === "interlinear") renderInterlinear(viewport, current, options, deps.getPresetsById());
+		else if (view === "tree") renderScopeTree(viewport, current, options, deps.getPresetsById());
 		else if (view === "ports") renderPortGraph(viewport, current, options, edit, (index) => {
 			if (current.seq.length !== current.ids.length) return;
 			selectedNode = index; insertionIndex = index + 1;
@@ -214,7 +215,7 @@ export function mountVisualizations(host, deps) {
 			categories.value = deps.getPresetsById().get(current.ids[index])?.morpheme_type || "";
 			filter.value = ""; limit = 24; palette.open = true; renderPalette();
 		}, selectedNode, deps.getPresetsById());
-		else if (view === "stepper") renderStepper(viewport, current, options, deps.engine);
+		else if (view === "stepper") renderStepper(viewport, current, options, deps.engine, deps.getPresetsById());
 		else if (view === "ribbon") renderSurfaceRibbon(viewport, current, options);
 		else if (view === "contrast") renderChainContrast(viewport, current, options, deps);
 		else if (view === "inflection") renderInflectionGrid(viewport, options, deps);
@@ -244,6 +245,16 @@ export function mountVisualizations(host, deps) {
 	}
 	return { refresh, discardDraft, setView, getView: () => view, getDraftError: () => pendingPlan && view !== "blockly" ? pendingError : "" };
 }
+
+const VIEW_HINTS = {
+	interlinear: "interlinearUse",
+	tree: "derivationTreeUse",
+	stepper: "derivationStepperUse",
+	ribbon: "surfaceRibbonUse",
+	contrast: "chainContrastUse",
+	inflection: "inflectionGridUse",
+	lanes: "analysisLanesUse",
+};
 
 function viewThumbnail(view) {
 	const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");

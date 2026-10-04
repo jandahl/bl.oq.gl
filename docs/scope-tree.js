@@ -1,8 +1,9 @@
 import { layoutDerivation } from "./tree-layout.js";
 import { element, action, nodeGloss, appendMorphemeLabel } from "./visualizations.js";
+import { applyMorphemeColours } from "./theme.js";
 import { t } from "./i18n.js";
 
-export function renderScopeTree(host, word, options) {
+export function renderScopeTree(host, word, options, presetsById = new Map()) {
 	if (!word.graph?.derivation?.root) return;
 	const graph = word.graph;
 	let layout;
@@ -25,7 +26,7 @@ export function renderScopeTree(host, word, options) {
 	board.append(svg);
 	const surface = element("div", "tree-surface");
 	const morphemes = graph.nodes.filter((node) => node.kind === "morpheme");
-	for (const node of morphemes) { const span = element("span", "", node.zero_surface ? "Ø" : node.surface?.surfaceText ?? "?"); span.dataset.node = node.id; surface.append(span); }
+	for (const node of morphemes) { const span = element("span", "", node.zero_surface ? "Ø" : node.surface?.surfaceText ?? "?"); span.dataset.node = node.id; applyMorphemeColours(span, presetsById.get(node.morpheme_id)); surface.append(span); }
 	const detail = element("p", "viz-secondary"); detail.setAttribute("aria-live", "polite");
 	function labelNode(host, node) {
 		if (node.kind === "morpheme") appendMorphemeLabel(host, node, word.seq[node.seqIndex], options);
@@ -42,6 +43,7 @@ export function renderScopeTree(host, word, options) {
 			detail.replaceChildren(); labelNode(detail, node);
 		});
 		button.className = "derivation-node"; button.dataset.node = node.id; button.setAttribute("aria-pressed", "false");
+		if (node.kind === "morpheme") applyMorphemeColours(button, presetsById.get(node.morpheme_id));
 		button.style.left = `${placed.x - 95}px`; button.style.top = `${placed.y}px`;
 		labelNode(button, node);
 		if (options.showIds) button.append(element("code", "viz-id", node.id));

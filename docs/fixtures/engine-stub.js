@@ -146,8 +146,15 @@ export const WORD_CLASS_THEMES = {
 	default: {},
 };
 
-export function getWordClassColors() {
-	return {};
+export function getWordClassColors(path, theme = WORD_CLASS_THEMES.light) {
+	const key = path?.[0] || "neutral";
+	const hue = ({ nominal_root: 205, verbal_root: 145, derivational_affix: 35, inflectional_affix: 275, enclitic: 320 })[key] ?? 0;
+	const dark = theme === WORD_CLASS_THEMES.default;
+	return {
+		fill: `hsl(${hue}, 60%, ${dark ? 24 : 92}%)`,
+		border: `hsl(${hue}, 55%, ${dark ? 55 : 42}%)`,
+		text: `hsl(${hue}, 35%, ${dark ? 94 : 16}%)`,
+	};
 }
 
 /** Tiny fixture catalog — not a parallel product list. Mirrors standard-examples/v1 shape. */

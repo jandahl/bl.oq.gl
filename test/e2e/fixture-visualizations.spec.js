@@ -133,6 +133,38 @@ test("interlinear selection highlights aligned tiers and supports narrow layouts
 	await page.setViewportSize({ width: 360, height: 800 });
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+for (const [view, selector] of [
+	["interlinear", ".interlinear-table td.api-morpheme-colours"],
+	["tree", '.derivation-node[data-node="m-0"].api-morpheme-colours'],
+	["stepper", '[data-stage="0"].api-morpheme-colours'],
+]) {
+	test(`${view} morphemes use the API palette while selected`, async ({ page }) => {
+		await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+		await page.locator(`#visualization-view [data-value="${view}"]`).click();
+		const target = page.locator(selector).first();
+		await expect(target).toHaveClass(/api-morpheme-colours/);
+		if (view === "interlinear") await page.locator(".interlinear-table button").first().click();
+		if (view === "tree") await page.locator('.derivation-node[data-node="m-0"]').click();
+		if (view === "stepper") await page.locator('[data-stage="0"]').click();
+		const actual = await target.evaluate((node) => ({
+			fill: node.style.getPropertyValue("--morpheme-light-fill"),
+			border: node.style.getPropertyValue("--morpheme-light-border"),
+			text: node.style.getPropertyValue("--morpheme-light-text"),
+			background: window.getComputedStyle(node).backgroundColor,
+		}));
+		const expected = await page.evaluate(async () => {
+			const { paletteColours } = await import("/theme.js");
+			const catalog = await (await import("/catalog.js")).loadCatalog();
+			return paletteColours(catalog.presets.find((preset) => preset.id === "qimmeq"), "light");
+		});
+		expect(actual.fill).toBe(expected.fill);
+		expect(actual.border).toBe(expected.border);
+		expect(actual.text).toBe(expected.text);
+		expect(actual.background).not.toBe("rgba(0, 0, 0, 0)");
+		await expect(page.locator(".visualization-hint")).toBeVisible();
+	});
+}
 test("slot palette builds, removes and shares the same chain as Blockly", async ({ page }) => {
 	await page.locator('#visualization-view [data-value="cards"]').click();
 	await expect(page.locator("#blockly-div")).toBeHidden();
