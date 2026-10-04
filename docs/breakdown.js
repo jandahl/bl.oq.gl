@@ -303,6 +303,15 @@ export function renderWordBreakdowns(container, parts, glossSummaryItems, opts =
 		article.classList.add("word-toned");
 		article.dataset.wordTone = wordTone(i);
 		if (parts.length > 1) article.classList.add("sentence-word-breakdown");
+		if (part.missing || !part.seq || !part.built?.ok) {
+			const note = document.createElement("p");
+			note.className = "breakdown-note";
+			note.textContent = translate("noVerifiedBreakdown", { token: part.word });
+			article.appendChild(note);
+			container.appendChild(article);
+			metas.push(note.textContent);
+			continue;
+		}
 		renderBreakdown(article, part.word, part.seq, part.built, glossSummaryItems, {
 			reverseOrder: opts.reverseOrder,
 			fillBlanks: opts.fillBlanks,

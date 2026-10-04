@@ -151,3 +151,97 @@ test("empty Deconstruct submit cancels an in-flight analysis", async ({ page }) 
 	await expect(page).not.toHaveURL(/[?&]w=/);
 	expect(await canvasBlockCount(page)).toBe(0);
 });
+
+async function canvasIds(page) {
+	return page.evaluate(async () => (await import("/blocks.js")).topLevelSentences(Blockly.getMainWorkspace()));
+}
+
+for (const layout of ["stack", "horizontal", "wrap"]) {
+	test(`missing shared morphemes remain visible in ${layout} layout`, async ({ page }) => {
+		await page.addInitScript((value) => localStorage.setItem("bloq:view-layout", value), layout);
+		await page.goto("/?chain=neri,UNKNOWN,V_IND_INTR_3SG");
+		await expect(page.locator("#status-line")).toContainText("Unknown morpheme");
+		expect(await canvasIds(page)).toEqual([[["neri", "UNKNOWN", "V_IND_INTR_3SG"]]]);
+		await expect(page).toHaveURL(/UNKNOWN/);
+		await page.locator("#blockly-div").getByText("Unknown morpheme in stack. UNKNOWN", { exact: true }).first().waitFor();
+		// Changing layout must not repair an unknown slot by deleting it.
+		await page.locator(`#opt-layout [data-value="${layout === "stack" ? "wrap" : "stack"}"]`).click();
+		expect(await canvasIds(page)).toEqual([[["neri", "UNKNOWN", "V_IND_INTR_3SG"]]]);
+		await expect(page.locator("#status")).toHaveClass("error");
+	});
+}
+
+test("canvas edits cancel an in-flight Deconstruct", async ({ page }) => {
+	await bootSlowAnalyze(page);
+	await page.goto("/?chain=qimmeq,N_ABS_SG");
+	await expect(page.locator("#status-line")).toHaveText("qimmeq");
+	await page.locator("#word-input").fill("nerivoq");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#status-line")).toContainText("Analyzing");
+	await page.evaluate(() => Blockly.getMainWorkspace().getAllBlocks(false).find((block) => block.data === "N_ABS_SG").dispose(false));
+	await expect(page).toHaveURL(/chain=qimmeq$/);
+	await page.waitForTimeout(900);
+	expect(await canvasIds(page)).toEqual([[["qimmeq"]]]);
+	await expect(page).toHaveURL(/chain=qimmeq$/);
+});
+
+test("history restoration cancels an in-flight Deconstruct", async ({ page }) => {
+	await bootSlowAnalyze(page);
+	await page.goto("/?chain=qimmeq,N_ABS_SG");
+	await expect(page.locator("#status-line")).toHaveText("qimmeq");
+	await page.evaluate(() => {
+		history.pushState(null, "", "?chain=illu,N_ABS_SG");
+		window.dispatchEvent(new window.PopStateEvent("popstate"));
+	});
+	await expect(page.locator("#status-line")).toHaveText("illu");
+	await page.locator("#word-input").fill("nerivoq");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#status-line")).toContainText("Analyzing");
+	await page.goBack();
+	await expect(page.locator("#status-line")).toHaveText("qimmeq");
+	await page.waitForTimeout(900);
+	expect(await canvasIds(page)).toEqual([[["qimmeq", "N_ABS_SG"]]]);
+	await expect(page).not.toHaveURL(/[?&]w=/);
+});
+
+test("failed analyses tolerate display-option repainting", async ({ page }) => {
+	await page.locator("#word-input").fill("notaword");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#status-line")).toContainText('No verified breakdown found for "notaword"');
+	await page.locator("#display-toggle").click();
+	await page.locator("#opt-show-ids").check();
+	await expect(page.locator("#breakdown .breakdown-note")).toHaveText('No verified breakdown found for "notaword".');
+	await page.locator("#opt-fill-blanks").check();
+	await page.locator('#opt-ui-lang [data-value="da"]').click();
+	await expect(page.locator("#breakdown .breakdown-note")).toHaveText('Ingen verificeret opdeling fundet for "notaword".');
+});
+
+test("analysis lane selection updates the primary breakdown and alternatives", async ({ page }) => {
+	await page.route("**/fixtures/engine-stub.js", async (route) => {
+		const response = await route.fetch();
+		const source = await response.text();
+		const body = source.replace("export async function analyzeWordAsync() {", `export async function analyzeWordAsync() {
+			return { matches: [
+				{ seq: [{ id: "neri", text: "neri" }, { id: "V_IND_INTR_3SG", text: "voq" }] },
+				{ seq: [{ id: "neri", text: "neri" }, { id: "V_IND_INTR_1SG", text: "vunga" }] },
+			], evalCount: 2 };
+		`);
+		await route.fulfill({ response, body });
+	});
+	await page.reload();
+	await expect(page.locator("#status-line")).toContainText("Loaded");
+	await page.locator("#word-input").fill("fixture");
+	await page.locator("#analyze-btn").click();
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("nerivoq");
+	await page.locator('#visualization-view [data-value="lanes"]').click();
+	await page.locator('[data-analysis-lane="1"]').click();
+	await expect(page.locator("#status-line")).toHaveText("nerivunga");
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("nerivunga");
+	await expect(page.locator(".alternative-breakdown .breakdown-word")).toHaveText("nerivoq");
+	await page.locator("#display-toggle").click();
+	await page.locator("#opt-fill-blanks").check();
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("nerivunga");
+	await page.locator('[data-analysis-lane="0"]').click();
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("nerivoq");
+	await expect(page.locator(".alternative-breakdown .breakdown-word")).toHaveText("nerivunga");
+});

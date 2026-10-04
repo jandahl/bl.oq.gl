@@ -18,6 +18,7 @@ import { sameIdTree } from "./id-tree.js";
  *   workspace: any,
  *   deconstructAbort: AbortController|null,
  *   deconstructRun: number,
+ *   deconstructCanvasIds: any,
  *   lastDeconstructIds: any,
  *   lastDeconstructWord: string,
  *   lastDeconstructSeq: any,
@@ -35,6 +36,7 @@ export function createSession() {
 		workspace: null,
 		deconstructAbort: null,
 		deconstructRun: 0,
+		deconstructCanvasIds: null,
 		lastDeconstructIds: null,
 		lastDeconstructWord: "",
 		lastDeconstructSeq: null,
@@ -66,6 +68,7 @@ export function clearAnalysisCaches(session) {
 export function cancelDeconstruct(session) {
 	session.deconstructAbort?.abort();
 	session.deconstructAbort = null;
+	session.deconstructCanvasIds = null;
 	session.deconstructRun += 1;
 }
 

@@ -481,6 +481,9 @@ function injectWorkspace(serializedState = null) {
 	session.workspace = Blockly.inject(blocklyDiv, workspaceOptions());
 	session.workspace.addChangeListener((event) => {
 		if (event?.isUiEvent) return;
+		if (session.deconstructAbort && !sameIdTree(topLevelSentences(session.workspace), session.deconstructCanvasIds)) {
+			cancelDeconstruct(session);
+		}
 		applyBuildShare(refreshBuild());
 		// The breakdown is not a build product. A noun presentation change
 		// still has to repaint it, or it stays on the value from when it opened.
@@ -726,6 +729,7 @@ function syncURL({ push = false } = {}) {
  * longer switches a hidden panel. Never itself touches the URL (the
  * caller already has it, or is about to set it). */
 function applyShareState(state) {
+	cancelDeconstruct(session);
 	visualizations?.discardDraft();
 	contrastChain = state.compare || [];
 	inflectionStem = state.stem || "";
@@ -1070,9 +1074,17 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 	}
 	const run = session.deconstructRun;
 	session.deconstructAbort = new AbortController();
+	session.deconstructCanvasIds = session.workspace ? topLevelSentences(session.workspace) : [];
 	session.lastSentencePlan = null;
 	if (isSentenceInput(surface)) {
-		await runSentenceDeconstruct(surface, { skipCanvas, run });
+		try {
+			await runSentenceDeconstruct(surface, { skipCanvas, run });
+		} finally {
+			if (run === session.deconstructRun) {
+				session.deconstructAbort = null;
+				session.deconstructCanvasIds = null;
+			}
+		}
 		return;
 	}
 	const tokens = surface.split(/\s+/).filter(Boolean);
@@ -1163,6 +1175,11 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 	} catch (err) {
 		if (err?.name === "AbortError" || run !== session.deconstructRun) return;
 		setStatus(t("analysisFailed", { message: err.message }), "error");
+	} finally {
+		if (run === session.deconstructRun) {
+			session.deconstructAbort = null;
+			session.deconstructCanvasIds = null;
+		}
 	}
 }
 
@@ -1340,11 +1357,20 @@ function mountWorkspace() {
 			session.lastDeconstructSeq = seq;
 			session.lastDeconstructBuilt = built;
 			session.lastDeconstructIds = [ids];
+			const part = session.lastDeconstructParts?.[0];
+			if (part) {
+				part.seq = seq;
+				part.built = built;
+				part.ids = ids;
+				part.alternatives = (part.readings || []).filter((candidate) => candidate !== reading);
+				session.lastDeconstructAlternatives = part.alternatives;
+			}
 			if (session.workspace) {
 				session.workspace.scrollCenter();
 				requestAnimationFrame(() => Blockly.svgResize(session.workspace));
 				refreshBuild();
 			}
+			rerenderBreakdown();
 			syncURL({ push: true });
 			return true;
 		},
