@@ -88,6 +88,7 @@ const ROW_CONNECTION = "WORD_ROW";
 const WORD_CONTAINER_TYPE = `${BLOCK_TYPE_PREFIX}word_container`;
 const SENTENCE_CONTAINER_TYPE = `${BLOCK_TYPE_PREFIX}sentence_container`;
 const NOUN_ENDING_PICKER_TYPE = `${BLOCK_TYPE_PREFIX}noun_ending_picker`;
+const MISSING_MORPHEME_TYPE = `${BLOCK_TYPE_PREFIX}missing`;
 const INFLECTION_BLOCK_STYLE = "oq_inflectional_blocks";
 const UI_INDENT = "\u00a0\u00a0\u00a0\u00a0";
 const NOUN_PRESENTATION_OPTIONS = [
@@ -294,6 +295,22 @@ export function defineMorphemeBlocks() {
 			this.setInputsInline(true);
 			this.setStyle("bloq_word_container_blocks");
 			this.setTooltip("One line of a left-to-right word");
+		},
+	};
+	Blockly.Blocks[MISSING_MORPHEME_TYPE] = {
+		init() {
+			this.appendDummyInput().appendField(new Blockly.FieldLabelSerializable(""), "LABEL");
+			this.setStyle(INFLECTION_BLOCK_STYLE);
+			// An absent preset has no known connection category. Retain its
+			// position and ID so Build rejects the whole chain visibly.
+			if (sideBySide()) {
+				this.setOutput(true);
+				this.appendValueInput("NEXT");
+				this.setInputsInline(true);
+			} else {
+				this.setPreviousStatement(true);
+				this.setNextStatement(true);
+			}
 		},
 	};
 	for (const cat of [...CATEGORY_ORDER, FALLBACK_CATEGORY]) {
@@ -874,7 +891,6 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 	let prev = null;
 	for (const id of ids) {
 		const block = createMorphemeBlock(workspace, id, presetsById, displayOptions);
-		if (!block) continue;
 		if (sideBySide()) {
 			const socket = prev ? prev.getInput("NEXT")?.connection : container.getInput("MORPHEMES")?.connection;
 			if (socket && block.outputConnection) socket.connect(block.outputConnection);
@@ -895,7 +911,6 @@ function fillWrappedWord(workspace, container, ids, presetsById, displayOptions)
 	let used = 0;
 	for (const id of ids) {
 		const block = createMorphemeBlock(workspace, id, presetsById, displayOptions);
-		if (!block) continue;
 		const label = block.getFieldValue("LABEL") || block.getFieldValue("RESOLVED") || id;
 		const est = Math.min(240, 56 + String(label).length * 7);
 		if (!row || (prev && used + est > max)) {
@@ -938,7 +953,14 @@ function createMorphemeBlock(workspace, id, presetsById, displayOptions) {
 		return block;
 	}
 	const preset = presetsById.get(id);
-	if (!preset) return null;
+	if (!preset) {
+		const block = workspace.newBlock(MISSING_MORPHEME_TYPE);
+		block.data = id;
+		block.setFieldValue(`${t("unknownMorpheme")} ${id}`, "LABEL");
+		block.initSvg();
+		block.render();
+		return block;
+	}
 	// Toolbox flyouts omit a zero ending (there is nothing to drag). A chain
 	// that already names that id must still draw it — dropping it makes the
 	// canvas disagree with the analysis. A plain block keeps block.data equal
