@@ -37,6 +37,10 @@ test("tree and stepper labels honor display modes with live engine glosses", asy
 	await page.locator("#display-toggle").click();
 	for (const [view, selector] of [["tree", '.derivation-node[data-node="m-0"]'], ["stepper", '[data-stage="0"]']]) {
 		await page.locator(`#visualization-view [data-value="${view}"]`).click();
+		if (view === "tree") {
+			await expect(page.locator('.derivation-node[data-node="d-1"] .viz-form')).toHaveText("qimmeqaq");
+			await expect(page.locator('.derivation-node[data-node="d-2"] .viz-form')).toHaveText("qimmeqarpunga");
+		}
 		await page.locator('#opt-spelling [data-value="gloss-only"]').click();
 		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(0);
 		await expect(page.locator(`${selector} .viz-gloss`)).toContainText("dog");

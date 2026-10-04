@@ -116,6 +116,66 @@ test("tree uses engine connections and aligns selected expression coverage", asy
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test("tree combining steps show engine-built words and only they fill gloss blanks", async ({ page }) => {
+	await page.addInitScript(() => { globalThis.__BLOQ_TEST_GLOSS_TEMPLATES__ = true; });
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG&view=tree");
+	const expected = await page.evaluate(async () => {
+		const catalog = await (await import("/catalog.js")).loadCatalog();
+		const { buildWord } = await import("/oq-api.js");
+		return ["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"].map((id, index, ids) => buildWord(ids.slice(0, index + 1).flatMap((part) => catalog.presets.find((preset) => preset.id === part).seq)).word);
+	});
+	await expect(page.locator('.derivation-node[data-node="d-1"] .viz-form')).toHaveText(expected[1]);
+	await expect(page.locator('.derivation-node[data-node="d-2"] .viz-form')).toHaveText(expected[2]);
+	await expect(page.locator('.derivation-node[data-node="d-1"] .viz-gloss')).toHaveText("N_qaq_Vb");
+	await expect(page.locator('.derivation-node[data-node="m-1"] .viz-gloss')).toHaveText("N_qaq_Vb template");
+	await page.locator("#display-toggle").click();
+	await page.locator("#opt-fill-blanks").check();
+	await expect(page.locator('.derivation-node[data-node="d-1"] .viz-gloss')).toHaveText("N_qaq_Vb");
+	await expect(page.locator('.derivation-node[data-node="m-1"] .viz-gloss')).toHaveText("N_qaq_Vb");
+});
+
+test("all visualizations remain usable in a narrow touch viewport", async ({ browser }) => {
+	const context = await browser.newContext({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+	const mobile = await context.newPage();
+	try {
+		await mobile.addInitScript(() => { globalThis.__BLOQ_TEST_GLOSS_TEMPLATES__ = true; });
+		await mobile.route("**/fixtures/engine-stub.js", async (route) => {
+			const response = await route.fetch();
+			const body = (await response.text()).replace(
+				"return { matches: [], evalCount: 0 };",
+				' return { matches: [{ band: "gold", seq: [{ id: "neri", text: "neri" }, { id: "V_IND_INTR_3SG", text: "voq" }] }], evalCount: 1 };',
+			);
+			await route.fulfill({ response, body });
+		});
+		await bootFixtureApp(mobile);
+		await mobile.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+		for (const view of ["cards", "interlinear", "tree", "ports", "stepper", "ribbon", "contrast"]) {
+			await mobile.locator(`#visualization-view [data-value="${view}"]`).click();
+			await expect(mobile.locator(`#visualization-view [data-value="${view}"]`)).toHaveAttribute("aria-checked", "true");
+			const layout = await mobile.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+			expect(layout.document, `${view} should not widen the page`).toBeLessThanOrEqual(layout.viewport);
+			const shortControls = await mobile.locator("#visualizations button:visible, #visualizations select:visible, #visualizations input[type=search]:visible").evaluateAll((nodes) => nodes.filter((node) => node.getBoundingClientRect().height < 44).map((node) => node.outerHTML));
+			expect(shortControls, `${view} touch controls should be at least 44px high`).toEqual([]);
+		}
+		await mobile.locator('#visualization-view [data-value="inflection"]').click();
+		await mobile.locator(".inflection-stem-picker input[type=search]").fill("neri");
+		await mobile.locator(".inflection-stem-results button").first().click();
+		const gridContainment = await mobile.locator(".inflection-grid-scroll").evaluate((node) => ({
+			overflowX: window.getComputedStyle(node).overflowX,
+			clientWidth: node.clientWidth,
+			viewportWidth: window.innerWidth,
+		}));
+		expect(gridContainment.overflowX).toBe("auto");
+		expect(gridContainment.clientWidth).toBeLessThanOrEqual(gridContainment.viewportWidth);
+		await mobile.goto("/?w=fixtureword&view=lanes");
+		await expect(mobile.locator(".analysis-lane")).toHaveCount(1);
+		const layout = await mobile.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+		expect(layout.document).toBeLessThanOrEqual(layout.viewport);
+	} finally {
+		await context.close();
+	}
+});
+
 test("zero-surface endings remain a column with no invented span", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
 	await page.locator('#visualization-view [data-value="interlinear"]').click();
@@ -487,6 +547,9 @@ test("surface ribbon follows engine spans, selects morphemes, and localizes cont
 	await expect(page.locator("#visualization-view [data-value=ribbon] span")).toHaveText("Overfladebånd");
 	await expect(page.locator(".ribbon-comparison")).toContainText("Grundform:");
 	await expect(page.locator(".ribbon-change-inspector")).toContainText("Inspektør for grænseændringer");
+	await page.setViewportSize({ width: 360, height: 800 });
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+	expect(await page.locator(".ribbon-change-inspector").evaluate((node) => window.getComputedStyle(node).gridTemplateColumns.split(" ").length)).toBe(1);
 });
 
 test("chain contrast builds a searched comparison and shares its API IDs", async ({ page }) => {

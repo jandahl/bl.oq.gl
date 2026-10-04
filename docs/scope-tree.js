@@ -3,7 +3,7 @@ import { element, action, nodeGloss, appendMorphemeLabel } from "./visualization
 import { applyMorphemeColours } from "./theme.js";
 import { t } from "./i18n.js";
 
-export function renderScopeTree(host, word, options, presetsById = new Map()) {
+export function renderScopeTree(host, word, options, presetsById = new Map(), engine = null) {
 	if (!word.graph?.derivation?.root) return;
 	const graph = word.graph;
 	let layout;
@@ -28,11 +28,19 @@ export function renderScopeTree(host, word, options, presetsById = new Map()) {
 	const morphemes = graph.nodes.filter((node) => node.kind === "morpheme");
 	for (const node of morphemes) { const span = element("span", "", node.zero_surface ? "Ø" : node.surface?.surfaceText ?? "?"); span.dataset.node = node.id; applyMorphemeColours(span, presetsById.get(node.morpheme_id)); surface.append(span); }
 	const detail = element("p", "viz-secondary"); detail.setAttribute("aria-live", "polite");
-	function labelNode(host, node) {
+	function labelNode(host, node, placed) {
 		if (node.kind === "morpheme") appendMorphemeLabel(host, node, word.seq[node.seqIndex], options);
 		else {
-			host.append(element("strong", "", t("derivedExpression")));
-			if (options.spellingMode !== "spelling-only") host.append(element("span", "viz-gloss", nodeGloss(node, options)));
+			const leaves = placed?.leaves.map((id) => graph.nodes.find((candidate) => candidate.id === id)) || [];
+			const sequence = leaves
+				.sort((a, b) => (a?.seqIndex ?? -1) - (b?.seqIndex ?? -1))
+				.map((leaf) => leaf?.kind === "morpheme" ? word.seq[leaf.seqIndex] : null);
+			let combined = null;
+			try { if (sequence.length && sequence.every(Boolean) && engine?.buildWord) combined = engine.buildWord(sequence); }
+			catch { /* Keep the missing engine form visible below. */ }
+			const form = combined?.ok ? `${combined.approximate ? "≈ " : ""}${combined.word}` : t("noSurface");
+			host.append(element("strong", "viz-form", form));
+			if (options.spellingMode !== "spelling-only") host.append(element("span", "viz-gloss", nodeGloss(node, { ...options, fillBlanks: true })));
 		}
 	}
 	for (const placed of layout.nodes.slice().sort((a, b) => a.depth - b.depth || a.x - b.x)) {
@@ -40,12 +48,12 @@ export function renderScopeTree(host, word, options, presetsById = new Map()) {
 		const button = action("", () => {
 			board.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.node === node.id)));
 			surface.querySelectorAll("span").forEach((span) => span.classList.toggle("is-selected", placed.leaves.includes(span.dataset.node)));
-			detail.replaceChildren(); labelNode(detail, node);
+			detail.replaceChildren(); labelNode(detail, node, placed);
 		});
 		button.className = "derivation-node"; button.dataset.node = node.id; button.setAttribute("aria-pressed", "false");
 		if (node.kind === "morpheme") applyMorphemeColours(button, presetsById.get(node.morpheme_id));
 		button.style.left = `${placed.x - 95}px`; button.style.top = `${placed.y}px`;
-		labelNode(button, node);
+		labelNode(button, node, placed);
 		if (options.showIds) button.append(element("code", "viz-id", node.id));
 		board.append(button);
 	}

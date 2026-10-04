@@ -66,6 +66,7 @@ export function presentSequence(seq, _catalog, options = {}) {
 		const surface = options.word === undefined ? null : { j: seqIndex, citationText: text, marker: "", surfaceStart: start, surfaceEnd: start + text.length, surfaceText: text, changedRanges: [] };
 		start += text.length;
 		const label = { gloss: item.id, stemIn: "", stemOut: item.id, semanticStep: { safe: false }, inflection: item.inflection };
+		if (globalThis.__BLOQ_TEST_GLOSS_TEMPLATES__) label.templateGloss = `${item.id} template`;
 		nodes.push({ id: `m-${seqIndex}`, kind: "morpheme", seqIndex, morpheme_id: item.id, zero_surface: text === "", surface, labels: { en: label, da: label } });
 		if (seqIndex > 0) {
 			nodes.push({ id: `d-${seqIndex}`, kind: "ordered_derivation", seqIndex, labels: { en: label, da: label } });

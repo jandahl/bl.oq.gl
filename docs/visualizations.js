@@ -207,7 +207,7 @@ export function mountVisualizations(host, deps) {
 		if (current.held) viewport.append(element("p", "", target?.surface || target?.raw || current.held));
 		else if (view === "cards") renderCards(viewport, current, options, edit, deps.getPresetsById());
 		else if (view === "interlinear") renderInterlinear(viewport, current, options, deps.getPresetsById());
-		else if (view === "tree") renderScopeTree(viewport, current, options, deps.getPresetsById());
+		else if (view === "tree") renderScopeTree(viewport, current, options, deps.getPresetsById(), deps.engine);
 		else if (view === "ports") renderPortGraph(viewport, current, options, edit, (index) => {
 			if (current.seq.length !== current.ids.length) return;
 			selectedNode = index; insertionIndex = index + 1;

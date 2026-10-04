@@ -967,7 +967,7 @@ footer p { margin: 0; }
 #visualizations button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .card-palette { padding: .7rem 0; margin-top: .75rem; border-top: 1px solid var(--border); }
 .visualization-status.is-error { color: var(--error); }
-@media (pointer: coarse) { #visualizations button, #visualizations select { min-height: 44px; } }
+@media (pointer: coarse) { #visualizations button, #visualizations select, #visualizations input[type="search"] { min-height: 44px; } }
 
 /* Morpheme cards use the engine's theme-specific colour triples. */
 #visualizations .api-morpheme-colours {
