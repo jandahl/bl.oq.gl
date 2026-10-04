@@ -205,3 +205,16 @@ test("Deconstruct links retain the routed visualization without leaking a Build 
 	await expect(page.locator('#visualization-view [data-value="ports"]')).toHaveAttribute("aria-checked", "true");
 	await expect(page).not.toHaveURL(/chain=/);
 });
+
+
+test("surface ribbon uses pinned API spans and preserves the complete word", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG&view=ribbon");
+	await expect(page.locator(".surface-ribbon .ribbon-morpheme > .ribbon-surface")).toHaveText(["qimme", "qar", "punga"]);
+	await expect(page.locator(".ribbon-detail")).toContainText("Citation form: qimmeq");
+	await expect(page.locator(".ribbon-detail")).toContainText("Surface: qimme");
+	await expect(page.locator(".visualization-status")).toContainText("qimmeqarpunga");
+	await expect(page.locator('#visualization-view [data-value="ribbon"]')).toHaveAttribute("aria-checked", "true");
+	await page.goto("/?chain=qimmeq%2CN_ABS_SG&view=ribbon");
+	await expect(page.locator(".surface-ribbon .ribbon-morpheme > .ribbon-surface")).toHaveText(["qimmeq", "Ø"]);
+	await expect(page.locator(".surface-ribbon .ribbon-morpheme").last()).toHaveAttribute("aria-label", /no written span/);
+});

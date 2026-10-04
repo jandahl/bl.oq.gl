@@ -338,14 +338,14 @@ test("a rejected sentence draft keeps its error when another word is selected", 
 test("thumbnail view selector supports keyboard selection and narrow screens", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	const chooser = page.getByRole("radiogroup", { name: "Visualization", exact: true });
-	await expect(chooser.getByRole("radio")).toHaveCount(6);
-	await expect(chooser.locator("svg[aria-hidden=true]")).toHaveCount(6);
+	await expect(chooser.getByRole("radio")).toHaveCount(7);
+	await expect(chooser.locator("svg[aria-hidden=true]")).toHaveCount(7);
 	const blockly = chooser.getByRole("radio", { name: "Blockly", exact: true });
 	await blockly.focus(); await blockly.press("ArrowRight");
 	await expect(chooser.getByRole("radio", { name: "Slot cards", exact: true })).toBeFocused();
 	await expect(page.locator(".slot-card")).toHaveCount(3);
 	await page.keyboard.press("End");
-	await expect(chooser.getByRole("radio", { name: "Derivation stepper", exact: true })).toHaveAttribute("aria-checked", "true");
+	await expect(chooser.getByRole("radio", { name: "Surface ribbon", exact: true })).toHaveAttribute("aria-checked", "true");
 	expect(await chooser.evaluate((root) => window.getComputedStyle(root.querySelector('[aria-checked="true"]')).backgroundColor !== window.getComputedStyle(root.querySelector('[aria-checked="false"]')).backgroundColor)).toBe(true);
 	await page.setViewportSize({ width: 360, height: 800 });
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -404,4 +404,18 @@ test("view-only and invalid visualization links use safe empty-canvas defaults",
 	await page.goto("/?view=unknown");
 	await expect(page.locator('#visualization-view [data-value="blockly"]')).toHaveAttribute("aria-checked", "true");
 	await expect(page.locator("#blockly-div")).toBeVisible();
+});
+
+
+test("surface ribbon follows engine spans, selects morphemes, and localizes controls", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG&view=ribbon");
+	await expect(page.locator(".surface-ribbon .ribbon-morpheme > .ribbon-surface")).toHaveText(["qimmeq", "qaq", "vunga"]);
+	await expect(page.locator(".ribbon-detail")).toContainText("Citation form: qimmeq");
+	await expect(page.locator(".ribbon-detail")).toContainText("Surface: qimmeq");
+	await page.locator(".ribbon-morpheme").nth(1).click();
+	await expect(page.locator(".ribbon-detail")).toContainText("N_qaq_Vb");
+	await page.locator("#display-toggle").click();
+	await page.locator('#opt-ui-lang [data-value="da"]').click();
+	await expect(page.locator("#visualization-view [data-value=ribbon] span")).toHaveText("Overfladebånd");
+	await expect(page.locator(".ribbon-detail")).toContainText("Grundform:");
 });
