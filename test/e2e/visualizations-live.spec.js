@@ -230,3 +230,13 @@ test("chain contrast builds both sides independently through the pinned API", as
 	await expect(page.locator(".contrast-morpheme").nth(0)).toContainText("qimme");
 	await expect(page.locator(".contrast-morpheme").nth(5)).toContainText("punga");
 });
+
+test("inflection grid includes only engine-built forms at API feature coordinates", async ({ page }) => {
+	await page.goto("/?view=inflection&stem=neri");
+	await expect(page.locator(".inflection-grid").first()).toBeVisible();
+	const gridText = (await page.locator(".inflection-grid").allInnerTexts()).join(" ");
+	expect(gridText).toContain("Statement");
+	expect(gridText).toContain("nerivunga");
+	expect(gridText).toContain("nerivoq");
+	await expect(page.locator('#visualization-view [data-value="inflection"]')).toHaveAttribute("aria-checked", "true");
+});

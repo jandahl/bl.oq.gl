@@ -338,14 +338,14 @@ test("a rejected sentence draft keeps its error when another word is selected", 
 test("thumbnail view selector supports keyboard selection and narrow screens", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	const chooser = page.getByRole("radiogroup", { name: "Visualization", exact: true });
-	await expect(chooser.getByRole("radio")).toHaveCount(8);
-	await expect(chooser.locator("svg[aria-hidden=true]")).toHaveCount(8);
+	await expect(chooser.getByRole("radio")).toHaveCount(9);
+	await expect(chooser.locator("svg[aria-hidden=true]")).toHaveCount(9);
 	const blockly = chooser.getByRole("radio", { name: "Blockly", exact: true });
 	await blockly.focus(); await blockly.press("ArrowRight");
 	await expect(chooser.getByRole("radio", { name: "Slot cards", exact: true })).toBeFocused();
 	await expect(page.locator(".slot-card")).toHaveCount(3);
 	await page.keyboard.press("End");
-	await expect(chooser.getByRole("radio", { name: "Chain contrast", exact: true })).toHaveAttribute("aria-checked", "true");
+	await expect(chooser.getByRole("radio", { name: "Inflection grid", exact: true })).toHaveAttribute("aria-checked", "true");
 	expect(await chooser.evaluate((root) => window.getComputedStyle(root.querySelector('[aria-checked="true"]')).backgroundColor !== window.getComputedStyle(root.querySelector('[aria-checked="false"]')).backgroundColor)).toBe(true);
 	await page.setViewportSize({ width: 360, height: 800 });
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -439,6 +439,22 @@ test("chain contrast builds a searched comparison and shares its API IDs", async
 	await expect(page.locator(".contrast-controls")).toContainText("Søg i morfemkataloget");
 	await page.reload();
 	await expect(page.locator(".contrast-morphemes").nth(1)).toContainText("qimmeq");
+	await page.setViewportSize({ width: 360, height: 800 });
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("inflection grid builds forms only at structured engine feature coordinates", async ({ page }) => {
+	await page.goto("/?view=inflection");
+	await page.locator(".inflection-stem-picker input[type=search]").fill("neri");
+	await page.locator(".inflection-stem-results button").first().click();
+	await expect(page).toHaveURL(/view=inflection&stem=neri$/);
+	await expect(page.locator(".inflection-grid")).toBeVisible();
+	await expect(page.locator(".inflection-grid")).toContainText("IND");
+	const forms = await page.locator(".inflection-form").allTextContents();
+	expect(forms.some((form) => form.includes("nerivunga"))).toBe(true);
+	expect(forms.some((form) => form.includes("nerivoq"))).toBe(true);
+	await page.goto("/?view=inflection&stem=qimmeq");
+	await expect(page.locator(".inflection-status")).toContainText("no structured inflection coordinates");
 	await page.setViewportSize({ width: 360, height: 800 });
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
