@@ -8,6 +8,7 @@ import { renderScopeTree } from "./scope-tree.js";
 import { renderPortGraph } from "./port-graph.js";
 import { renderStepper } from "./stepper.js";
 import { renderSurfaceRibbon } from "./surface-ribbon.js";
+import { renderChainContrast } from "./chain-contrast.js";
 
 export function element(tag, className, text) {
 	const el = document.createElement(tag);
@@ -86,7 +87,7 @@ export function mountVisualizations(host, deps) {
 	const viewSelect = element("div", "segmented visualization-segments");
 	viewSelect.id = "visualization-view";
 	viewSelect.setAttribute("role", "radiogroup"); viewSelect.setAttribute("aria-labelledby", heading.id);
-	for (const [value, key] of [["blockly", null], ["cards", "slotCards"], ["interlinear", "interlinear"], ["tree", "derivationTree"], ["ports", "portGraph"], ["stepper", "derivationStepper"], ["ribbon", "surfaceRibbon"]]) {
+	for (const [value, key] of [["blockly", null], ["cards", "slotCards"], ["interlinear", "interlinear"], ["tree", "derivationTree"], ["ports", "portGraph"], ["stepper", "derivationStepper"], ["ribbon", "surfaceRibbon"], ["contrast", "chainContrast"]]) {
 		const button = action("", () => {}); button.dataset.value = value;
 		button.setAttribute("role", "radio"); button.setAttribute("aria-checked", String(value === "blockly"));
 		button.append(viewThumbnail(value), key ? localized("span", key) : element("span", "", "Blockly"));
@@ -213,6 +214,7 @@ export function mountVisualizations(host, deps) {
 		}, selectedNode, deps.getPresetsById());
 		else if (view === "stepper") renderStepper(viewport, current, options, deps.engine);
 		else if (view === "ribbon") renderSurfaceRibbon(viewport, current, options);
+		else if (view === "contrast") renderChainContrast(viewport, current, options, deps);
 		palette.hidden = view !== "cards" && view !== "ports";
 		at.replaceChildren();
 		for (let i = 0; i <= current.ids.length; i++) { const option = element("option", "", i === current.ids.length ? t("endOfChain") : `${t("beforeMorpheme")} ${i + 1}`); option.value = String(i); at.append(option); }
@@ -262,6 +264,8 @@ function viewThumbnail(view) {
 		for (let i = 0; i < 3; i++) { box(3 + i * 35, 12, 24, 24); draw("circle", { cx: 27 + i * 35, cy: 24, r: 2 }); }
 	} else if (view === "ribbon") {
 		for (let i = 0; i < 3; i++) { box(3 + i * 33, 8, 29, 32); line(6 + i * 33, 31, 29 + i * 33, 31); }
+	} else if (view === "contrast") {
+		box(3, 6, 43, 36); box(54, 6, 43, 36); line(8, 17, 40, 17); line(59, 17, 91, 17); line(8, 29, 40, 29); line(59, 29, 91, 29);
 	} else {
 		for (let i = 0; i < 3; i++) box(4 + i * 33, 3, 25, 12);
 		box(4, 23, 91, 21); line(13, 33, 80, 33);

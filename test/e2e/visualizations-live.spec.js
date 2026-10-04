@@ -221,3 +221,12 @@ test("surface ribbon uses pinned API spans and preserves the complete word", asy
 	await expect(page.locator(".surface-ribbon .ribbon-morpheme > .ribbon-surface")).toHaveText(["qimmeq", "Ø"]);
 	await expect(page.locator(".surface-ribbon .ribbon-morpheme").last()).toHaveAttribute("aria-label", /no written span/);
 });
+
+test("chain contrast builds both sides independently through the pinned API", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG&view=contrast&compare=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
+	await expect(page.locator(".contrast-lane")).toHaveCount(2);
+	await expect(page.locator(".contrast-lane .contrast-status")).toHaveText(["Complete word · qimmeqarpunga", "Complete word · qimmeqarpunga"]);
+	await expect(page.locator(".contrast-shared")).toHaveCount(6);
+	await expect(page.locator(".contrast-morpheme").nth(0)).toContainText("qimme");
+	await expect(page.locator(".contrast-morpheme").nth(5)).toContainText("punga");
+});

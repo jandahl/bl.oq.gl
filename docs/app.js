@@ -79,6 +79,7 @@ let DISPLAY_MQ;
 const session = createSession();
 let rawCatalog = null;
 let visualizations = null;
+let contrastChain = [];
 let paletteVisible = true;
 let blocklyThemes = null;
 let selectedBlocklyTheme = "classic";
@@ -645,6 +646,7 @@ function currentShareState() {
 	return {
 		mode: session.mode,
 		view: visualizations?.getView() || "blockly",
+		compare: contrastChain,
 		word,
 		chain: words.length === 1 ? words[0] : [],
 		words,
@@ -723,6 +725,7 @@ function syncURL({ push = false } = {}) {
  * caller already has it, or is about to set it). */
 function applyShareState(state) {
 	visualizations?.discardDraft();
+	contrastChain = state.compare || [];
 	visualizations?.setView(state.view);
 	const sentences = state.sentences?.length
 		? state.sentences
@@ -1308,6 +1311,8 @@ function mountWorkspace() {
 		getPresets: () => session.presets,
 		getPresetsById: () => session.presetsById,
 		getCatalog: () => rawCatalog,
+		getContrastChain: () => contrastChain,
+		setContrastChain: (ids) => { contrastChain = ids; syncURL({ push: true }); },
 		getOptions: displayOptions,
 		onViewChange: () => syncURL({ push: true }),
 		engine: { buildWord, presentSequence, glossSummaryItems }, matches: presetMatchesQuery, label: labelFor,
@@ -1346,7 +1351,7 @@ function mountWorkspace() {
 	}
 	const initialState = readState(location.search);
 	visualizations.setView(initialState.view);
-	if (initialState.word || initialState.chain.length > 0 || initialState.words?.length) applyShareState(initialState);
+	if (initialState.word || initialState.chain.length > 0 || initialState.words?.length || initialState.compare?.length) applyShareState(initialState);
 	requestAnimationFrame(() => { if (session.workspace) Blockly.svgResize(session.workspace); });
 }
 
