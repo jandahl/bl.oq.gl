@@ -1014,3 +1014,16 @@ html[data-theme="dark"] #visualizations .api-morpheme-colours {
 @media (max-width: 600px) { .ribbon-change-inspector { grid-template-columns: 1fr; } }
 .ribbon-unmapped-morphemes { display: flex; flex-wrap: wrap; gap: .5rem; padding-left: 1.5rem; }
 .ribbon-unmapped-morphemes li { display: flex; gap: .5rem; padding: .5rem; border: 1px solid var(--morpheme-light-border, var(--border)); border-radius: 4px; }
+.contrast-controls { display: grid; gap: .5rem; margin-bottom: 1rem; }
+.contrast-controls h3, .contrast-lane h3 { margin: 0; }
+.contrast-controls label { display: grid; gap: .25rem; }
+.contrast-search-results { display: flex; flex-wrap: wrap; gap: .35rem; }
+.contrast-selected, .contrast-morphemes { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none; }
+.contrast-selected li { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.contrast-lanes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.contrast-lane { min-width: 0; padding: .75rem; border: 1px solid var(--border); border-radius: 6px; }
+.contrast-status { overflow-wrap: anywhere; }
+.contrast-morpheme { display: grid; gap: .25rem; min-width: 0; padding: .5rem; border: 1px solid var(--morpheme-light-border, var(--border)); border-radius: 4px; overflow-wrap: anywhere; }
+.contrast-morpheme .contrast-shared { font-size: .8rem; opacity: .8; }
+.contrast-gap, .contrast-empty { display: flex; justify-content: center; color: var(--muted, currentColor); }
+@media (max-width: 600px) { .contrast-lanes { grid-template-columns: 1fr; } }

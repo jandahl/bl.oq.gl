@@ -34,6 +34,11 @@ The visualization picker keeps Blockly available and offers:
 - An editable node/port path with explicit class metadata and ending features.
 - A derivation stepper that builds each original prefix through the engine.
 - A surface ribbon aligned to engine-provided morpheme spans.
+- A side-by-side chain contrast aligned by shared API IDs and order.
+
+In chain contrast links, `chain` names the current (left) chain and the
+comma-joined `compare` parameter stores the comparison (right) chain's API
+IDs. For example: `?chain=qimmeq&view=contrast&compare=illu%2CN_ABS_SG`.
 
 Edits update the same sentence plans and share links. Invalid proposals remain
 visible in the alternative editor instead of losing morphemes through Blockly

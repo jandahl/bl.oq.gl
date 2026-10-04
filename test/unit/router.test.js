@@ -92,6 +92,17 @@ test("writeState/readState: several sentences are separated with a pipe", () => 
 	assert.deepEqual(readState(writeState(state)), state);
 });
 
+test("contrast links store the comparison chain in compact API-ID order", () => {
+	const state = { mode: "build", view: "contrast", chain: ["qimmeq"], compare: ["illu", "N_ABS_SG"] };
+	assert.equal(writeState(state), "?chain=qimmeq&view=contrast&compare=illu%2CN_ABS_SG");
+	assert.deepEqual(readState(writeState(state)), {
+		view: "contrast", mode: "build", word: "", chain: ["qimmeq"], words: [["qimmeq"]], sentences: [[ ["qimmeq"] ]], compare: ["illu", "N_ABS_SG"],
+	});
+	assert.deepEqual(readState("?view=contrast&compare=unknown"), {
+		view: "contrast", mode: "build", word: "", chain: [], words: [], sentences: [], compare: ["unknown"],
+	});
+});
+
 test("routeForState: always uses the single-page route and preserves the site base path", () => {
 	assert.equal(routeForState("/"), "/");
 	assert.equal(routeForState("/deconstruct/"), "/");
@@ -103,7 +114,7 @@ test("routeForState: always uses the single-page route and preserves the site ba
 });
 
 test("visualizations round-trip with either content mode and safely default", () => {
-	for (const view of ["cards", "interlinear", "tree", "ports", "stepper"]) {
+	for (const view of ["cards", "interlinear", "tree", "ports", "stepper", "ribbon", "contrast"]) {
 		for (const content of [{ chain: ["qimmeq"] }, { mode: "deconstruct", word: "nerivoq" }, {}]) {
 			assert.equal(readState(writeState({ ...content, view })).view, view);
 		}

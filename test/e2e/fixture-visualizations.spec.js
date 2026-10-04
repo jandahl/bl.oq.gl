@@ -338,14 +338,14 @@ test("a rejected sentence draft keeps its error when another word is selected", 
 test("thumbnail view selector supports keyboard selection and narrow screens", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	const chooser = page.getByRole("radiogroup", { name: "Visualization", exact: true });
-	await expect(chooser.getByRole("radio")).toHaveCount(7);
-	await expect(chooser.locator("svg[aria-hidden=true]")).toHaveCount(7);
+	await expect(chooser.getByRole("radio")).toHaveCount(8);
+	await expect(chooser.locator("svg[aria-hidden=true]")).toHaveCount(8);
 	const blockly = chooser.getByRole("radio", { name: "Blockly", exact: true });
 	await blockly.focus(); await blockly.press("ArrowRight");
 	await expect(chooser.getByRole("radio", { name: "Slot cards", exact: true })).toBeFocused();
 	await expect(page.locator(".slot-card")).toHaveCount(3);
 	await page.keyboard.press("End");
-	await expect(chooser.getByRole("radio", { name: "Surface ribbon", exact: true })).toHaveAttribute("aria-checked", "true");
+	await expect(chooser.getByRole("radio", { name: "Chain contrast", exact: true })).toHaveAttribute("aria-checked", "true");
 	expect(await chooser.evaluate((root) => window.getComputedStyle(root.querySelector('[aria-checked="true"]')).backgroundColor !== window.getComputedStyle(root.querySelector('[aria-checked="false"]')).backgroundColor)).toBe(true);
 	await page.setViewportSize({ width: 360, height: 800 });
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -422,4 +422,23 @@ test("surface ribbon follows engine spans, selects morphemes, and localizes cont
 	await expect(page.locator("#visualization-view [data-value=ribbon] span")).toHaveText("Overfladebånd");
 	await expect(page.locator(".ribbon-comparison")).toContainText("Grundform:");
 	await expect(page.locator(".ribbon-change-inspector")).toContainText("Inspektør for grænseændringer");
+});
+
+test("chain contrast builds a searched comparison and shares its API IDs", async ({ page }) => {
+	await page.goto("/?chain=qimmeq%2CN_qaq_Vb&view=contrast");
+	await expect(page.locator(".contrast-lane")).toHaveCount(2);
+	await expect(page.locator(".contrast-lane .contrast-status").first()).toContainText("Complete word");
+	await page.locator(".contrast-controls input[type=search]").fill("qimmeq");
+	await page.locator(".contrast-search-results button").first().click();
+	await expect(page).toHaveURL(/view=contrast&compare=qimmeq$/);
+	await expect(page.locator(".contrast-shared")).toHaveCount(2);
+	await expect(page.locator(".contrast-lane").nth(1)).toContainText("Same API ID and order");
+	await page.locator("#display-toggle").click();
+	await page.locator('#opt-ui-lang [data-value="da"]').click();
+	await expect(page.locator('#visualization-view [data-value="contrast"] span')).toHaveText("Kædesammenligning");
+	await expect(page.locator(".contrast-controls")).toContainText("Søg i morfemkataloget");
+	await page.reload();
+	await expect(page.locator(".contrast-morphemes").nth(1)).toContainText("qimmeq");
+	await page.setViewportSize({ width: 360, height: 800 });
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

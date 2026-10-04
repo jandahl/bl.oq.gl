@@ -27,7 +27,7 @@
 // Node-testable, same discipline as gloss.js/verb-endings.js -- app.js owns
 // the actual history.pushState/replaceState calls and the popstate listener.
 
-const VISUALIZATION_VIEWS = ["blockly", "cards", "interlinear", "tree", "ports", "stepper", "ribbon"];
+const VISUALIZATION_VIEWS = ["blockly", "cards", "interlinear", "tree", "ports", "stepper", "ribbon", "contrast"];
 export function normalizeView(view) {
 	return VISUALIZATION_VIEWS.includes(view) ? view : "blockly";
 }
@@ -67,6 +67,7 @@ export function readState(search) {
 	const words = sentences[0] ?? [];
 	return {
 		view: normalizeView(params.get("view")),
+		...(params.has("compare") ? { compare: parseWords(params.get("compare"))[0] ?? [] } : {}),
 		mode: mode === "deconstruct" || params.has("w") ? "deconstruct" : "build",
 		word,
 		chain: words[0] ?? [],
@@ -84,7 +85,7 @@ export function readState(search) {
  * @param {{ mode?: string, word?: string, chain?: string[], words?: string[][], sentences?: string[][][], view?: string }} [state]
  * @returns {string}
  */
-export function writeState({ mode, word, chain, words, sentences, view } = {}) {
+export function writeState({ mode, word, chain, words, sentences, view, compare } = {}) {
 	const params = new URLSearchParams();
 	if (mode === "deconstruct") {
 		if (word) params.set("w", word);
@@ -98,6 +99,7 @@ export function writeState({ mode, word, chain, words, sentences, view } = {}) {
 		if (encoded.length) params.set("chain", encoded.join("|"));
 	}
 	if (normalizeView(view) !== "blockly") params.set("view", view);
+	if (normalizeView(view) === "contrast" && compare?.length) params.set("compare", compare.join(","));
 	const qs = params.toString();
 	return qs ? `?${qs}` : "";
 }
