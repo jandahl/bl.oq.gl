@@ -24,6 +24,9 @@ export function renderSurfaceRibbon(host, word, options) {
 	const ribbon = element("div", "surface-ribbon");
 	ribbon.setAttribute("role", "group"); ribbon.setAttribute("aria-label", t("surfaceRibbon"));
 	const detail = element("div", "ribbon-detail"); detail.setAttribute("aria-live", "polite");
+	const inspector = element("section", "ribbon-change-inspector");
+	inspector.append(element("h3", "", t("boundaryInspector")));
+	const comparison = element("div", "ribbon-comparison"); inspector.append(comparison);
 	const buttons = [];
 	for (const [index, segment] of alignment.segments.entries()) {
 		if (segment.kind === "unmapped") {
@@ -36,11 +39,21 @@ export function renderSurfaceRibbon(host, word, options) {
 		const item = word.seq[node.seqIndex];
 		const button = action("", () => {
 			buttons.forEach((entry) => entry.button.setAttribute("aria-pressed", String(entry.button === button)));
+			comparison.replaceChildren();
+			const citation = node.surface?.citationText ?? morphemeForm(node, item);
+			comparison.append(element("span", "ribbon-citation", `${t("citationForm")}: `));
+			appendChangedCitation(comparison, citation, node.surface?.changedRanges);
+			comparison.append(
+				element("span", "ribbon-surface", `${t("surfaceForm")}: ${segment.text || "Ø"}`),
+				element("span", "ribbon-offsets", `${t("surfaceOffsets")}: ${segment.start}–${segment.end}`),
+			);
 			detail.replaceChildren(
-				element("span", "ribbon-citation", `${t("citationForm")}: ${morphemeForm(node, item)}`),
 				element("span", "ribbon-surface", `${t("surfaceForm")}: ${segment.text || "Ø"}`),
 				element("span", "ribbon-gloss", `${t("morphemeGloss")}: ${nodeGloss(node, options) || t("noGloss")}`),
 			);
+			if (node.surface?.changedRanges?.length) {
+				comparison.append(element("span", "ribbon-change-label", t("apiChangedRanges")));
+			} else comparison.append(element("span", "ribbon-change-label", t("noApiChangedRanges")));
 		});
 		button.className = "ribbon-morpheme api-morpheme-colours";
 		button.setAttribute("aria-pressed", "false");
@@ -53,6 +66,21 @@ export function renderSurfaceRibbon(host, word, options) {
 		if (options.showIds) button.append(element("code", "viz-id", node.morpheme_id || ""));
 		ribbon.append(button); buttons.push({ button, index });
 	}
-	host.append(ribbon, detail);
+	host.append(ribbon, inspector, detail);
 	if (buttons.length) buttons[0].button.click();
+}
+
+function appendChangedCitation(host, citation, changedRanges) {
+	const valid = Array.isArray(changedRanges)
+		? changedRanges.filter((range) => Number.isSafeInteger(range?.start) && Number.isSafeInteger(range?.end) && range.start >= 0 && range.end > range.start && range.end <= citation.length).sort((a, b) => a.start - b.start)
+		: [];
+	let cursor = 0;
+	for (const range of valid) {
+		if (range.start < cursor) continue;
+		if (range.start > cursor) host.append(element("span", "", citation.slice(cursor, range.start)));
+		host.append(element("mark", "ribbon-changed", citation.slice(range.start, range.end)));
+		cursor = range.end;
+	}
+	if (cursor < citation.length) host.append(element("span", "", citation.slice(cursor)));
+	if (!citation) host.append(element("span", "", "Ø"));
 }

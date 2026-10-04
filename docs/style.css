@@ -1006,5 +1006,11 @@ html[data-theme="dark"] #visualizations .api-morpheme-colours {
 .surface-ribbon .ribbon-morpheme .viz-gloss { font-size: .85rem; opacity: .82; }
 .surface-ribbon .ribbon-unmapped { display: inline-flex; align-items: center; border-bottom: 1px dashed var(--border); opacity: .8; }
 .ribbon-detail { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin-top: .75rem; }
+.ribbon-change-inspector { display: grid; grid-template-columns: minmax(10rem, max-content) 1fr; gap: .5rem 1rem; align-items: baseline; margin-top: 1rem; padding: .75rem; border: 1px solid var(--border); border-radius: 6px; }
+.ribbon-change-inspector h3 { margin: 0; font-size: 1rem; }
+.ribbon-comparison { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; }
+.ribbon-change-label { flex-basis: 100%; font-size: .9rem; opacity: .8; }
+.ribbon-changed { background: var(--accent-soft, #f6d365); color: inherit; text-decoration: underline; text-decoration-style: dotted; }
+@media (max-width: 600px) { .ribbon-change-inspector { grid-template-columns: 1fr; } }
 .ribbon-unmapped-morphemes { display: flex; flex-wrap: wrap; gap: .5rem; padding-left: 1.5rem; }
 .ribbon-unmapped-morphemes li { display: flex; gap: .5rem; padding: .5rem; border: 1px solid var(--morpheme-light-border, var(--border)); border-radius: 4px; }

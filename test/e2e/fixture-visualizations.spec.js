@@ -410,12 +410,16 @@ test("view-only and invalid visualization links use safe empty-canvas defaults",
 test("surface ribbon follows engine spans, selects morphemes, and localizes controls", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG&view=ribbon");
 	await expect(page.locator(".surface-ribbon .ribbon-morpheme > .ribbon-surface")).toHaveText(["qimmeq", "qaq", "vunga"]);
-	await expect(page.locator(".ribbon-detail")).toContainText("Citation form: qimmeq");
-	await expect(page.locator(".ribbon-detail")).toContainText("Surface: qimmeq");
+	await expect(page.locator(".ribbon-comparison")).toContainText("Citation form: qimmeq");
+	await expect(page.locator(".ribbon-comparison")).toContainText("Surface: qimmeq");
+	await expect(page.locator(".ribbon-change-inspector")).toContainText("Boundary change inspector");
+	await expect(page.locator(".ribbon-comparison")).toContainText("Surface offsets: 0–6");
+	await expect(page.locator(".ribbon-comparison")).toContainText("The API reports no changed citation range.");
 	await page.locator(".ribbon-morpheme").nth(1).click();
 	await expect(page.locator(".ribbon-detail")).toContainText("N_qaq_Vb");
 	await page.locator("#display-toggle").click();
 	await page.locator('#opt-ui-lang [data-value="da"]').click();
 	await expect(page.locator("#visualization-view [data-value=ribbon] span")).toHaveText("Overfladebånd");
-	await expect(page.locator(".ribbon-detail")).toContainText("Grundform:");
+	await expect(page.locator(".ribbon-comparison")).toContainText("Grundform:");
+	await expect(page.locator(".ribbon-change-inspector")).toContainText("Inspektør for grænseændringer");
 });
