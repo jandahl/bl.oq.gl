@@ -10,6 +10,7 @@ import { renderStepper } from "./stepper.js";
 import { renderSurfaceRibbon } from "./surface-ribbon.js";
 import { renderChainContrast } from "./chain-contrast.js";
 import { renderInflectionGrid } from "./inflection-grid.js";
+import { renderAnalysisLanes } from "./analysis-lanes.js";
 
 export function element(tag, className, text) {
 	const el = document.createElement(tag);
@@ -88,7 +89,7 @@ export function mountVisualizations(host, deps) {
 	const viewSelect = element("div", "segmented visualization-segments");
 	viewSelect.id = "visualization-view";
 	viewSelect.setAttribute("role", "radiogroup"); viewSelect.setAttribute("aria-labelledby", heading.id);
-	for (const [value, key] of [["blockly", null], ["cards", "slotCards"], ["interlinear", "interlinear"], ["tree", "derivationTree"], ["ports", "portGraph"], ["stepper", "derivationStepper"], ["ribbon", "surfaceRibbon"], ["contrast", "chainContrast"], ["inflection", "inflectionGrid"]]) {
+	for (const [value, key] of [["blockly", null], ["cards", "slotCards"], ["interlinear", "interlinear"], ["tree", "derivationTree"], ["ports", "portGraph"], ["stepper", "derivationStepper"], ["ribbon", "surfaceRibbon"], ["contrast", "chainContrast"], ["inflection", "inflectionGrid"], ["lanes", "analysisLanes"]]) {
 		const button = action("", () => {}); button.dataset.value = value;
 		button.setAttribute("role", "radio"); button.setAttribute("aria-checked", String(value === "blockly"));
 		button.append(viewThumbnail(value), key ? localized("span", key) : element("span", "", "Blockly"));
@@ -217,6 +218,7 @@ export function mountVisualizations(host, deps) {
 		else if (view === "ribbon") renderSurfaceRibbon(viewport, current, options);
 		else if (view === "contrast") renderChainContrast(viewport, current, options, deps);
 		else if (view === "inflection") renderInflectionGrid(viewport, options, deps);
+		else if (view === "lanes") renderAnalysisLanes(viewport, deps.getAnalysisReadings?.() || [], current?.ids || [], options, deps);
 		palette.hidden = view !== "cards" && view !== "ports";
 		at.replaceChildren();
 		for (let i = 0; i <= current.ids.length; i++) { const option = element("option", "", i === current.ids.length ? t("endOfChain") : `${t("beforeMorpheme")} ${i + 1}`); option.value = String(i); at.append(option); }
@@ -270,6 +272,8 @@ function viewThumbnail(view) {
 		box(3, 6, 43, 36); box(54, 6, 43, 36); line(8, 17, 40, 17); line(59, 17, 91, 17); line(8, 29, 40, 29); line(59, 29, 91, 29);
 	} else if (view === "inflection") {
 		for (let i = 0; i < 3; i++) { line(5, 7 + i * 14, 95, 7 + i * 14); line(30 + i * 22, 4, 30 + i * 22, 44); }
+	} else if (view === "lanes") {
+		for (let i = 0; i < 3; i++) { box(3, 3 + i * 15, 94, 12); line(8, 9 + i * 15, 25, 9 + i * 15); line(31, 9 + i * 15, 87, 9 + i * 15); }
 	} else {
 		for (let i = 0; i < 3; i++) box(4 + i * 33, 3, 25, 12);
 		box(4, 23, 91, 21); line(13, 33, 80, 33);

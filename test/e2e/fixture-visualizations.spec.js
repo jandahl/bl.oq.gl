@@ -338,15 +338,48 @@ test("a rejected sentence draft keeps its error when another word is selected", 
 test("thumbnail view selector supports keyboard selection and narrow screens", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	const chooser = page.getByRole("radiogroup", { name: "Visualization", exact: true });
-	await expect(chooser.getByRole("radio")).toHaveCount(9);
-	await expect(chooser.locator("svg[aria-hidden=true]")).toHaveCount(9);
+	await expect(chooser.getByRole("radio")).toHaveCount(10);
+	await expect(chooser.locator("svg[aria-hidden=true]")).toHaveCount(10);
 	const blockly = chooser.getByRole("radio", { name: "Blockly", exact: true });
 	await blockly.focus(); await blockly.press("ArrowRight");
 	await expect(chooser.getByRole("radio", { name: "Slot cards", exact: true })).toBeFocused();
 	await expect(page.locator(".slot-card")).toHaveCount(3);
 	await page.keyboard.press("End");
-	await expect(chooser.getByRole("radio", { name: "Inflection grid", exact: true })).toHaveAttribute("aria-checked", "true");
+	await expect(chooser.getByRole("radio", { name: "Analysis lanes", exact: true })).toHaveAttribute("aria-checked", "true");
 	expect(await chooser.evaluate((root) => window.getComputedStyle(root.querySelector('[aria-checked="true"]')).backgroundColor !== window.getComputedStyle(root.querySelector('[aria-checked="false"]')).backgroundColor)).toBe(true);
+	await page.setViewportSize({ width: 360, height: 800 });
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("analysis lanes preserve API order, localize, and select a reading on the canvas", async ({ page }) => {
+	await page.route("**/fixtures/engine-stub.js", async (route) => {
+		const response = await route.fetch();
+		const body = (await response.text()).replace(
+			"return { matches: [], evalCount: 0 };",
+			`return { matches: [
+				{ band: "gold", seq: [{ id: "neri", text: "neri" }, { id: "V_IND_INTR_3SG", text: "voq" }] },
+				{ band: "soft_exact", seq: [{ id: "illu", text: "illu" }] },
+			], evalCount: 2 };`,
+		);
+		await route.fulfill({ response, body });
+	});
+	await page.goto("/?w=fixtureword&view=lanes");
+	await expect(page.locator(".analysis-lane")).toHaveCount(2);
+	await expect(page.locator(".analysis-lane-heading").nth(0)).toContainText("gold");
+	await expect(page.locator(".analysis-lane-heading").nth(1)).toContainText("soft");
+	await expect(page.locator(".analysis-lane").first()).toHaveAttribute("aria-checked", "true");
+	await page.locator(".analysis-lane").first().focus();
+	await page.keyboard.press("ArrowDown");
+	await expect(page.locator(".analysis-lane").nth(1)).toHaveAttribute("aria-checked", "true");
+	await page.locator("#display-toggle").click();
+	await page.locator("#opt-ui-lang [data-value=da]").click();
+	await expect(page.locator("#visualization-view [data-value=lanes] span").last()).toHaveText("Analyserækker");
+	await expect(page.locator(".analysis-lanes-instruction")).toHaveText("Vælg en række for at placere læsningen på ordets lærred.");
+	await page.locator(".analysis-lane").nth(1).click();
+	await expect(page.locator(".analysis-lane").nth(1)).toHaveAttribute("aria-checked", "true");
+	await page.locator('#visualization-view [data-value="cards"]').click();
+	await expect(page.locator(".slot-card .viz-form")).toHaveText(["illu"]);
+	await expect(page).toHaveURL(/w=fixtureword/);
 	await page.setViewportSize({ width: 360, height: 800 });
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

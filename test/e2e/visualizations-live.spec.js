@@ -1,5 +1,37 @@
 import { test, expect } from "@playwright/test";
 
+test("analysis lanes show the live API's returned readings and select the same ID chain", async ({ page }) => {
+	await page.goto("/?w=qimmeqarpunga&view=lanes");
+	const apiReadings = await page.evaluate(async () => {
+		const { analyzeWordAsync } = await import("/oq-api.js");
+		const catalog = await (await import("/catalog.js")).loadCatalog();
+		const abort = new AbortController();
+		return (await analyzeWordAsync("qimmeqarpunga", catalog.presets, {}, { signal: abort.signal })).matches.map((match) => ({
+			band: match.band || "none",
+			ids: (match.seq || []).map((item) => item.id),
+		}));
+	});
+	await expect(page.locator(".analysis-lane")).toHaveCount(apiReadings.length);
+	for (const [index, reading] of apiReadings.entries()) {
+		const bandLabel = { gold: "gold", hard_exact: "exact", soft_exact: "soft", approximate: "Approximate chain" }[reading.band] || reading.band;
+		if (reading.band !== "none") await expect(page.locator(".analysis-lane").nth(index)).toContainText(bandLabel);
+	}
+	if (apiReadings.length > 1) {
+		await page.locator("#display-toggle").click();
+		await page.locator("#opt-show-ids").check();
+		const displayedIds = await page.locator(".analysis-lane").nth(1).locator("code").allTextContents();
+		const previous = await page.evaluate(async () => (await import("/blocks.js")).planFromCanvas(globalThis.Blockly.getMainWorkspace()));
+		await page.locator(".analysis-lane").nth(1).click();
+		const canvas = await page.evaluate(async () => (await import("/blocks.js")).planFromCanvas(globalThis.Blockly.getMainWorkspace()));
+		if (await page.locator(".analysis-lanes-error").count()) {
+			await expect(page.locator(".analysis-lanes-error")).toBeVisible();
+			expect(canvas).toEqual(previous);
+		} else {
+			expect(canvas[0].words[0].canvasIds).toEqual(displayedIds);
+		}
+	}
+});
+
 test("tree and stepper labels honor display modes with live engine glosses", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	await page.locator("#display-toggle").click();

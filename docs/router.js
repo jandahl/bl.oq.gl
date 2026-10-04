@@ -27,7 +27,7 @@
 // Node-testable, same discipline as gloss.js/verb-endings.js -- app.js owns
 // the actual history.pushState/replaceState calls and the popstate listener.
 
-const VISUALIZATION_VIEWS = ["blockly", "cards", "interlinear", "tree", "ports", "stepper", "ribbon", "contrast", "inflection"];
+const VISUALIZATION_VIEWS = ["blockly", "cards", "interlinear", "tree", "ports", "stepper", "ribbon", "contrast", "inflection", "lanes"];
 export function normalizeView(view) {
 	return VISUALIZATION_VIEWS.includes(view) ? view : "blockly";
 }
