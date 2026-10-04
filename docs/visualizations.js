@@ -7,6 +7,7 @@ import { renderInterlinear } from "./interlinear.js";
 import { renderScopeTree } from "./scope-tree.js";
 import { renderPortGraph } from "./port-graph.js";
 import { renderStepper } from "./stepper.js";
+import { renderSurfaceRibbon } from "./surface-ribbon.js";
 
 export function element(tag, className, text) {
 	const el = document.createElement(tag);
@@ -85,7 +86,7 @@ export function mountVisualizations(host, deps) {
 	const viewSelect = element("div", "segmented visualization-segments");
 	viewSelect.id = "visualization-view";
 	viewSelect.setAttribute("role", "radiogroup"); viewSelect.setAttribute("aria-labelledby", heading.id);
-	for (const [value, key] of [["blockly", null], ["cards", "slotCards"], ["interlinear", "interlinear"], ["tree", "derivationTree"], ["ports", "portGraph"], ["stepper", "derivationStepper"]]) {
+	for (const [value, key] of [["blockly", null], ["cards", "slotCards"], ["interlinear", "interlinear"], ["tree", "derivationTree"], ["ports", "portGraph"], ["stepper", "derivationStepper"], ["ribbon", "surfaceRibbon"]]) {
 		const button = action("", () => {}); button.dataset.value = value;
 		button.setAttribute("role", "radio"); button.setAttribute("aria-checked", String(value === "blockly"));
 		button.append(viewThumbnail(value), key ? localized("span", key) : element("span", "", "Blockly"));
@@ -211,6 +212,7 @@ export function mountVisualizations(host, deps) {
 			filter.value = ""; limit = 24; palette.open = true; renderPalette();
 		}, selectedNode, deps.getPresetsById());
 		else if (view === "stepper") renderStepper(viewport, current, options, deps.engine);
+		else if (view === "ribbon") renderSurfaceRibbon(viewport, current, options);
 		palette.hidden = view !== "cards" && view !== "ports";
 		at.replaceChildren();
 		for (let i = 0; i <= current.ids.length; i++) { const option = element("option", "", i === current.ids.length ? t("endOfChain") : `${t("beforeMorpheme")} ${i + 1}`); option.value = String(i); at.append(option); }
@@ -258,6 +260,8 @@ function viewThumbnail(view) {
 	} else if (view === "ports") {
 		line(10, 24, 90, 24);
 		for (let i = 0; i < 3; i++) { box(3 + i * 35, 12, 24, 24); draw("circle", { cx: 27 + i * 35, cy: 24, r: 2 }); }
+	} else if (view === "ribbon") {
+		for (let i = 0; i < 3; i++) { box(3 + i * 33, 8, 29, 32); line(6 + i * 33, 31, 29 + i * 33, 31); }
 	} else {
 		for (let i = 0; i < 3; i++) box(4 + i * 33, 3, 25, 12);
 		box(4, 23, 91, 21); line(13, 33, 80, 33);

@@ -33,6 +33,7 @@ The visualization picker keeps Blockly available and offers:
 - A connected derivation tree with aligned leaves and separate semantic evidence.
 - An editable node/port path with explicit class metadata and ending features.
 - A derivation stepper that builds each original prefix through the engine.
+- A surface ribbon aligned to engine-provided morpheme spans.
 
 Edits update the same sentence plans and share links. Invalid proposals remain
 visible in the alternative editor instead of losing morphemes through Blockly

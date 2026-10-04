@@ -1001,3 +1001,10 @@ html[data-theme="dark"] #visualizations .api-morpheme-colours {
    visually separate. Preserve the existing selection outline. */
 #visualizations .port-node [data-select-node] { background: transparent; color: inherit; }
 #visualizations .api-morpheme-colours .viz-secondary { color: inherit; opacity: .75; }
+.surface-ribbon { display: flex; align-items: stretch; flex-wrap: wrap; gap: .2rem; min-height: 5rem; padding: .5rem; border: 1px solid var(--border); border-radius: 6px; overflow-wrap: anywhere; }
+#visualizations .surface-ribbon .ribbon-morpheme { display: flex; flex: 1 1 auto; flex-direction: column; align-items: flex-start; justify-content: center; min-width: 3rem; min-height: 4rem; gap: .25rem; overflow-wrap: anywhere; }
+.surface-ribbon .ribbon-morpheme .viz-gloss { font-size: .85rem; opacity: .82; }
+.surface-ribbon .ribbon-unmapped { display: inline-flex; align-items: center; border-bottom: 1px dashed var(--border); opacity: .8; }
+.ribbon-detail { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin-top: .75rem; }
+.ribbon-unmapped-morphemes { display: flex; flex-wrap: wrap; gap: .5rem; padding-left: 1.5rem; }
+.ribbon-unmapped-morphemes li { display: flex; gap: .5rem; padding: .5rem; border: 1px solid var(--morpheme-light-border, var(--border)); border-radius: 4px; }
