@@ -3,25 +3,37 @@ import { test, expect } from "@playwright/test";
 test("analysis lanes show the live API's returned readings and select the same ID chain", async ({ page }) => {
 	await page.goto("/?w=qimmeqarpunga&view=lanes");
 	const apiReadings = await page.evaluate(async () => {
-		const { analyzeWordAsync } = await import("/oq-api.js");
+		const { analyzeWordAsync, buildWord } = await import("/oq-api.js");
 		const catalog = await (await import("/catalog.js")).loadCatalog();
+		const ids = new Set(catalog.presets.map((preset) => preset.id));
 		const abort = new AbortController();
 		return (await analyzeWordAsync("qimmeqarpunga", catalog.presets, {}, { signal: abort.signal })).matches.map((match) => ({
 			band: match.band || "none",
 			ids: (match.seq || []).map((item) => item.id),
+			selectable: (match.seq || []).every((item) => ids.has(item.id)) && match.band !== "approximate"
+				&& (() => { const built = buildWord(match.seq); return built.ok && built.closed && !built.approximate; })(),
 		}));
 	});
 	await expect(page.locator(".analysis-lane")).toHaveCount(apiReadings.length);
 	for (const [index, reading] of apiReadings.entries()) {
 		const bandLabel = { gold: "gold", hard_exact: "exact", soft_exact: "soft", approximate: "Approximate chain" }[reading.band] || reading.band;
 		if (reading.band !== "none") await expect(page.locator(".analysis-lane").nth(index)).toContainText(bandLabel);
+		await expect(page.locator(".analysis-lane").nth(index)).toHaveAttribute("aria-disabled", String(!reading.selectable));
 	}
 	if (apiReadings.length > 1) {
 		await page.locator("#display-toggle").click();
 		await page.locator("#opt-show-ids").check();
 		const displayedIds = await page.locator(".analysis-lane").nth(1).locator("code").allTextContents();
 		const previous = await page.evaluate(async () => (await import("/blocks.js")).planFromCanvas(globalThis.Blockly.getMainWorkspace()));
-		await page.locator(".analysis-lane").nth(1).click();
+		if (apiReadings[1].selectable) await page.locator(".analysis-lane").nth(1).click();
+		else {
+			await expect(page.locator(".analysis-lane").nth(1)).toContainText("Inspection only");
+			await page.locator(".analysis-lane").nth(1).dispatchEvent("click");
+			const canvas = await page.evaluate(async () => (await import("/blocks.js")).planFromCanvas(globalThis.Blockly.getMainWorkspace()));
+			expect(canvas).toEqual(previous);
+			await expect(page.locator(".analysis-lanes-error")).toHaveCount(0);
+			return;
+		}
 		const canvas = await page.evaluate(async () => (await import("/blocks.js")).planFromCanvas(globalThis.Blockly.getMainWorkspace()));
 		if (await page.locator(".analysis-lanes-error").count()) {
 			await expect(page.locator(".analysis-lanes-error")).toBeVisible();

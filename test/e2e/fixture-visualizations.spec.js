@@ -466,7 +466,7 @@ test("analysis lanes preserve API order, localize, and select a reading on the c
 	await page.locator("#display-toggle").click();
 	await page.locator("#opt-ui-lang [data-value=da]").click();
 	await expect(page.locator("#visualization-view [data-value=lanes] span").last()).toHaveText("Analyserækker");
-	await expect(page.locator(".analysis-lanes-instruction")).toHaveText("Vælg en række for at placere læsningen på ordets lærred.");
+	await expect(page.locator(".analysis-lanes-instruction")).toHaveText("Vælg en komplet, præcis række for at placere den på lærredet. Rækker kun til inspektion vises stadig til sammenligning.");
 	await page.locator(".analysis-lane").nth(1).click();
 	await expect(page.locator(".analysis-lane").nth(1)).toHaveAttribute("aria-checked", "true");
 	await page.locator('#visualization-view [data-value="cards"]').click();
@@ -585,4 +585,64 @@ test("inflection grid builds forms only at structured engine feature coordinates
 	await expect(page.locator(".inflection-status")).toContainText("no structured inflection coordinates");
 	await page.setViewportSize({ width: 360, height: 800 });
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("the tree root is larger and remains contained on a narrow screen", async ({ page }) => {
+	await page.goto("/?chain=qimmeq,N_qaq_Vb,V_IND_INTR_1SG&view=tree");
+	const root = page.locator(".derivation-root");
+	await expect(root).toHaveCount(1);
+	const size = await root.boundingBox();
+	const child = await page.locator('.derivation-node:not(.derivation-root)').first().boundingBox();
+	expect(size.width).toBeGreaterThan(child.width);
+	expect(size.height).toBeGreaterThan(child.height);
+	await expect(root.locator(".viz-form")).toHaveCSS("font-size", "21.6px");
+	await page.setViewportSize({ width: 360, height: 800 });
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+	await page.goto("/?chain=qimmeq&view=tree");
+	const bounds = await page.locator(".derivation-root").evaluate((node) => ({ left: node.offsetLeft, right: node.offsetLeft + node.offsetWidth, board: node.parentElement.offsetWidth }));
+	expect(bounds.left).toBeGreaterThanOrEqual(0);
+	expect(bounds.right).toBeLessThanOrEqual(bounds.board);
+});
+
+test("inflection grid has a one-click example and explains how to read the table", async ({ page }) => {
+	await page.goto("/?view=inflection");
+	await expect(page.locator("#visualization-word")).toBeHidden();
+	await expect(page.locator(".inflection-stem-picker")).toContainText("who acts");
+	await page.locator('[data-inflection-example="neri"]').click();
+	await expect(page).toHaveURL(/stem=neri/);
+	await expect(page.locator(".inflection-grid")).toContainText("nerivunga");
+	await expect(page.locator(".inflection-grid")).toContainText("nerivoq");
+	await page.locator(".inflection-group > summary").first().click();
+	await expect(page.locator(".inflection-grid").first()).toBeHidden();
+	await page.locator(".inflection-group > summary").first().click();
+	await expect(page.locator(".inflection-grid").first()).toBeVisible();
+});
+
+test("chain contrast suggests a verified change without editing the current chain", async ({ page }) => {
+	await page.goto("/?chain=neri,V_IND_INTR_1SG&view=contrast");
+	await expect(page.locator(".contrast-controls")).toContainText("What changes in a word");
+	await page.locator('[data-contrast-suggestion="contrastChangeSubject"]').first().click();
+	await expect(page.locator(".contrast-lane .contrast-status").first()).toContainText("nerivunga");
+	await expect(page.locator(".contrast-lane .contrast-status").last()).toContainText("nerivoq");
+	await expect(page).toHaveURL(/compare=neri%2CV_IND_INTR_3SG/);
+});
+
+test("approximate lanes with missing IDs explain inspection-only status before selection", async ({ page }) => {
+	await page.route("**/fixtures/engine-stub.js", async (route) => {
+		const response = await route.fetch();
+		const body = (await response.text()).replace("return { matches: [], evalCount: 0 };", `return { matches: [
+			{ band: "hard_exact", seq: [{ id: "neri", text: "neri" }, { id: "V_IND_INTR_1SG", text: "vunga" }] },
+			{ band: "approximate", seq: [{ id: "neri", text: "neri" }, { id: "V_EXCL_INTR_3SG", text: "vunga" }] },
+		], evalCount: 2 };`);
+		await route.fulfill({ response, body });
+	});
+	await page.goto("/?w=fixtureword&view=lanes");
+	const lane = page.locator(".analysis-lane").nth(1);
+	await expect(lane).toHaveAttribute("aria-disabled", "true");
+	await expect(lane).toContainText("Inspection only");
+	await expect(lane).toContainText("V_EXCL_INTR_3SG");
+	await lane.dispatchEvent("click");
+	await expect(page.locator(".analysis-lanes-error")).toHaveCount(0);
+	await expect(page.locator(".analysis-lane").first()).toHaveAttribute("aria-checked", "true");
+	await expect(page.locator("#status-line")).toHaveText("nerivunga");
 });

@@ -3,6 +3,7 @@ import { wordPresentation } from "./visualization-model.js";
 import { applyMorphemeColours } from "./theme.js";
 import { action, element, morphemeForm, nodeGloss } from "./visualizations.js";
 import { t } from "./i18n.js";
+import { contrastSuggestions } from "./exploration-examples.js";
 
 export function renderChainContrast(host, left, options, deps) {
 	const controls = element("section", "contrast-controls");
@@ -13,6 +14,19 @@ export function renderChainContrast(host, left, options, deps) {
 	const selected = element("ol", "contrast-selected");
 	const ids = deps.getContrastChain().slice();
 	const update = () => deps.setContrastChain(ids.slice());
+	controls.append(element("p", "exploration-purpose", t("contrastPurpose")), element("p", "viz-secondary", t("contrastHowTo")));
+	const examples = element("div", "exploration-examples");
+	examples.append(element("strong", "", t("contrastTryChange")));
+	const suggestions = contrastSuggestions(left.ids || [], deps.getPresetsById(), deps.engine.buildWord);
+	for (const suggestion of suggestions) {
+		const button = action(`${suggestion.surface} — ${t(suggestion.reason)}`, () => {
+			ids.splice(0, ids.length, ...suggestion.ids); update(); drawSelected(); renderRight();
+		});
+		button.dataset.contrastSuggestion = suggestion.reason;
+		examples.append(button);
+	}
+	if (!suggestions.length) examples.append(element("p", "viz-secondary", t("contrastNoSuggestions")));
+	controls.append(examples);
 	function drawSelected() {
 		selected.replaceChildren();
 		ids.forEach((id, index) => {

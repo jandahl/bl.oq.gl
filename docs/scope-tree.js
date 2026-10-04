@@ -20,7 +20,7 @@ export function renderScopeTree(host, word, options, presetsById = new Map(), en
 		const a = positions.get(edge.parent), b = positions.get(edge.operand);
 		if (!a || !b) continue;
 		const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-		path.setAttribute("d", `M${a.x},${a.y + 82} C${a.x},${a.y + 100} ${b.x},${b.y - 18} ${b.x},${b.y}`);
+		path.setAttribute("d", `M${a.x},${a.y + a.height} C${a.x},${a.y + a.height + 18} ${b.x},${b.y - 18} ${b.x},${b.y}`);
 		path.dataset.parent = edge.parent; path.dataset.operand = edge.operand; svg.append(path);
 	}
 	board.append(svg);
@@ -51,8 +51,10 @@ export function renderScopeTree(host, word, options, presetsById = new Map(), en
 			detail.replaceChildren(); labelNode(detail, node, placed);
 		});
 		button.className = "derivation-node"; button.dataset.node = node.id; button.setAttribute("aria-pressed", "false");
+		button.classList.toggle("derivation-root", node.id === graph.derivation.root);
 		if (node.kind === "morpheme") applyMorphemeColours(button, presetsById.get(node.morpheme_id));
-		button.style.left = `${placed.x - 95}px`; button.style.top = `${placed.y}px`;
+		button.style.left = `${placed.x - placed.width / 2}px`; button.style.top = `${placed.y}px`;
+		button.style.width = `${placed.width}px`; button.style.height = `${placed.height}px`;
 		labelNode(button, node, placed);
 		if (options.showIds) button.append(element("code", "viz-id", node.id));
 		board.append(button);
