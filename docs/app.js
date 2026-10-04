@@ -80,6 +80,7 @@ const session = createSession();
 let rawCatalog = null;
 let visualizations = null;
 let contrastChain = [];
+let inflectionStem = "";
 let paletteVisible = true;
 let blocklyThemes = null;
 let selectedBlocklyTheme = "classic";
@@ -647,6 +648,7 @@ function currentShareState() {
 		mode: session.mode,
 		view: visualizations?.getView() || "blockly",
 		compare: contrastChain,
+		stem: inflectionStem,
 		word,
 		chain: words.length === 1 ? words[0] : [],
 		words,
@@ -726,6 +728,7 @@ function syncURL({ push = false } = {}) {
 function applyShareState(state) {
 	visualizations?.discardDraft();
 	contrastChain = state.compare || [];
+	inflectionStem = state.stem || "";
 	visualizations?.setView(state.view);
 	const sentences = state.sentences?.length
 		? state.sentences
@@ -1313,9 +1316,11 @@ function mountWorkspace() {
 		getCatalog: () => rawCatalog,
 		getContrastChain: () => contrastChain,
 		setContrastChain: (ids) => { contrastChain = ids; syncURL({ push: true }); },
+		getInflectionStem: () => inflectionStem,
+		setInflectionStem: (id) => { inflectionStem = id; syncURL({ push: true }); },
 		getOptions: displayOptions,
 		onViewChange: () => syncURL({ push: true }),
-		engine: { buildWord, presentSequence, glossSummaryItems }, matches: presetMatchesQuery, label: labelFor,
+		engine: { buildWord, presentSequence, glossSummaryItems }, resolveMoodLabel, resolvePersonLabel, matches: presetMatchesQuery, label: labelFor,
 		setBlocklyVisible: (visible) => {
 			blocklyDiv.hidden = !visible;
 			document.querySelector(".palette-controls").hidden = !visible;
@@ -1351,7 +1356,7 @@ function mountWorkspace() {
 	}
 	const initialState = readState(location.search);
 	visualizations.setView(initialState.view);
-	if (initialState.word || initialState.chain.length > 0 || initialState.words?.length || initialState.compare?.length) applyShareState(initialState);
+	if (initialState.word || initialState.chain.length > 0 || initialState.words?.length || initialState.compare?.length || initialState.stem) applyShareState(initialState);
 	requestAnimationFrame(() => { if (session.workspace) Blockly.svgResize(session.workspace); });
 }
 

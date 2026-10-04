@@ -103,6 +103,14 @@ test("contrast links store the comparison chain in compact API-ID order", () => 
 	});
 });
 
+test("inflection links preserve the selected API stem", () => {
+	const state = { mode: "build", view: "inflection", chain: [], stem: "neri" };
+	assert.equal(writeState(state), "?view=inflection&stem=neri");
+	assert.deepEqual(readState(writeState(state)), {
+		view: "inflection", mode: "build", word: "", chain: [], words: [], sentences: [], stem: "neri",
+	});
+});
+
 test("routeForState: always uses the single-page route and preserves the site base path", () => {
 	assert.equal(routeForState("/"), "/");
 	assert.equal(routeForState("/deconstruct/"), "/");
@@ -114,7 +122,7 @@ test("routeForState: always uses the single-page route and preserves the site ba
 });
 
 test("visualizations round-trip with either content mode and safely default", () => {
-	for (const view of ["cards", "interlinear", "tree", "ports", "stepper", "ribbon", "contrast"]) {
+	for (const view of ["cards", "interlinear", "tree", "ports", "stepper", "ribbon", "contrast", "inflection"]) {
 		for (const content of [{ chain: ["qimmeq"] }, { mode: "deconstruct", word: "nerivoq" }, {}]) {
 			assert.equal(readState(writeState({ ...content, view })).view, view);
 		}
