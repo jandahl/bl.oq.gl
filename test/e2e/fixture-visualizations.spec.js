@@ -604,6 +604,22 @@ test("the tree root is larger and remains contained on a narrow screen", async (
 	expect(bounds.right).toBeLessThanOrEqual(bounds.board);
 });
 
+test("multi-sentence focus navigation groups words by sentence", async ({ page }) => {
+	await page.evaluate(async () => {
+		const { renderSentencePlan } = await import("/blocks.js");
+		const catalog = await (await import("/catalog.js")).loadCatalog();
+		renderSentencePlan(globalThis.Blockly.getMainWorkspace(), [
+			{ source: "First sentence", words: [{ canvasIds: ["qimmeq"] }, { canvasIds: ["illu"] }] },
+			{ source: "Second sentence", words: [{ canvasIds: ["neri", "V_IND_INTR_3SG"] }] },
+		], new Map(catalog.presets.map((p) => [p.id, p])), {});
+	});
+	await page.locator('#visualization-view [data-value="cards"]').click();
+	await expect(page.locator("#visualization-word optgroup")).toHaveCount(2);
+	await expect(page.locator("#visualization-word optgroup").first()).toHaveAttribute("label", "Sentence 1");
+	await expect(page.locator("#visualization-word optgroup").last()).toHaveAttribute("label", "Sentence 2");
+	await expect(page.locator("#visualization-word").locator("xpath=.." )).toContainText("Focus");
+});
+
 test("inflection grid has a one-click example and explains how to read the table", async ({ page }) => {
 	await page.goto("/?view=inflection");
 	await expect(page.locator("#visualization-word")).toBeHidden();
