@@ -1100,13 +1100,14 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 				});
 				continue;
 			}
-			const analyzed = result.matches.map((match) => ({ seq: match.seq, built: buildWord(match.seq) }));
+			const analyzed = result.matches.map((match) => ({ ...match, seq: match.seq, built: buildWord(match.seq) }));
 			const best = analyzed[0];
 			parts.push({
 				word: token,
 				seq: best.seq,
 				built: best.built,
 				alternatives: analyzed.slice(1),
+				readings: analyzed,
 				ids: best.seq.map((item) => item.id).filter(Boolean),
 			});
 		}
@@ -1318,6 +1319,35 @@ function mountWorkspace() {
 		setContrastChain: (ids) => { contrastChain = ids; syncURL({ push: true }); },
 		getInflectionStem: () => inflectionStem,
 		setInflectionStem: (id) => { inflectionStem = id; syncURL({ push: true }); },
+		getAnalysisReadings: () => session.mode === "deconstruct" && !session.lastSentencePlan && session.lastDeconstructParts?.length === 1 && !session.lastDeconstructParts[0].missing
+			? (session.lastDeconstructParts[0].readings || [session.lastDeconstructParts[0]])
+			: [],
+		selectAnalysisReading: (reading) => {
+			const ids = (reading.seq || []).map((item) => item.id);
+			if (!ids.length || ids.some((id) => !session.presetsById.has(id))) return { error: t("analysisLaneMissingMorpheme") };
+			const seq = ids.flatMap((id) => session.presetsById.get(id).seq);
+			const built = buildWord(seq);
+			if (!built.ok) return { error: t("analysisLaneCanvasUnsupported") };
+			const previousPlan = session.workspace ? snapshotCanvas(session.workspace) : null;
+			if (session.workspace) {
+				renderSentencePlan(session.workspace, [{ words: [{ canvasIds: ids, presentation: nounPresentationValue() }] }], session.presetsById, displayOptions());
+				if (!planMatchesCanvas(topLevelSentences(session.workspace), { sentences: [{ words: [{ canvasIds: ids }] }] })) {
+					renderSentencePlan(session.workspace, previousPlan, session.presetsById, displayOptions());
+					refreshBuild();
+					return { error: t("analysisLaneCanvasUnsupported") };
+				}
+			}
+			session.lastDeconstructSeq = seq;
+			session.lastDeconstructBuilt = built;
+			session.lastDeconstructIds = [ids];
+			if (session.workspace) {
+				session.workspace.scrollCenter();
+				requestAnimationFrame(() => Blockly.svgResize(session.workspace));
+				refreshBuild();
+			}
+			syncURL({ push: true });
+			return true;
+		},
 		getOptions: displayOptions,
 		onViewChange: () => syncURL({ push: true }),
 		engine: { buildWord, presentSequence, glossSummaryItems }, resolveMoodLabel, resolvePersonLabel, matches: presetMatchesQuery, label: labelFor,

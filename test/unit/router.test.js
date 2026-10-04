@@ -122,7 +122,7 @@ test("routeForState: always uses the single-page route and preserves the site ba
 });
 
 test("visualizations round-trip with either content mode and safely default", () => {
-	for (const view of ["cards", "interlinear", "tree", "ports", "stepper", "ribbon", "contrast", "inflection"]) {
+	for (const view of ["cards", "interlinear", "tree", "ports", "stepper", "ribbon", "contrast", "inflection", "lanes"]) {
 		for (const content of [{ chain: ["qimmeq"] }, { mode: "deconstruct", word: "nerivoq" }, {}]) {
 			assert.equal(readState(writeState({ ...content, view })).view, view);
 		}
