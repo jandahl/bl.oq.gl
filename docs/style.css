@@ -101,7 +101,7 @@ header, main, footer { max-width: 96rem; margin-left: auto; margin-right: auto; 
 	max-width: none;
 }
 
-.header-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.header-top { display: flex; align-items: baseline; justify-content: flex-start; gap: 1rem; flex-wrap: wrap; }
 .header-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 h1 { margin: 0 0 0.2rem; font-size: 1.35rem; font-weight: 750; letter-spacing: 0.16em; }
 .theme-toggle {
@@ -197,9 +197,9 @@ h1 { margin: 0 0 0.2rem; font-size: 1.35rem; font-weight: 750; letter-spacing: 0
 	align-items: center;
 }
 #display-panel:not(.is-open) { display: none; }
-#display-panel.is-open { position: fixed; z-index: 20; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 1rem 3rem rgb(0 0 0 / .3); pointer-events: none; }
+#display-panel.is-open { position: fixed; z-index: 200; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 1rem 3rem rgb(0 0 0 / .3); pointer-events: none; }
 #display-panel.is-open > * { pointer-events: auto; }
-#display-panel.is-open::before { content: ""; position: fixed; inset: -100vh; z-index: -1; background: rgb(0 0 0 / .45); pointer-events: none; }
+body:has(#display-panel.is-open)::before { content: ""; position: fixed; inset: 0; z-index: 150; background: rgb(8 12 14 / .62); backdrop-filter: blur(4px) saturate(.75); pointer-events: none; }
 .gloss-language-bar { margin-top: 0.35rem; }
 .view-note {
 	flex: 1 0 100%;
@@ -409,10 +409,12 @@ body:has(#results-details[open]) { --results-footer-height: min(14rem, 30vh); }
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-start;
-	justify-content: space-between;
+	justify-content: flex-start;
 	gap: 0.5rem 1rem;
 }
 .build-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.section-anchor { margin-left: .3rem; color: var(--accent); font-size: .8em; text-decoration: none; opacity: 0; transition: opacity .15s ease; }
+h2:hover .section-anchor, h2:focus-within .section-anchor, .section-anchor:focus-visible { opacity: 1; }
 .build-examples {
 	padding: 0.55rem 0.7rem;
 	border: 1px solid var(--border);

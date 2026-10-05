@@ -34,7 +34,7 @@
 		</div>
 		<p class="subtitle" data-i18n="subtitle">A block-based learning aid for building and taking apart Kalaallisut words and short sentences. Prototype — nothing here is authoritative.</p>
 		<form class="deconstruct-input" id="deconstruct-form">
-			<h2 id="entry-heading" data-i18n="entryHeading">Entry</h2>
+			<h2 id="entry-heading"><span data-i18n="entryHeading">Entry</span> <a class="section-anchor" href="#entry-heading" aria-label="Link to Entry">#</a></h2>
 			<label for="word-input" class="visually-hidden" data-i18n="attested">Word or sentence</label>
 			<div class="clearable">
 				<input id="word-input" type="text" data-i18n-placeholder="wordPlaceholder" placeholder="e.g. qimmeqarpunga or Piitap inaaniippoq." autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off" />
@@ -47,8 +47,8 @@
 			<div class="option-cluster">
 				<span id="opt-lang-label" data-i18n="glossLanguage">Gloss language</span>
 				<div id="opt-lang" class="segmented" role="radiogroup" aria-labelledby="opt-lang-label">
-					<button type="button" role="radio" data-value="en" aria-checked="true" data-i18n="english">English</button>
-					<button type="button" role="radio" data-value="da" aria-checked="false" data-i18n="danish">Dansk</button>
+					<button type="button" role="radio" data-value="en" aria-checked="true" data-i18n="englishToGreenlandic">English → Greenlandic</button>
+					<button type="button" role="radio" data-value="da" aria-checked="false" data-i18n="danishToGreenlandic">Danish → Greenlandic</button>
 					<button type="button" role="radio" data-value="both" aria-checked="false" data-i18n="both">Both</button>
 				</div>
 			</div>
@@ -92,7 +92,7 @@
 	<main>
 		<nav class="section-nav" aria-label="Sections"><a href="#analysis" data-i18n="analysisHeading">Analysis</a><a href="#build" data-i18n="buildHeading">Build</a><a href="#visualization" data-i18n="visualizationNav">Visualization</a></nav>
 		<section class="page-section analyze-section" id="analysis" aria-labelledby="analyze-heading">
-			<h2 id="analyze-heading" data-i18n="analysisHeading">Analysis</h2>
+			<h2 id="analyze-heading"><span data-i18n="analysisHeading">Analysis</span> <a class="section-anchor" href="#analysis" aria-label="Link to Analysis">#</a></h2>
 			<details id="breakdown-details" hidden>
 				<summary id="breakdown-summary">
 					<span class="disclosure-label" data-i18n="morphemeChain">Morpheme chain</span>
@@ -105,7 +105,7 @@
 		<section class="page-section build-section" id="build" aria-labelledby="build-heading">
 			<div class="build-heading-row">
 				<div>
-					<h2 id="build-heading" data-i18n="buildHeading">Build</h2>
+					<h2 id="build-heading"><span data-i18n="buildHeading">Build</span> <a class="section-anchor" href="#build" aria-label="Link to Build">#</a></h2>
 					<p class="section-instruction" data-i18n="buildInstruction">Choose a category, then drag a block onto the canvas — or try an example below.</p>
 				</div>
 				<div class="build-actions">
@@ -126,7 +126,7 @@
 				<p class="section-instruction" data-i18n="exampleDescription">Deconstructs a word or sentence and drops the closed chains onto the canvas.</p>
 			</section>
 
-			<section id="visualization" class="visualization-section" aria-labelledby="visualization-heading"><h2 id="visualization-heading" data-i18n="visualizationHeading">Visualization</h2><div id="visualizations"></div></section>
+			<section id="visualization" class="visualization-section" aria-labelledby="visualization-heading"><h2 id="visualization-heading"><span data-i18n="visualizationHeading">Visualization</span> <a class="section-anchor" href="#visualization" aria-label="Link to Visualization">#</a></h2><div id="visualizations"></div></section>
 			<div class="palette-controls">
 				<button id="palette-toggle" type="button" aria-expanded="true" aria-controls="blockly-div">Hide palette</button>
 				<div class="clearable" id="morpheme-filter-wrap">

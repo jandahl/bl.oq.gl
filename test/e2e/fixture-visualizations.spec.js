@@ -304,9 +304,12 @@ test("UI language refreshes static controls, actions, palette and stage labels",
 	await expect(page.locator(".card-palette summary")).toHaveText("Morfempalette");
 	await expect(page.locator(".slot-card").first().getByRole("button", { name: "Fjern", exact: true })).toBeVisible();
 	await expect(page.locator("#card-insert-at option").last()).toHaveText("Slutningen af kæden");
+	await page.locator("#display-close").click();
 	await page.locator('#visualization-view [data-value="stepper"]').click();
 	await page.locator('[data-stage="0"]').click();
+	await page.locator("#display-toggle").click();
 	await page.locator('#opt-ui-lang [data-value="en"]').click();
+	await page.locator("#display-close").click();
 	await expect(page.getByRole("button", { name: "Next stage", exact: true })).toBeVisible();
 	await expect(page.locator('[data-stage="0"]')).toHaveAttribute("aria-pressed", "true");
 });
@@ -401,9 +404,9 @@ test("Blockly edits invalidate a draft while display options preserve it", async
 
 test("card and port labels honor display modes without dropping zero forms", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
-	await page.locator("#display-toggle").click();
 	for (const [view, selector] of [["cards", ".slot-card"], ["ports", "[data-select-node]"]]) {
 		await page.locator(`#visualization-view [data-value="${view}"]`).click();
+		await page.locator("#display-toggle").click();
 		await page.locator('#opt-spelling [data-value="gloss-only"]').click();
 		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(0);
 		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(2);
@@ -413,6 +416,7 @@ test("card and port labels honor display modes without dropping zero forms", asy
 		await page.locator('#opt-spelling [data-value="both"]').click();
 		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(2);
 		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(2);
+		await page.locator("#display-close").click();
 	}
 });
 
