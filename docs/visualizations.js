@@ -96,7 +96,7 @@ export function mountVisualizations(host, deps) {
 		viewSelect.append(button);
 	}
 	enhanceSegmented(viewSelect); viewLabel.append(viewSelect);
-	const wordLabel = element("label"); wordLabel.append(localized("span", "selectedWord"));
+	const wordLabel = element("label"); wordLabel.append(localized("span", "selectedFocus"));
 	const wordSelect = element("select"); wordSelect.id = "visualization-word"; wordLabel.append(wordSelect);
 	chooser.append(viewLabel, wordLabel);
 	const panel = element("div", "visualization-panel"); panel.hidden = true;
@@ -179,7 +179,15 @@ export function mountVisualizations(host, deps) {
 		if (signature === nextSignature) return;
 		signature = nextSignature;
 		wordSelect.replaceChildren();
-		words.forEach(({ word }, index) => {
+		let currentSentence = -1;
+		let group = null;
+		words.forEach(({ word, s }, index) => {
+			if (s !== currentSentence) {
+				currentSentence = s;
+				group = element("optgroup");
+				group.label = t("sentenceN", { n: s + 1 });
+				wordSelect.append(group);
+			}
 			let label = word.surface || word.raw || "…";
 			const ids = word.canvasIds || [];
 			if (!word.heldLabel && ids.length) {
@@ -194,7 +202,7 @@ export function mountVisualizations(host, deps) {
 			} else label = t("noSurface");
 				if (options.showIds) label += ` · ${ids.join(" + ")}`;
 			}
-			const option = element("option", "", `${index + 1} · ${label}`); option.value = String(index); wordSelect.append(option);
+			const option = element("option", "", `${index + 1} · ${label}`); option.value = String(index); group.append(option);
 		});
 		wordSelect.value = String(selected); wordSelect.disabled = !words.length;
 		if (view === "blockly") return;
