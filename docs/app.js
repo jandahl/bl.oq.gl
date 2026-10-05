@@ -50,6 +50,8 @@ let breakdownSummaryMeta;
 let themeToggleBtn;
 let displayToggleBtn;
 let displayPanel;
+let displayCloseBtn;
+let pasteWordBtn;
 let paletteToggleBtn;
 let copyLinkBtn;
 let clearCanvasBtn;
@@ -74,7 +76,6 @@ let loadingStatus;
 let loadingProgress;
 let loadingProgressFill;
 let prefersDarkQuery;
-let DISPLAY_MQ;
 
 const session = createSession();
 let rawCatalog = null;
@@ -102,6 +103,8 @@ function bindDom() {
 	themeToggleBtn = document.getElementById("theme-toggle");
 	displayToggleBtn = document.getElementById("display-toggle");
 	displayPanel = document.getElementById("display-panel");
+	displayCloseBtn = document.getElementById("display-close");
+	pasteWordBtn = document.getElementById("paste-word-btn");
 	paletteToggleBtn = document.getElementById("palette-toggle");
 	copyLinkBtn = document.getElementById("copy-link-btn");
 	clearCanvasBtn = document.getElementById("clear-canvas-btn");
@@ -127,7 +130,6 @@ function bindDom() {
 	loadingProgress = document.getElementById("loading-progress");
 	loadingProgressFill = document.getElementById("loading-progress-fill");
 	prefersDarkQuery = window.matchMedia("(prefers-color-scheme: dark)");
-	DISPLAY_MQ = window.matchMedia("(min-width: 720px)");
 	paletteVisible = window.innerWidth >= 640;
 }
 
@@ -446,18 +448,13 @@ function initBlocklyTheme() {
 }
 
 function initDisplayChrome() {
-	function sync() {
-		if (displayToggleBtn.dataset.userToggled === "true") return;
-		displayPanel.classList.remove("is-open");
-		displayToggleBtn.setAttribute("aria-expanded", "false");
-	}
+	function sync() { displayToggleBtn.setAttribute("aria-expanded", String(displayPanel.classList.contains("is-open"))); }
 	displayToggleBtn.addEventListener("click", () => {
 		const open = !displayPanel.classList.contains("is-open");
 		displayPanel.classList.toggle("is-open", open);
-		displayToggleBtn.dataset.userToggled = "true";
-		displayToggleBtn.setAttribute("aria-expanded", String(open));
+		sync();
 	});
-	DISPLAY_MQ.addEventListener("change", sync);
+	displayCloseBtn?.addEventListener("click", () => { displayPanel.classList.remove("is-open"); sync(); });
 	sync();
 }
 
@@ -1237,6 +1234,16 @@ function bindUiEvents() {
 	deconstructForm.addEventListener("submit", (e) => {
 		e.preventDefault();
 		runDeconstruct();
+	});
+	pasteWordBtn?.addEventListener("click", async () => {
+		try {
+			if (!navigator.clipboard?.readText) throw new Error("Clipboard unavailable");
+			setFieldValue(wordInput, await navigator.clipboard.readText());
+			wordInput.focus();
+		} catch {
+			wordInput.focus();
+			setStatus(t("pasteUnavailable"), "error");
+		}
 	});
 	ensureExamplesPanel();
 	copyLinkBtn.addEventListener("click", () => { copyShareLink(); });
