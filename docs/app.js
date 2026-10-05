@@ -455,6 +455,12 @@ function initDisplayChrome() {
 		sync();
 	});
 	displayCloseBtn?.addEventListener("click", () => { displayPanel.classList.remove("is-open"); sync(); });
+	document.addEventListener("pointerdown", (event) => {
+		if (!displayPanel.classList.contains("is-open") || displayPanel.contains(event.target)) return;
+		displayPanel.classList.remove("is-open");
+		sync();
+		event.stopPropagation();
+	}, true);
 	sync();
 }
 
