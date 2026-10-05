@@ -34,11 +34,13 @@
 		</div>
 		<p class="subtitle" data-i18n="subtitle">A block-based learning aid for building and taking apart Kalaallisut words and short sentences. Prototype — nothing here is authoritative.</p>
 		<form class="deconstruct-input" id="deconstruct-form">
+			<h2 id="entry-heading" data-i18n="entryHeading">Entry</h2>
 			<label for="word-input" class="visually-hidden" data-i18n="attested">Word or sentence</label>
 			<div class="clearable">
 				<input id="word-input" type="text" data-i18n-placeholder="wordPlaceholder" placeholder="e.g. qimmeqarpunga or Piitap inaaniippoq." autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off" />
 				<button type="button" class="clear-field" id="word-input-clear" hidden aria-label="Clear word" data-i18n-aria-label="clearWord">×</button>
 			</div>
+			<button id="paste-word-btn" type="button" class="theme-toggle" data-i18n="paste">Paste</button>
 			<button id="analyze-btn" type="submit" data-i18n="deconstruct">Deconstruct</button>
 		</form>
 		<div class="view-options gloss-language-bar">
@@ -60,8 +62,8 @@
 			</div>
 			<p class="view-note" data-i18n="viewStyleNote">Horizontal and wrap are still the Blockly blocks. A word runs left to right instead of as a tall stack.</p>
 		</div>
-		<div class="view-options settings-panel" id="display-panel" aria-labelledby="settings-heading">
-			<h2 id="settings-heading" data-i18n="settingsHeading">Display and language</h2>
+		<div class="settings-panel" id="display-panel" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
+			<div class="modal-header"><h2 id="settings-heading" data-i18n="settingsHeading">Display and language</h2><button id="display-close" type="button" class="theme-toggle" data-i18n="close">Close</button></div>
 			<div class="settings-grid">
 			<div class="option-cluster"><span id="ui-lang-label" data-i18n="uiLanguage">UI language</span><div id="opt-ui-lang" class="segmented" role="radiogroup" aria-labelledby="ui-lang-label"><button type="button" role="radio" data-value="en" aria-checked="true" data-i18n="english">English</button><button type="button" role="radio" data-value="da" aria-checked="false" data-i18n="danish">Dansk</button></div></div>
 			<label><input type="checkbox" id="opt-reading-order" checked /> <span data-i18n="readLast">Read last morpheme first</span></label>
@@ -88,8 +90,9 @@
 	</header>
 
 	<main>
-		<section class="page-section analyze-section" aria-labelledby="analyze-heading">
-			<h2 id="analyze-heading" data-i18n="analyzeHeading">Analyze</h2>
+		<nav class="section-nav" aria-label="Sections"><a href="#analysis" data-i18n="analysisHeading">Analysis</a><a href="#build" data-i18n="buildHeading">Build</a><a href="#visualization" data-i18n="visualization">Visualization</a></nav>
+		<section class="page-section analyze-section" id="analysis" aria-labelledby="analyze-heading">
+			<h2 id="analyze-heading" data-i18n="analysisHeading">Analysis</h2>
 			<details id="breakdown-details" hidden>
 				<summary id="breakdown-summary">
 					<span class="disclosure-label" data-i18n="morphemeChain">Morpheme chain</span>
@@ -99,10 +102,10 @@
 			</details>
 		</section>
 
-		<section class="page-section build-section" aria-labelledby="build-heading">
+		<section class="page-section build-section" id="build" aria-labelledby="build-heading">
 			<div class="build-heading-row">
 				<div>
-					<h2 id="build-heading" data-i18n="buildHeading">Build a word</h2>
+					<h2 id="build-heading" data-i18n="buildHeading">Build</h2>
 					<p class="section-instruction" data-i18n="buildInstruction">Choose a category, then drag a block onto the canvas — or try an example below.</p>
 				</div>
 				<div class="build-actions">
@@ -123,7 +126,7 @@
 				<p class="section-instruction" data-i18n="exampleDescription">Deconstructs a word or sentence and drops the closed chains onto the canvas.</p>
 			</section>
 
-			<div id="visualizations"></div>
+			<section id="visualization" class="visualization-section" aria-labelledby="visualization-heading"><h2 id="visualization-heading" data-i18n="visualization">Visualization</h2><div id="visualizations"></div></section>
 			<div class="palette-controls">
 				<button id="palette-toggle" type="button" aria-expanded="true" aria-controls="blockly-div">Hide palette</button>
 				<div class="clearable" id="morpheme-filter-wrap">
