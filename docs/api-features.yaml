@@ -1,10 +1,35 @@
 contract_version: 1
 api: oq-api
-api_version: 0.4.6
+api_version: 0.4.25
 consumer: jandahl/bl.oq.gl
 consumes:
   - sentence-analysis
+  - noun-paradigm
+  - generation-sentence-cards
+  - sentence-generation
+  - translation-contracts
+  - sequence-semantic-composition
+  - semantic-frame-presentation
 evidence:
   sentence-analysis:
     tests:
       - test/unit/sentence-plan.test.js
+  noun-paradigm:
+    tests:
+      - test/unit/noun-endings.test.js
+  generation-sentence-cards:
+    tests:
+      - test/unit/generation.test.js
+      - test/unit/sentence-plan.test.js
+  sentence-generation:
+    tests:
+      - test/unit/generation.test.js
+  translation-contracts:
+    tests:
+      - test/unit/generation.test.js
+  sequence-semantic-composition:
+    tests:
+      - test/unit/semantics.test.js
+  semantic-frame-presentation:
+    tests:
+      - test/unit/semantics.test.js

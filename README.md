@@ -43,7 +43,7 @@ IDs. For example: `?chain=qimmeq&view=contrast&compare=illu%2CN_ABS_SG`.
 
 Edits update the same sentence plans and share links. Invalid proposals remain
 visible in the alternative editor instead of losing morphemes through Blockly
-connections. Presentation data comes from oq-api 0.4.6 `presentSequence`; the
+connections. Presentation data comes from oq-api 0.4.25 `presentSequence`; the
 original compatible catalog payload is retained alongside its engine presets.
 Zero forms, approximate/open states and unresolved semantic obligations remain
 explicit. Ordered derivation is never presented as verified semantic scope.
