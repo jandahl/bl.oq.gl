@@ -209,3 +209,188 @@ export function setActiveLocale(locale) {
 export function getActiveLocale() {
 	return activeLocale;
 }
+
+export const NOUN_PARADIGM_CELLS = [
+	{ id: "N_ABS_SG", case: "absolutive", number: "sg" },
+	{ id: "N_ABS_PL", case: "absolutive", number: "pl" },
+	{ id: "N_ERG_SG", case: "ergative", number: "sg" },
+	{ id: "N_ERG_PL", case: "ergative", number: "pl" },
+	{ id: "N_INS_SG", case: "instrumental", number: "sg" },
+	{ id: "N_INS_PL", case: "instrumental", number: "pl" },
+	{ id: "N_ALL_SG", case: "allative", number: "sg" },
+	{ id: "N_ALL_PL", case: "allative", number: "pl" },
+	{ id: "N_LOC_SG", case: "locative", number: "sg" },
+	{ id: "N_ABL_SG", case: "ablative", number: "sg" },
+	{ id: "N_VIA_SG", case: "vialis", number: "sg" },
+	{ id: "N_EQU_SG", case: "equalis", number: "sg" },
+	{ id: "N_EQU_PL", case: "equalis", number: "pl" },
+];
+
+export function matchNounStem(headword, stems) {
+	const stem = (Array.isArray(stems) ? stems : []).find((s) => s?.id === headword || s?.text === headword);
+	return stem ? { ok: true, stem, match: "exact" } : { ok: false, errorKey: "missing_stem", candidateIds: [] };
+}
+
+export function nounForm(stem, spec = {}) {
+	const cellId = typeof spec.cell === "string" ? spec.cell : spec.cell?.id;
+	const cell = NOUN_PARADIGM_CELLS.find((c) => c.id === cellId) || spec.cell || null;
+	if (!stem || stem.word_class !== "N") {
+		return { ok: false, status: "unavailable", word: null, approximate: false, closed: false, cell, stemId: stem?.id ?? null, errorKey: "invalid_selection" };
+	}
+	const text = stem.expected || stem.text || stem.id;
+	const endingId = cell?.id || spec.ending?.id || "";
+	return { ok: true, status: "built", word: `${text}_${endingId}`, approximate: false, closed: true, cell, stemId: stem.id, errorKey: null };
+}
+
+export function nounParadigm(stem, spec = {}) {
+	return {
+		stemId: stem?.id ?? null,
+		cells: NOUN_PARADIGM_CELLS.map((cell) => nounForm(stem, { ...spec, cell: cell.id })),
+	};
+}
+
+// ---------------------------------------------------------------------------
+// Generation and card projection stubs (3a)
+// ---------------------------------------------------------------------------
+export const GENERATION_CARD_SCHEMA = "generation-card/v1";
+export const GENERATION_CARD_FEATURE = "generation-sentence-cards";
+export const GENERATION_CARD_FINISHED_SCHEMA = "generation-card-finished/v1";
+export const GENERATION_CARD_PROJECTION_RECORDED = "recorded_chain";
+export const GENERATION_CARD_PROJECTION_LIVE = "live_generation";
+export const GENERATION_CARD_PROJECTION_UNKNOWN = "unknown";
+
+export function inferGenerationCardProjectionKind(card) {
+	if (card?.projection_kind === GENERATION_CARD_PROJECTION_RECORDED) return GENERATION_CARD_PROJECTION_RECORDED;
+	if (card?.projection_kind === GENERATION_CARD_PROJECTION_LIVE) return GENERATION_CARD_PROJECTION_LIVE;
+	return GENERATION_CARD_PROJECTION_UNKNOWN;
+}
+
+export function generationCardFinishedState(card) {
+	if (!card || typeof card !== "object") {
+		return {
+			schema_version: GENERATION_CARD_FINISHED_SCHEMA,
+			showable: false,
+			complete: false,
+			status_label: "Malformed generation card",
+		};
+	}
+	const isRecorded = card.projection_kind === GENERATION_CARD_PROJECTION_RECORDED;
+	return {
+		schema_version: GENERATION_CARD_FINISHED_SCHEMA,
+		showable: Boolean(card.ok),
+		complete: Boolean(card.ok && !isRecorded),
+		status_label: card.ok ? "Ready" : "Incomplete",
+	};
+}
+
+export function projectGenerationCard(result, options = {}) {
+	const words = Array.isArray(result?.words) ? result.words : [];
+	return {
+		schema_version: GENERATION_CARD_SCHEMA,
+		ok: Boolean(result?.ok ?? true),
+		projection_kind: GENERATION_CARD_PROJECTION_LIVE,
+		words: words.map((w) => ({
+			surface: w.surface || w.text || "",
+			morpheme_ids: w.morpheme_ids || w.canvasIds || [],
+		})),
+		options,
+	};
+}
+
+export function projectGenerationWordCard(args) {
+	return {
+		surface: args.surface || "",
+		morpheme_ids: args.morpheme_ids || [],
+	};
+}
+
+export function projectRecordedChainCard(args) {
+	return {
+		schema_version: GENERATION_CARD_SCHEMA,
+		ok: true,
+		projection_kind: GENERATION_CARD_PROJECTION_RECORDED,
+		words: [{ surface: args.surface || "", morpheme_ids: args.morpheme_ids || [] }],
+	};
+}
+
+export async function generateFromMeaning(args) {
+	return {
+		schema_version: "generation-result/v1",
+		ok: true,
+		words: [{ surface: "stub", morpheme_ids: ["neri", "V_IND_INTR_3SG"] }],
+		args,
+	};
+}
+
+export async function generateFromSource(args) {
+	return {
+		schema_version: "generation-result/v1",
+		ok: true,
+		words: [{ surface: "stub", morpheme_ids: ["neri", "V_IND_INTR_3SG"] }],
+		args,
+	};
+}
+
+// ---------------------------------------------------------------------------
+// Translation contracts and sequence composition stubs (3b)
+// ---------------------------------------------------------------------------
+export const TRANSLATION_CONTRACT_VERSION = 1;
+export const SOURCE_ANALYSIS_SCHEMA = "source-analysis/v1";
+export const MEANING_GRAPH_SCHEMA = "meaning-graph/v1";
+export const TARGET_PLAN_SCHEMA = "target-plan/v1";
+export const GENERATION_CANDIDATE_SCHEMA = "generation-candidate/v1";
+
+export function validateSourceAnalysis(doc) {
+	const ok = Boolean(doc && doc.schema_version === SOURCE_ANALYSIS_SCHEMA);
+	return { ok, errors: ok ? [] : [{ path: "schema_version", message: "invalid" }] };
+}
+
+export function validateMeaningGraph(doc) {
+	const ok = Boolean(doc && doc.schema_version === MEANING_GRAPH_SCHEMA);
+	return { ok, errors: ok ? [] : [{ path: "schema_version", message: "invalid" }] };
+}
+
+export function validateTargetPlan(doc, _context) {
+	const ok = Boolean(doc && doc.schema_version === TARGET_PLAN_SCHEMA);
+	return { ok, errors: ok ? [] : [{ path: "schema_version", message: "invalid" }] };
+}
+
+export function validateGenerationCandidate(doc, _context) {
+	const ok = Boolean(doc && doc.schema_version === GENERATION_CANDIDATE_SCHEMA);
+	return { ok, errors: ok ? [] : [{ path: "schema_version", message: "invalid" }] };
+}
+
+export const SEQUENCE_COMPOSITION_SCHEMA = "sequence-composition/v1";
+export const SEMANTIC_SOURCE_CONTRACT = "semantic-source/v2";
+
+export function composeSequenceSemantics(seq, _catalog, _options = {}) {
+	const list = Array.isArray(seq) ? seq : [];
+	return {
+		schema_version: SEQUENCE_COMPOSITION_SCHEMA,
+		ok: true,
+		obligations: [],
+		root: list[0]?.id ?? null,
+	};
+}
+
+export function resolveCatalogVariant(ref, _catalog) {
+	return typeof ref === "string" ? { id: ref } : ref;
+}
+
+export function normalizeSequenceSelection(item, _index) {
+	return typeof item === "string" ? { id: item } : item;
+}
+
+export const SEMANTIC_FRAME_SCHEMA = "semantic-frame/v1";
+
+export function attachSemanticFrames(result, _catalog) {
+	return result ? { ...result, semantic_frame: { schema_version: SEMANTIC_FRAME_SCHEMA } } : result;
+}
+
+export function semanticFrameFromSequence(seq, _catalog) {
+	return { schema_version: SEMANTIC_FRAME_SCHEMA, root: seq?.[0]?.id ?? null };
+}
+
+export function semanticFrameOrLegacy(seq, catalog) {
+	return semanticFrameFromSequence(seq, catalog);
+}

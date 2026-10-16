@@ -12,6 +12,22 @@ test("parseNominalCoordinate recognizes explicit case, number, and possessor coo
 	assert.equal(parseNominalCoordinate(ending("N_ABS_POSS9SG_SG", "absolutive")), null);
 });
 
+test("parseNominalCoordinate consumes 0.4.7+ structured inflection coordinates directly", () => {
+	const structuredPossessed = {
+		id: "N_ABS_POSS2SG_SG",
+		morpheme_type: "inflectional_ending",
+		inflection: { case: "absolutive", number: "sg", possessor: { person: 2, number: "sg" } },
+	};
+	assert.deepEqual(parseNominalCoordinate(structuredPossessed), { case: "absolutive", possessor: "2SG", number: "SG" });
+
+	const structuredUnpossessed = {
+		id: "N_INS_PL",
+		morpheme_type: "inflectional_ending",
+		inflection: { case: "instrumental", number: "pl", possessor: null },
+	};
+	assert.deepEqual(parseNominalCoordinate(structuredUnpossessed), { case: "instrumental", possessor: "none", number: "PL" });
+});
+
 test("buildNounEndingIndex groups structured nominal endings and keeps duplicate candidates", () => {
 	const index = buildNounEndingIndex([
 		ending("N_ABS_SG", "absolutive", "absolutive singular"),
@@ -23,4 +39,23 @@ test("buildNounEndingIndex groups structured nominal endings and keeps duplicate
 	assert.deepEqual(index.cases, ["absolutive", "ergative"]);
 	assert.deepEqual(nounCandidatesFor(index, "absolutive", "none", "SG").map((x) => x.id), ["N_ABS_SG"]);
 	assert.deepEqual(nounCandidatesFor(index, "absolutive", "1SG", "PL").map((x) => x.id), ["N_ABS_POSS1SG_PL", "N_ABS_POSS1SG_PL_ARCHAIC"]);
+});
+
+test("nounForm and nounParadigm contracts match nominal stem [api-feature:noun-paradigm]", async () => {
+	const { NOUN_PARADIGM_CELLS, matchNounStem, nounForm, nounParadigm } = await import("../../docs/fixtures/engine-stub.js");
+	assert.equal(NOUN_PARADIGM_CELLS.length, 13);
+	assert.equal(NOUN_PARADIGM_CELLS[0].id, "N_ABS_SG");
+
+	const stem = { id: "qimmeq", text: "qimmeq", word_class: "N", morpheme_type: "stem" };
+	const matched = matchNounStem("qimmeq", [stem]);
+	assert.equal(matched.ok, true);
+	assert.equal(matched.stem.id, "qimmeq");
+
+	const cellResult = nounForm(stem, { cell: "N_ABS_SG" });
+	assert.equal(cellResult.ok, true);
+	assert.equal(cellResult.status, "built");
+
+	const paradigm = nounParadigm(stem);
+	assert.equal(paradigm.stemId, "qimmeq");
+	assert.equal(paradigm.cells.length, 13);
 });

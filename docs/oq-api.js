@@ -12,7 +12,7 @@
 // After oq-api#337 publishes standard-examples/v1, prefer bumping this pin so
 // getStandardExamples / glossText ship from the package; until then examples.js
 // falls back to the rolling/versioned JSON URLs documented there.
-export const OQ_API_URL = "https://jandahl.github.io/api.oq.gl/api/v0.4.6/public-api.js";
+export const OQ_API_URL = "https://jandahl.github.io/api.oq.gl/api/v0.4.25/public-api.js";
 
 /**
  * @param {string} [url]
@@ -47,9 +47,46 @@ export const {
 	getWordClassColors,
 	STANDARD_EXAMPLES,
 	getStandardExamples,
-	setActiveLocale,
-	getActiveLocale,
+	setActiveLocale = () => {},
+	getActiveLocale = () => "en",
 	glossText,
 	STANDARD_EXAMPLES_SCHEMA,
 	STANDARD_EXAMPLES_ID,
+	NOUN_PARADIGM_CELLS,
+	matchNounStem,
+	nounForm,
+	nounParadigm,
+	// Generation and cards (3a)
+	GENERATION_CARD_SCHEMA,
+	GENERATION_CARD_FEATURE,
+	GENERATION_CARD_FINISHED_SCHEMA,
+	GENERATION_CARD_PROJECTION_RECORDED,
+	GENERATION_CARD_PROJECTION_LIVE,
+	GENERATION_CARD_PROJECTION_UNKNOWN,
+	inferGenerationCardProjectionKind,
+	generationCardFinishedState,
+	projectGenerationCard,
+	projectGenerationWordCard,
+	projectRecordedChainCard,
+	generateFromMeaning,
+	generateFromSource,
+	// Translation contracts and sequence composition (3b)
+	TRANSLATION_CONTRACT_VERSION,
+	SOURCE_ANALYSIS_SCHEMA,
+	MEANING_GRAPH_SCHEMA,
+	TARGET_PLAN_SCHEMA,
+	GENERATION_CANDIDATE_SCHEMA,
+	validateSourceAnalysis,
+	validateMeaningGraph,
+	validateTargetPlan,
+	validateGenerationCandidate,
+	SEQUENCE_COMPOSITION_SCHEMA,
+	SEMANTIC_SOURCE_CONTRACT,
+	composeSequenceSemantics,
+	resolveCatalogVariant,
+	normalizeSequenceSelection,
+	SEMANTIC_FRAME_SCHEMA,
+	attachSemanticFrames,
+	semanticFrameFromSequence,
+	semanticFrameOrLegacy,
 } = api;

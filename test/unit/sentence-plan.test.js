@@ -9,6 +9,7 @@ import {
 	canvasAssemblies,
 	withInitialCapital,
 	assemblyReading,
+	planFromGenerationCard,
 } from "../../docs/sentence-plan.js";
 
 function assemble(lattice) {
@@ -196,4 +197,37 @@ test("planFromLattice makes one Blockly sentence per source sentence and keeps t
 	assert.equal(plan.sentences[1].assembly.text, "he eats");
 	assert.deepEqual(canvasSentences(plan), [[["illu"]], [["neri", "V_IND_INTR_3SG"]]]);
 	assert.deepEqual(canvasAssemblies(plan), ["house", "he eats"]);
+});
+
+test("planFromGenerationCard converts card to sentence plan and gates missing IDs honestly [api-feature:generation-sentence-cards]", () => {
+	const card = {
+		schema_version: "generation-card/v1",
+		ok: true,
+		sentence_gloss: "he eats in the house",
+		words: [
+			{ surface: "illumi", morpheme_ids: ["illu"] },
+			{ surface: "nerivoq", morpheme_ids: ["neri", "V_IND_INTR_3SG"] },
+		],
+	};
+	const plan = planFromGenerationCard(card, catalog);
+	assert.equal(plan.hasUnparsed, false);
+	assert.equal(plan.sentences.length, 1);
+	assert.deepEqual(canvasSentences(plan), [[["illu"], ["neri", "V_IND_INTR_3SG"]]]);
+	assert.equal(plan.sentences[0].assembly.ok, true);
+	assert.equal(plan.sentences[0].assembly.text, "he eats in the house");
+
+	// Gating: missing morpheme ID fails visibly
+	const missingCard = {
+		schema_version: "generation-card/v1",
+		ok: true,
+		sentence_gloss: "unknown word",
+		words: [
+			{ surface: "unknown", morpheme_ids: ["nonexistent_id"] },
+		],
+	};
+	const missingPlan = planFromGenerationCard(missingCard, catalog);
+	assert.equal(missingPlan.hasUnparsed, true);
+	assert.equal(missingPlan.sentences[0].words[0].status, "unparsed");
+	assert.equal(missingPlan.sentences[0].words[0].heldLabel, "heldMissingId");
+	assert.deepEqual(canvasSentences(missingPlan), []);
 });

@@ -265,3 +265,67 @@ export function canvasAssemblies(plan) {
 		.filter((sentence) => sentence.words.some((word) => word.canvasIds.length))
 		.map((sentence) => String(sentence.assembly?.text ?? ""));
 }
+
+/**
+ * Ingests an upstream generation-card/v1 into a Blockly sentence plan.
+ * Retains honest outcome gating: only cards with verified/showable words
+ * become canvas chains, and missing IDs are kept as held/unparsed items.
+ *
+ * @param {any} card
+ * @param {Map<string, any>} presetsById
+ * @param {any} [_options]
+ * @returns {ReturnType<typeof planFromLattice>}
+ */
+export function planFromGenerationCard(card, presetsById, _options = {}) {
+	const words = Array.isArray(card?.words) ? card.words : [];
+	const cardWords = words.map((word, index) => {
+		const rawIds = Array.isArray(word.morpheme_ids)
+			? word.morpheme_ids
+			: (Array.isArray(word.canvasIds) ? word.canvasIds : []);
+		const missing = rawIds.filter((id) => !presetsById.has(id));
+		const surface = word.surface || word.text || "";
+		if (missing.length > 0 || rawIds.length === 0) {
+			return {
+				surface,
+				raw: surface,
+				status: "unparsed",
+				note: missing.length > 0 ? "noteMissingId" : "noteUnverifiedReading",
+				heldLabel: missing.length > 0 ? "heldMissingId" : "heldUnverifiedReading",
+				canvasIds: [],
+				ids: rawIds,
+				latticeIndex: index,
+			};
+		}
+		return {
+			surface,
+			raw: surface,
+			status: "verified",
+			note: null,
+			heldLabel: null,
+			canvasIds: [...rawIds],
+			ids: [...rawIds],
+			headline: word.gloss || word.headline || "",
+			latticeIndex: index,
+		};
+	});
+
+	const sentenceGloss = card?.sentence_gloss || card?.gloss || "";
+	return {
+		sentences: [
+			{
+				raw: cardWords.map((w) => w.surface).join(" "),
+				words: cardWords,
+				clauseGloss: typeof sentenceGloss === "string" ? sentenceGloss : (sentenceGloss?.en || ""),
+				assembly: {
+					ok: cardWords.every((w) => w.status === "verified"),
+					text: typeof sentenceGloss === "string" ? sentenceGloss : (sentenceGloss?.en || ""),
+					reason: null,
+					mode: "generation_card",
+					parts: [],
+				},
+			},
+		],
+		openAlternatives: [],
+		hasUnparsed: cardWords.some((w) => w.status !== "verified"),
+	};
+}
