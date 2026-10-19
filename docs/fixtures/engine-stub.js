@@ -54,21 +54,6 @@ export function mergeMorphemeSources(results) {
 }
 
 export const GRAMMAR_MORPHEMES_URL = FIXTURE_CATALOG_URL;
-export const DICT_SOURCES = [{ name: "Fixture dictionary", urls: [] }];
-
-export async function searchEntries(_sources, query) {
-	const normalized = String(query || "").trim().toLowerCase();
-	const result = normalized.includes("arna") ? [{
-		surface: "arnaq",
-		wordClass: { en: "noun", path: ["noun"] },
-		gloss_en: "woman, female",
-		gloss_da: "kvinde, kvindelig",
-		glosses: { en: "woman, female", da: "kvinde, kvindelig" },
-		gloss_options: { en: ["woman", "female"], da: ["kvinde", "kvindelig"] },
-	}] : [];
-	return { results: result, attributions: ["fixture"], failed: false, errors: [] };
-}
-
 // Fixture-only contract adapter: labels are IDs and surfaces concatenate.
 // It intentionally makes no linguistic correctness claims.
 export function presentSequence(seq, _catalog, options = {}) {

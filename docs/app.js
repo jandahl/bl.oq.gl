@@ -1,4 +1,4 @@
-import { buildWord, presentSequence, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, setActiveLocale, DICT_SOURCES, searchEntries } from "./oq-api.js";
+import { buildWord, presentSequence, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, setActiveLocale } from "./oq-api.js";
 import { mountVisualizations } from "./visualizations.js";
 import { loadCatalog } from "./catalog.js";
 import {
@@ -19,7 +19,6 @@ import { readState, writeState, routeForState } from "./router.js";
 import { isSentenceInput, planFromLattice, withInitialCapital, assemblyReading } from "./sentence-plan.js";
 import { loadExamplesCatalog, mountExamplesPanel } from "./examples.js";
 import { setLocale, applyLocale, t } from "./i18n.js";
-import { mountDictionaryLookup } from "./dictionary-lookup.js";
 
 import { enhanceSegmented } from "./segmented.js";
 
@@ -82,7 +81,6 @@ let prefersDarkQuery;
 const session = createSession();
 let rawCatalog = null;
 let visualizations = null;
-let dictionaryLookup = null;
 let contrastChain = [];
 let inflectionStem = "";
 let paletteVisible = true;
@@ -291,7 +289,6 @@ function initDisplayOptions() {
 		setLocale(uiLangSelect.value);
 		setActiveLocale(uiLangSelect.value);
 		applyLocale();
-		dictionaryLookup?.refreshLocale();
 		syncPaletteToggle();
 		examplesPanel?.refreshChrome();
 		syncDocumentTitle();
@@ -1346,7 +1343,6 @@ function mountWorkspace() {
 	initTheme();
 	initBlocklyTheme();
 	initDisplayOptions();
-	dictionaryLookup = mountDictionaryLookup(document.getElementById("dictionary-lookup"), { sources: DICT_SOURCES, searchEntries });
 	initDisplayChrome();
 	injectWorkspace();
 	applyLayout();
