@@ -75,7 +75,7 @@ export function renderAnalysisLanes(host, readings, selectedIds, options, deps) 
 			const row = element("li", "analysis-lane-morpheme");
 			if (preset) applyMorphemeColours(row, preset);
 			if (node) {
-				const realized = node.zero_surface ? "Ø" : node.surface?.surfaceText;
+				const realized = node.zero_surface ? (options.showZero ? "Ø" : "") : node.surface?.surfaceText;
 				row.append(element("strong", "viz-form", realized != null ? realized : t("analysisLaneSpanUnavailable")));
 				row.append(element("span", "viz-gloss", nodeGloss(node, options) || t("noGloss")));
 			} else {

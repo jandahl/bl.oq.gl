@@ -87,7 +87,7 @@ function morphemeCell(word, index, options, deps, shared) {
 	applyMorphemeColours(cell, preset);
 	if (node) {
 		cell.append(element("strong", "", morphemeForm(node, item)));
-		const realized = node.zero_surface ? "Ø" : node.surface?.surfaceText || t("noSurface");
+		const realized = node.zero_surface ? (options.showZero ? "Ø" : "") : node.surface?.surfaceText || t("noSurface");
 		const offsets = node.surface ? ` · ${node.surface.surfaceStart}–${node.surface.surfaceEnd}` : "";
 		cell.append(element("span", "", `${realized}${offsets}`));
 		cell.append(element("span", "viz-gloss", nodeGloss(node, options) || t("noGloss")));

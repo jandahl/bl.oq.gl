@@ -75,7 +75,6 @@ function renderGroup(group, stem, deps, options, open = false) {
 				if (built?.ok && built.closed && !built.approximate) {
 					const form = element("div", "inflection-form"); applyMorphemeColours(form, preset);
 					form.append(element("strong", "", built.word));
-					if (preset.seq.some((item) => item.text === "")) form.append(element("span", "", "Ø"));
 					form.append(element("span", "viz-gloss", deps.label(preset, options)));
 					if (options.showIds) form.append(element("code", "", preset.id));
 					cell.append(form);
