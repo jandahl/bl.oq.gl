@@ -288,6 +288,15 @@ test("pinned API returns explicit zero-length spans for zero-surface morphemes [
 	expect(zeroSpan).toMatchObject({ surfaceText: "", surfaceStart: result.word.length, surfaceEnd: result.word.length });
 });
 
+test("dictionary lookup displays gloss options from the pinned API [api-feature:dictionary-gloss-options]", async ({ page }) => {
+	await page.goto("/#dictionary");
+	await page.locator("#dictionary-query").fill("arnaq");
+	await page.locator(".dictionary-search button[type=submit]").click();
+	await expect(page.locator(".dictionary-entry").first()).toBeVisible();
+	await expect(page.locator(".dictionary-gloss-options").first().locator("li").first()).toBeVisible();
+	await expect(page.locator(".dictionary-options-note").first()).toBeVisible();
+});
+
 test("chain contrast builds both sides independently through the pinned API", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG&view=contrast&compare=qimmeq%2CN_qaq_Vb%2CV_IND_INTR_1SG");
 	await expect(page.locator(".contrast-lane")).toHaveCount(2);
