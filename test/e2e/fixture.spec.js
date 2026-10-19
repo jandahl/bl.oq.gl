@@ -178,11 +178,13 @@ test("canvas edits cancel an in-flight Deconstruct", async ({ page }) => {
 	await page.locator("#word-input").fill("nerivoq");
 	await page.locator("#analyze-btn").click();
 	await expect(page.locator("#status-line")).toContainText("Analyzing");
-	await page.evaluate(() => Blockly.getMainWorkspace().getAllBlocks(false).find((block) => block.data === "N_ABS_SG").dispose(false));
-	await expect(page).toHaveURL(/chain=qimmeq$/);
+	// N_ABS_SG is implicit on the Word container; removing the only visible
+	// stem still counts as a canvas edit and drops the unpaired implicit ending.
+	await page.evaluate(() => Blockly.getMainWorkspace().getAllBlocks(false).find((block) => block.data === "qimmeq").dispose(false));
+	await expect(page).not.toHaveURL(/[?&]chain=/);
 	await page.waitForTimeout(900);
-	expect(await canvasIds(page)).toEqual([[["qimmeq"]]]);
-	await expect(page).toHaveURL(/chain=qimmeq$/);
+	expect(await canvasIds(page)).toEqual([]);
+	await expect(page).not.toHaveURL(/[?&]chain=/);
 });
 
 test("history restoration cancels an in-flight Deconstruct", async ({ page }) => {
