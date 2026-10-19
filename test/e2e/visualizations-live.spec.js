@@ -1,5 +1,19 @@
 import { test, expect } from "@playwright/test";
 
+test("analysis stem blocks offer pinned API dictionary gloss options [api-feature:dictionary-gloss-options]", async ({ page }) => {
+	await page.goto("/");
+	await expect(page.locator("#loading-modal")).toBeHidden({ timeout: 20_000 });
+	await page.locator("#word-input").fill("arnaq");
+	await page.locator("#analyze-btn").click();
+	await expect.poll(() => page.evaluate(() => {
+		const block = globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((candidate) => candidate.data === "arnaq");
+		return { label: block?.getFieldValue("LABEL"), visible: block?.getInput("GLOSS_CHOICE")?.isVisible() };
+	})).toEqual({ label: "arnaq — woman, female", visible: true });
+	await page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
+		.find((candidate) => candidate.data === "arnaq").getField("GLOSS_CHOICE").showEditor_());
+	await expect(page.getByText("English: lady", { exact: true })).toBeVisible();
+});
+
 test("analysis lanes show the live API's returned readings and select the same ID chain", async ({ page }) => {
 	await page.goto("/?w=qimmeqarpunga&view=lanes");
 	const apiReadings = await page.evaluate(async () => {

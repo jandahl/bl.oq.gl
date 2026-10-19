@@ -54,6 +54,22 @@ export function mergeMorphemeSources(results) {
 }
 
 export const GRAMMAR_MORPHEMES_URL = FIXTURE_CATALOG_URL;
+export const DICT_SOURCES = [{ name: "Fixture dictionary", urls: [] }];
+
+export async function searchEntries(_sources, query, options = {}) {
+	const normalized = String(query || "").trim().toLowerCase();
+	const result = normalized === "arnaq" && options.match === "exact" ? [{
+		surface: "arnaq",
+		desc: "taggit",
+		wordClass: { id: "noun", path: ["nominal_root", "common_noun"] },
+		gloss_options: { en: ["woman", "lady"], da: ["kvinde"] },
+	}] : [];
+	return { results: result, attributions: ["fixture"], failed: false, errors: [] };
+}
+
+export function stemWordClass(desc) {
+	return String(desc).toLowerCase() === "taggit" ? "N" : null;
+}
 // Fixture-only contract adapter: labels are IDs and surfaces concatenate.
 // It intentionally makes no linguistic correctness claims.
 export function presentSequence(seq, _catalog, options = {}) {
@@ -87,7 +103,10 @@ export function buildWord(seq) {
 	return { ok: true, word, closed: true, approximate: false };
 }
 
-export async function analyzeWordAsync() {
+export async function analyzeWordAsync(word) {
+	if (String(word).toLowerCase() === "arnaq") {
+		return { matches: [{ seq: [{ id: "arnaq", text: "arnaq" }] }], evalCount: 1 };
+	}
 	const slow = Number(globalThis.__BLOQ_SLOW_ANALYZE__) || 0;
 	if (slow > 0) {
 		// Resolve even if the caller aborted. The Clear-canvas regression is a
