@@ -375,9 +375,14 @@ function isNounEndingPreset(preset) {
 	return Boolean(parseNominalCoordinate(preset)) && !isVerbEndingPreset(preset);
 }
 
-function isZeroEndingPreset(preset) {
-	return preset?.morpheme_type === "inflectional_ending"
-		&& (preset.expected === "Ø" || preset.seq?.[0]?.text === "" || preset.seq?.[0]?.text === "Ø");
+export function isZeroEndingPreset(preset) {
+	if (preset?.morpheme_type !== "inflectional_ending") return false;
+	// oq's preset converter preserves the catalog spelling in `expected`,
+	// including the `-Ø` spelling used by some null endings, while the
+	// buildable sequence item has an empty `text`. Accept both representations
+	// so reconstruction never turns a zero ending into a visible Blockly block.
+	const forms = [preset.expected, preset.underlyingForm, preset.underlying_form, preset.seq?.[0]?.text];
+	return forms.some((form) => typeof form === "string" && ["", "Ø", "-Ø"].includes(form.trim()));
 }
 
 // Same reason as verbCatalog: the noun picker type is defined once, and a
@@ -684,16 +689,33 @@ function morphemeIdsFrom(block) {
 }
 
 function idsInsideWord(block) {
+	let ids;
 	if (block.getInput?.("ROWS")) {
-		const ids = [];
+		ids = [];
 		let row = block.getInputTargetBlock?.("ROWS");
 		while (row) {
 			ids.push(...morphemeIdsFrom(row.getInputTargetBlock?.("CHAIN")));
 			row = row.getNextBlock?.() || null;
 		}
-		return ids;
+	} else {
+		ids = morphemeIdsFrom(block.getInputTargetBlock?.("MORPHEMES"));
 	}
-	return morphemeIdsFrom(block.getInputTargetBlock?.("MORPHEMES"));
+	return appendImplicitZeroEndings(block, ids);
+}
+
+function appendImplicitZeroEndings(block, visibleIds) {
+	if (typeof block?.data !== "string") return visibleIds;
+	try {
+		const state = JSON.parse(block.data);
+		if (state?.type !== "bloq-implicit-zero-endings"
+			|| !Array.isArray(state.visibleIds)
+			|| !Array.isArray(state.endingIds)
+			|| state.visibleIds.length !== visibleIds.length
+			|| state.visibleIds.some((id, index) => id !== visibleIds[index])) return visibleIds;
+		return [...visibleIds, ...state.endingIds];
+	} catch {
+		return visibleIds;
+	}
 }
 
 /** The noun stem block inside a word, including a wrap layout's ROWS → CHAIN. */
@@ -884,12 +906,28 @@ function buildWordBlock(workspace, ids, presetsById, displayOptions) {
 	const container = workspace.newBlock(WORD_CONTAINER_TYPE);
 	container.initSvg();
 	container.render();
+	// Zero-realization citation endings still belong to the verified chain, but
+	// displaying an Ø block for every ordinary singular is distracting. Keep
+	// trailing zero-ending ids on the Word container's serialized data and
+	// restore them in idsInsideWord(), so validation, URLs, and later workspace
+	// rebuilds retain the exact analyzed sequence without a visible block.
+	let visibleIds = ids;
+	let visibleLength = ids.length;
+	while (visibleLength > 0 && isZeroEndingPreset(presetsById.get(ids[visibleLength - 1]))) visibleLength--;
+	if (visibleLength < ids.length) {
+		visibleIds = ids.slice(0, visibleLength);
+		container.data = JSON.stringify({
+			type: "bloq-implicit-zero-endings",
+			visibleIds,
+			endingIds: ids.slice(visibleLength),
+		});
+	}
 	if (viewLayout === "wrap") {
-		fillWrappedWord(workspace, container, ids, presetsById, displayOptions);
+		fillWrappedWord(workspace, container, visibleIds, presetsById, displayOptions);
 		return container;
 	}
 	let prev = null;
-	for (const id of ids) {
+	for (const id of visibleIds) {
 		const block = createMorphemeBlock(workspace, id, presetsById, displayOptions);
 		if (sideBySide()) {
 			const socket = prev ? prev.getInput("NEXT")?.connection : container.getInput("MORPHEMES")?.connection;
@@ -961,10 +999,9 @@ function createMorphemeBlock(workspace, id, presetsById, displayOptions) {
 		block.render();
 		return block;
 	}
-	// Toolbox flyouts omit a zero ending (there is nothing to drag). A chain
-	// that already names that id must still draw it — dropping it makes the
-	// canvas disagree with the analysis. A plain block keeps block.data equal
-	// to that id; the noun/verb pickers would resolve it to some other candidate.
+	// A zero ending in the middle of a chain cannot be hidden as implicit final
+	// metadata. Keep that unusual shape explicit; trailing zero endings have
+	// already been moved onto the Word container by buildWordBlock().
 	const zero = isZeroEndingPreset(preset);
 	const isVerbEnding = !zero && isVerbEndingPreset(preset);
 	const isNounEnding = !zero && isNounEndingPreset(preset);

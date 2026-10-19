@@ -665,6 +665,23 @@ test("Deconstruct instantly recreates the verified chain as connected, editable 
 	expect(endingBlock).toEqual({ data: "V_IND_INTR_1SG", mood: "indicative", moodOptionCount: 9, polarity: "positive", subject: "1|sg" });
 });
 
+test("Deconstruct keeps zero-realization singular endings implicit on the canvas", async ({ page }) => {
+	await page.fill("#word-input", "arnatuaq");
+	await page.click("#analyze-btn");
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("arnatuaq", { timeout: 20_000 });
+	await expect(page.locator("#status")).toHaveClass(/ok/);
+	const canvas = await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		const word = ws.getAllBlocks(false).find((block) => block.type === "morpheme_block__word_container");
+		return {
+			blocks: ws.getAllBlocks(false).map((block) => ({ id: block.data, text: block.getFieldValue("LABEL") ?? "" })),
+			implicitEnding: word?.data,
+		};
+	});
+	expect(canvas.blocks.some((block) => block.id === "N_ABS_SG" || block.text.includes("Ø"))).toBe(false);
+	expect(canvas.implicitEnding).toContain("N_ABS_SG");
+});
+
 test("Build: a restored verb ending block stays live -- changing its mood dropdown re-resolves to a different real morpheme", async ({ page }) => {
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");

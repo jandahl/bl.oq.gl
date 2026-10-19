@@ -61,7 +61,7 @@ for (const removed of ["morpheme", "held word"]) {
 			const { renderSentencePlan } = await import("/blocks.js");
 			const catalog = await (await import("/catalog.js")).loadCatalog();
 			renderSentencePlan(globalThis.Blockly.getMainWorkspace(), [{ source: "fixture source", assembly: "fixture assembly", words: [{ canvasIds: ["qimmeq", "N_ABS_SG"] }, { surface: "Piita", heldLabel: "heldName" }] }], new Map(catalog.presets.map((p) => [p.id, p])), {});
-			globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((b) => removed === "morpheme" ? b.data === "N_ABS_SG" : b.bloqHeld === "heldName").dispose(false);
+			globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((b) => removed === "morpheme" ? b.data === "qimmeq" : b.bloqHeld === "heldName").dispose(false);
 		}, removed);
 		await page.locator("#opt-layout [data-value=horizontal]").click();
 		const state = await page.evaluate(async () => {

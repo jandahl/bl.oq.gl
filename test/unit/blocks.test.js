@@ -322,7 +322,7 @@ function chainWorkspace() {
 	};
 }
 
-test("renderSentencePlan: a chain keeps a zero-realization ending id", () => {
+test("renderSentencePlan keeps zero-realization endings in the chain without drawing Ø blocks", () => {
 	const stem = preset({ id: "qimmeq", morpheme_type: "stem", word_class: "N", expected: "qimmeq" });
 	const zero = preset({
 		id: "N_ABS_SG",
@@ -338,12 +338,11 @@ test("renderSentencePlan: a chain keeps a zero-realization ending id", () => {
 		["N_ABS_SG", zero],
 	]), { showIds: false });
 	const word = canvasTree(workspace).sentences[0].words[0].block;
-	const ending = word.getInputTargetBlock("MORPHEMES").getNextBlock();
-	assert.equal(ending.type, "morpheme_block__inflection");
-	assert.equal(ending.data, "N_ABS_SG");
-	assert.match(ending.getFieldValue("LABEL"), /^Ø/);
+	assert.equal(word.getInputTargetBlock("MORPHEMES").getNextBlock(), null);
+	assert.match(word.data, /N_ABS_SG/);
 	assert.deepEqual(wordsFromBlock(word), [["qimmeq", "N_ABS_SG"]]);
 	assert.deepEqual(topLevelSentences(workspace), [[["qimmeq", "N_ABS_SG"]]]);
+	assert.deepEqual(planFromCanvas(workspace)[0].words[0].canvasIds, ["qimmeq", "N_ABS_SG"]);
 });
 
 test("nounStemBlock reads a wrapped row instead of the empty MORPHEMES socket", () => {
