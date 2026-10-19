@@ -1,6 +1,6 @@
 contract_version: 1
 api: oq-api
-api_version: 0.4.31
+api_version: 0.4.32
 consumer: jandahl/bl.oq.gl
 consumes:
   - sentence-analysis
@@ -11,6 +11,7 @@ consumes:
   - sequence-semantic-composition
   - semantic-frame-presentation
   - zero-surface-morpheme-spans
+  - dictionary-gloss-options
 evidence:
   sentence-analysis:
     tests:
@@ -35,5 +36,8 @@ evidence:
     tests:
       - test/unit/semantics.test.js
   zero-surface-morpheme-spans:
+    tests:
+      - test/e2e/visualizations-live.spec.js
+  dictionary-gloss-options:
     tests:
       - test/e2e/visualizations-live.spec.js

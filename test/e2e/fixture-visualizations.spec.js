@@ -3,6 +3,16 @@ import { bootFixtureApp } from "./fixture-boot.js";
 
 test.beforeEach(async ({ page }) => { await bootFixtureApp(page); });
 
+test("dictionary lookup keeps source glosses and shows heuristic options separately", async ({ page }) => {
+	await page.locator("#dictionary-query").fill("arnaq");
+	await page.locator(".dictionary-search button[type=submit]").click();
+	await expect(page.locator(".dictionary-entry")).toHaveCount(1);
+	await expect(page.locator(".dictionary-entry h3")).toHaveText("arnaq");
+	await expect(page.locator(".dictionary-source-gloss").first()).toHaveText("woman, female");
+	await expect(page.locator(".dictionary-gloss-options").first().locator("li")).toHaveText(["woman", "female"]);
+	await expect(page.locator(".dictionary-options-note")).toContainText("heuristic");
+});
+
 for (const [view, selector] of [["tree", '.derivation-node[data-node^="m-"]'], ["stepper", "[data-stage]"]]) {
 	test(`${view} label modes retain zero nodes and engine result displays`, async ({ page }) => {
 		await page.goto("/?chain=qimmeq%2CN_ABS_SG");
