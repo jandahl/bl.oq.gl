@@ -44,11 +44,11 @@ export function renderSurfaceRibbon(host, word, options) {
 			comparison.append(element("span", "ribbon-citation", `${t("citationForm")}: `));
 			appendChangedCitation(comparison, citation, node.surface?.changedRanges);
 			comparison.append(
-				element("span", "ribbon-surface", `${t("surfaceForm")}: ${segment.text || "Ø"}`),
+				element("span", "ribbon-surface", `${t("surfaceForm")}: ${segment.text || (options.showZero ? "Ø" : "")}`),
 				element("span", "ribbon-offsets", `${t("surfaceOffsets")}: ${segment.start}–${segment.end}`),
 			);
 			detail.replaceChildren(
-				element("span", "ribbon-surface", `${t("surfaceForm")}: ${segment.text || "Ø"}`),
+				element("span", "ribbon-surface", `${t("surfaceForm")}: ${segment.text || (options.showZero ? "Ø" : "")}`),
 				element("span", "ribbon-gloss", `${t("morphemeGloss")}: ${nodeGloss(node, options) || t("noGloss")}`),
 			);
 			if (node.surface?.changedRanges?.length) {
@@ -57,11 +57,11 @@ export function renderSurfaceRibbon(host, word, options) {
 		});
 		button.className = "ribbon-morpheme api-morpheme-colours";
 		button.setAttribute("aria-pressed", "false");
-		if (node.zero_surface) button.setAttribute("aria-label", `${t("zeroSurface")}: ${nodeGloss(node, options) || t("noGloss")}`);
+		if (node.zero_surface) button.setAttribute("aria-label", `${options.showZero ? `${t("zeroSurface")}: ` : ""}${nodeGloss(node, options) || t("noGloss")}`);
 		button.dataset.seqIndex = String(node.seqIndex);
 		applyMorphemeColours(button, item);
 		button.style.flexGrow = String(Math.max(1, segment.end - segment.start));
-		button.append(element("strong", "ribbon-surface", segment.text || "Ø"));
+		button.append(element("strong", "ribbon-surface", segment.text || (options.showZero ? "Ø" : "")));
 		if (options.spellingMode !== "spelling-only") button.append(element("span", "viz-gloss", nodeGloss(node, options) || t("noGloss")));
 		if (options.showIds) button.append(element("code", "viz-id", node.morpheme_id || ""));
 		ribbon.append(button); buttons.push({ button, index });
@@ -82,5 +82,4 @@ function appendChangedCitation(host, citation, changedRanges) {
 		cursor = range.end;
 	}
 	if (cursor < citation.length) host.append(element("span", "", citation.slice(cursor)));
-	if (!citation) host.append(element("span", "", "Ø"));
 }

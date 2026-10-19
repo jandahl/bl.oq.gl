@@ -15,11 +15,11 @@ for (const [view, selector] of [["tree", '.derivation-node[data-node^="m-"]'], [
 		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(2);
 		await page.locator('#opt-spelling [data-value="spelling-only"]').click();
 		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(0);
-		await expect(page.locator(`${selector} .viz-form`).last()).toHaveText("Ø");
+		await expect(page.locator(`${selector} .viz-form`).last()).toHaveText("");
 		if (view === "stepper") {
 			await expect(page.locator('[data-stage="0"]')).toHaveAttribute("aria-pressed", "true");
 			await expect(page.locator(".step-surface")).toHaveText("qimmeq");
-		} else await expect(page.locator(".tree-surface span").last()).toHaveText("Ø");
+		} else await expect(page.locator(".tree-surface span").last()).toHaveText("");
 		await page.locator('#opt-spelling [data-value="both"]').click();
 		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(2);
 		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(2);
@@ -77,7 +77,7 @@ test("stepper retains zero stages and supports keyboard navigation", async ({ pa
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
 	await page.locator('#visualization-view [data-value="stepper"]').click();
 	await expect(page.locator("[data-stage]")).toHaveCount(2);
-	await expect(page.locator("[data-stage]").last()).toContainText("Ø");
+	await expect(page.locator("[data-stage]").last()).not.toContainText("Ø");
 	await page.getByRole("button", { name: "Previous stage", exact: true }).focus();
 	await page.keyboard.press("Enter");
 	await expect(page.locator("[data-stage]").first()).toHaveAttribute("aria-pressed", "true");
@@ -179,6 +179,11 @@ test("all visualizations remain usable in a narrow touch viewport", async ({ bro
 test("zero-surface endings remain a column with no invented span", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
 	await page.locator('#visualization-view [data-value="interlinear"]').click();
+	await expect(page.locator(".interlinear-table button").last()).toHaveText("");
+	await expect(page.locator(".interlinear-table tbody tr").nth(1).locator("td").last()).toHaveText("");
+	await page.locator("#display-toggle").click();
+	await expect(page.locator("#opt-show-zero")).not.toBeChecked();
+	await page.locator("#opt-show-zero").check();
 	await expect(page.locator(".interlinear-table button").last()).toHaveText("Ø");
 	await expect(page.locator(".interlinear-table tbody tr").nth(1).locator("td").last()).toContainText("no written span");
 });
@@ -317,7 +322,7 @@ test("UI language refreshes static controls, actions, palette and stage labels",
 test("zero card forms and word names hide IDs unless explicitly enabled", async ({ page }) => {
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG");
 	await page.locator('#visualization-view [data-value="cards"]').click();
-	await expect(page.locator(".slot-card .viz-form").last()).toHaveText("Ø");
+	await expect(page.locator(".slot-card .viz-form").last()).toHaveText("");
 	await expect(page.locator("#visualization-word")).toHaveText("1 · qimmeq");
 	await expect(page.locator(".slot-card code")).toHaveCount(0);
 	await page.locator("#display-toggle").click();
@@ -411,7 +416,7 @@ test("card and port labels honor display modes without dropping zero forms", asy
 		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(0);
 		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(2);
 		await page.locator('#opt-spelling [data-value="spelling-only"]').click();
-		await expect(page.locator(`${selector} .viz-form`).last()).toHaveText("Ø");
+		await expect(page.locator(`${selector} .viz-form`).last()).toHaveText("");
 		await expect(page.locator(`${selector} .viz-gloss`)).toHaveCount(0);
 		await page.locator('#opt-spelling [data-value="both"]').click();
 		await expect(page.locator(`${selector} .viz-form`)).toHaveCount(2);

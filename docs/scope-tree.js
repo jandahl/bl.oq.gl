@@ -26,7 +26,7 @@ export function renderScopeTree(host, word, options, presetsById = new Map(), en
 	board.append(svg);
 	const surface = element("div", "tree-surface");
 	const morphemes = graph.nodes.filter((node) => node.kind === "morpheme");
-	for (const node of morphemes) { const span = element("span", "", node.zero_surface ? "Ø" : node.surface?.surfaceText ?? "?"); span.dataset.node = node.id; applyMorphemeColours(span, presetsById.get(node.morpheme_id)); surface.append(span); }
+	for (const node of morphemes) { const span = element("span", "", node.zero_surface ? (options.showZero ? "Ø" : "") : node.surface?.surfaceText ?? "?"); span.dataset.node = node.id; applyMorphemeColours(span, presetsById.get(node.morpheme_id)); surface.append(span); }
 	const detail = element("p", "viz-secondary"); detail.setAttribute("aria-live", "polite");
 	function labelNode(host, node, placed) {
 		if (node.kind === "morpheme") appendMorphemeLabel(host, node, word.seq[node.seqIndex], options);

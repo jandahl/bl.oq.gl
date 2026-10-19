@@ -266,8 +266,26 @@ test("surface ribbon uses pinned API spans and preserves the complete word", asy
 	await expect(page.locator(".ribbon-changed")).toContainText("q");
 	await expect(page.locator(".ribbon-comparison")).toContainText("Surface offsets: 5–8");
 	await page.goto("/?chain=qimmeq%2CN_ABS_SG&view=ribbon");
-	await expect(page.locator(".surface-ribbon .ribbon-morpheme > .ribbon-surface")).toHaveText(["qimmeq", "Ø"]);
-	await expect(page.locator(".surface-ribbon .ribbon-morpheme").last()).toHaveAttribute("aria-label", /no written span/);
+	await expect(page.locator(".surface-ribbon .ribbon-morpheme > .ribbon-surface")).toHaveText(["qimmeq", ""]);
+	await expect(page.locator(".surface-ribbon .ribbon-morpheme").last()).not.toHaveAttribute("aria-label", /no written span/);
+});
+
+test("pinned API returns explicit zero-length spans for zero-surface morphemes [api-feature:zero-surface-morpheme-spans]", async ({ page }) => {
+	await page.goto("/");
+	const result = await page.evaluate(async () => {
+		const engine = await import("/oq-api.js");
+		const { loadCatalog } = await import("/catalog.js");
+		const catalog = await loadCatalog();
+		const byId = new Map(catalog.presets.map((preset) => [preset.id, preset]));
+		const seq = [...byId.get("qimmeq").seq, ...byId.get("N_ABS_SG").seq];
+		const built = engine.buildWord(seq);
+		const presentation = engine.presentSequence(seq, catalog.raw, { word: built.word });
+		const node = presentation.nodes.find((candidate) => candidate.morpheme_id === "N_ABS_SG");
+		return { word: built.word, node };
+	});
+	const zeroSpan = result.node?.surface;
+	expect(result.node?.zero_surface).toBe(true);
+	expect(zeroSpan).toMatchObject({ surfaceText: "", surfaceStart: result.word.length, surfaceEnd: result.word.length });
 });
 
 test("chain contrast builds both sides independently through the pinned API", async ({ page }) => {

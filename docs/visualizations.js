@@ -31,11 +31,11 @@ export function nodeGloss(node, options) {
 }
 
 export function morphemeForm(node, item) {
-	if (node?.zero_surface || item?.text === "") return "Ø";
+	if (node?.zero_surface || item?.text === "") return "";
 	return node?.surface ? `${node.surface.marker || ""}${node.surface.citationText}` : item?.text || t("noSurface");
 }
 export function appendMorphemeLabel(host, node, item, options) {
-	if (options.spellingMode !== "gloss-only") host.append(element("strong", "viz-form", morphemeForm(node, item)));
+	if (options.spellingMode !== "gloss-only") host.append(element("strong", "viz-form", node?.zero_surface && options.showZero ? "Ø" : morphemeForm(node, item)));
 	if (options.spellingMode !== "spelling-only") host.append(element("span", "viz-gloss", node ? nodeGloss(node, options) || t("noGloss") : t("noGloss")));
 }
 export function editControls(index, count, edit) {

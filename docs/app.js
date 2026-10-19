@@ -63,6 +63,7 @@ let workedExamplesModal;
 /** @type {ReturnType<typeof mountExamplesPanel> | null} */
 let examplesPanel = null;
 let showIdsCheckbox;
+let showZeroCheckbox;
 let fillBlanksCheckbox;
 let showMoodCheckbox;
 let readingOrderCheckbox;
@@ -118,6 +119,7 @@ function bindDom() {
 	workedExamplesModal = document.getElementById("worked-examples-modal");
 	fillBlanksCheckbox = document.getElementById("opt-fill-blanks");
 	showIdsCheckbox = document.getElementById("opt-show-ids");
+	showZeroCheckbox = document.getElementById("opt-show-zero");
 	showMoodCheckbox = document.getElementById("opt-show-mood");
 	readingOrderCheckbox = document.getElementById("opt-reading-order");
 	langSelect = enhanceSegmented(document.getElementById("opt-lang"));
@@ -176,6 +178,7 @@ function displayOptions() {
 	const lang = langSelect.value;
 	return {
 		showIds: showIdsCheckbox.checked,
+		showZero: showZeroCheckbox.checked,
 		fillBlanks: fillBlanksCheckbox.checked,
 		lang,
 		showOther: lang === "both",
@@ -267,6 +270,7 @@ function initDisplayOptions() {
 	});
 	uiLangSelect.value = stored("bloq:ui-lang", "bl-oq-ly:ui-lang") === "da" ? "da" : "en";
 	showIdsCheckbox.checked = stored(SHOW_IDS_KEY_RENAMED, SHOW_IDS_KEY) === "true";
+	showZeroCheckbox.checked = stored("bloq:show-zero") === "true";
 	showMoodCheckbox.checked = stored(SHOW_MOOD_KEY_RENAMED, SHOW_MOOD_KEY) === "true"; // default off
 	readingOrderCheckbox.checked = stored(READING_ORDER_KEY_RENAMED, READING_ORDER_KEY) !== "false"; // default on
 	langSelect.value = ["en", "da", "both"].includes(stored(LANG_KEY_RENAMED, LANG_KEY)) ? stored(LANG_KEY_RENAMED, LANG_KEY) : "en";
@@ -294,6 +298,10 @@ function initDisplayOptions() {
 	});
 	showIdsCheckbox.addEventListener("change", () => {
 		storePreference(SHOW_IDS_KEY_RENAMED, SHOW_IDS_KEY, String(showIdsCheckbox.checked));
+		onDisplayOptionChange();
+	});
+	showZeroCheckbox.addEventListener("change", () => {
+		storePreference("bloq:show-zero", null, String(showZeroCheckbox.checked));
 		onDisplayOptionChange();
 	});
 	showMoodCheckbox.addEventListener("change", () => {
