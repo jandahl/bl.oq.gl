@@ -111,7 +111,10 @@ function glossChoiceMenu() {
 function updateGlossChoiceVisibility(block) {
 	const field = block.getField?.("GLOSS_CHOICE");
 	if (!field) return;
-	field.setVisible((glossOptionsById.get(block.data)?.length ?? 0) > 0);
+	const visible = (glossOptionsById.get(block.data)?.length ?? 0) > 0;
+	if (field.isVisible() === visible) return;
+	field.setVisible(visible);
+	if (block.rendered) block.render();
 }
 
 export function setGlossOptionsById(optionsById) {
