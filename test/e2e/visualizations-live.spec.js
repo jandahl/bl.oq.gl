@@ -3,15 +3,22 @@ import { test, expect } from "@playwright/test";
 test("analysis stem blocks offer pinned API dictionary gloss options [api-feature:dictionary-gloss-options]", async ({ page }) => {
 	await page.goto("/");
 	await expect(page.locator("#loading-modal")).toBeHidden({ timeout: 20_000 });
-	await page.locator("#word-input").fill("arnaq");
+	await page.locator("#word-input").fill("arnatuaq");
 	await page.locator("#analyze-btn").click();
 	await expect.poll(() => page.evaluate(() => {
 		const block = globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((candidate) => candidate.data === "arnaq");
-		return { label: block?.getFieldValue("LABEL"), visible: block?.getInput("GLOSS_CHOICE")?.isVisible() };
-	})).toEqual({ label: "arnaq — woman, female", visible: true });
+		const word = globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((candidate) => candidate.type === "morpheme_block__word_container");
+		return { label: block?.getFieldValue("LABEL"), visible: block?.getField("GLOSS_CHOICE")?.isVisible(), choice: block?.getFieldValue("GLOSS_CHOICE"), translation: word?.getFieldValue("TRANSLATION") };
+	})).toMatchObject({ label: "arnaq — woman, female", visible: true, choice: "__catalog__" });
+	await expect.poll(() => page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
+		.find((candidate) => candidate.type === "morpheme_block__word_container")?.getFieldValue("TRANSLATION")))
+		.toMatch(/the one and only woman, female/i);
 	await page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
 		.find((candidate) => candidate.data === "arnaq").getField("GLOSS_CHOICE").showEditor_());
-	await expect(page.getByText("English: lady", { exact: true })).toBeVisible();
+	await page.getByText("English: lady", { exact: true }).click();
+	await expect.poll(() => page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
+		.find((candidate) => candidate.type === "morpheme_block__word_container")?.getFieldValue("TRANSLATION")))
+		.toMatch(/the one and only lady/i);
 });
 
 test("analysis lanes show the live API's returned readings and select the same ID chain", async ({ page }) => {

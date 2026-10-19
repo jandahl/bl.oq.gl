@@ -27,6 +27,7 @@ function entryToPreset(id, entry) {
 		seq: [{
 			id,
 			text: form,
+			plainGloss: { en: plain.en, da: plain.da },
 			...(inflection ? { inflection } : {}),
 			...(facts.category_shift ? { category_shift: facts.category_shift } : {}),
 		}],
@@ -105,7 +106,13 @@ export function buildWord(seq) {
 
 export async function analyzeWordAsync(word) {
 	if (String(word).toLowerCase() === "arnaq") {
-		return { matches: [{ seq: [{ id: "arnaq", text: "arnaq" }] }], evalCount: 1 };
+		return { matches: [{ seq: [{
+			id: "arnaq",
+			text: "arnaq",
+			type: "root",
+			meaning: "woman, female",
+			plainGloss: { en: "woman, female", en_short: "woman, female", da: "kvinde", da_short: "kvinde" },
+		}] }], evalCount: 1 };
 	}
 	const slow = Number(globalThis.__BLOQ_SLOW_ANALYZE__) || 0;
 	if (slow > 0) {
@@ -144,7 +151,7 @@ export function glossSummaryItems(seq) {
 	return (seq || []).map((item) => ({
 		id: item.id,
 		spelling: item.text || item.id,
-		gloss: item.id,
+		gloss: item.plainGloss?.en || item.id,
 	}));
 }
 

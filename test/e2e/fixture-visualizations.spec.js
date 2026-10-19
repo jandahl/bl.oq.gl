@@ -8,13 +8,26 @@ test("analysis stem blocks offer dictionary gloss choices and retain the catalog
 	await page.locator("#analyze-btn").click();
 	await expect.poll(() => page.evaluate(() => {
 		const block = globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((candidate) => candidate.data === "arnaq");
-		return { label: block?.getFieldValue("LABEL"), visible: block?.getInput("GLOSS_CHOICE")?.isVisible() };
-	})).toEqual({ label: "arnaq — woman, female", visible: true });
+		return { label: block?.getFieldValue("LABEL"), visible: block?.getField("GLOSS_CHOICE")?.isVisible(), choice: block?.getFieldValue("GLOSS_CHOICE") };
+	})).toEqual({ label: "arnaq — woman, female", visible: true, choice: "__catalog__" });
 	await page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
 		.find((candidate) => candidate.data === "arnaq").getField("GLOSS_CHOICE").showEditor_());
 	await page.getByText("English: lady", { exact: true }).click();
 	await expect.poll(() => page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
 		.find((candidate) => candidate.data === "arnaq")?.getFieldValue("LABEL"))).toBe("arnaq — lady");
+	await expect.poll(() => page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
+		.find((candidate) => candidate.type === "morpheme_block__word_container")?.getFieldValue("TRANSLATION")))
+		.toMatch(/lady/i);
+	await expect.poll(() => page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
+		.find((candidate) => candidate.type === "morpheme_block__word_container")?.getFieldValue("TRANSLATION")))
+		.not.toMatch(/woman/i);
+	expect(await page.evaluate(async () => (await import("/blocks.js")).planFromCanvas(globalThis.Blockly.getMainWorkspace())[0].words[0]))
+		.toMatchObject({ glossChoice: "en|lady" });
+	await page.locator('#opt-layout [data-value="horizontal"]').click();
+	await expect.poll(() => page.evaluate(() => {
+		const block = globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((candidate) => candidate.data === "arnaq");
+		return { label: block?.getFieldValue("LABEL"), choice: block?.getFieldValue("GLOSS_CHOICE") };
+	})).toEqual({ label: "arnaq — lady", choice: "en|lady" });
 });
 
 for (const [view, selector] of [["tree", '.derivation-node[data-node^="m-"]'], ["stepper", "[data-stage]"]]) {

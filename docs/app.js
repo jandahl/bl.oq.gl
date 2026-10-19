@@ -5,7 +5,7 @@ import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
 	bindVerbPickerCatalog, bindNounPickerCatalog, reresolveBoundVerbPickers, reresolveBoundNounPickers,
-	presetMatchesQuery, labelFor, canvasTree, setViewLayout, getViewLayout, nounStemBlock, planFromCanvas, setGlossOptionsById,
+	presetMatchesQuery, labelFor, canvasTree, setViewLayout, getViewLayout, nounStemBlock, planFromCanvas, setGlossOptionsById, selectedGlossForWord,
 } from "./blocks.js";
 import { sameIdTree } from "./id-tree.js";
 import {
@@ -523,7 +523,11 @@ function injectWorkspace(serializedState = null) {
 		// The breakdown is not a build product. A noun presentation change
 		// still has to repaint it, or it stays on the value from when it opened.
 		if (event?.type === Blockly.Events.BLOCK_CHANGE && event.name === "PRESENTATION") rerenderBreakdown();
-		if (event?.type === Blockly.Events.BLOCK_CHANGE && event.name === "GLOSS_CHOICE") relabelBlocks(session.workspace, session.presetsById, displayOptions());
+		if (event?.type === Blockly.Events.BLOCK_CHANGE && event.name === "GLOSS_CHOICE") {
+			const block = session.workspace.getBlockById(event.blockId);
+			if (block) block.bloqGlossChoiceUserSelected = true;
+			relabelBlocks(session.workspace, session.presetsById, displayOptions());
+		}
 	});
 	if (serializedState) Blockly.serialization.workspaces.load(serializedState, session.workspace);
 	registerVerbPickerReactivity(session.workspace);
@@ -861,9 +865,20 @@ function paintCanvasLabels(result) {
 	// next successful surface onto the broken word.
 	const { built, seqs } = labelsForCanvasWords(result);
 	const options = canvasGlossOptions();
-	const translations = seqs.map((seq) => (seq
-		? composedTranslation(glossSummaryItems(seq, options), headlineGloss, glossOptions())
-		: ""));
+	const canvasWords = canvasTree(session.workspace).sentences.flatMap((sentence) => sentence.words.filter((word) => !word.held));
+	const translations = seqs.map((seq, index) => {
+		if (!seq) return "";
+		const selected = selectedGlossForWord(canvasWords[index]?.block);
+		let glossSequence = seq;
+		if (selected && ["en", "da"].includes(selected.lang) && seq[0]?.id) {
+			const preset = session.presetsById.get(seq[0].id);
+			glossSequence = [{
+				...seq[0],
+				plainGloss: { ...(seq[0].plainGloss ?? preset?.plainGloss ?? {}), [selected.lang]: selected.text },
+			}, ...seq.slice(1)];
+		}
+		return composedTranslation(glossSummaryItems(glossSequence, options), headlineGloss, glossOptions());
+	});
 	labelContainers(session.workspace, built, translations);
 }
 
