@@ -3,6 +3,20 @@ import { bootFixtureApp } from "./fixture-boot.js";
 
 test.beforeEach(async ({ page }) => { await bootFixtureApp(page); });
 
+test("analysis stem blocks offer dictionary gloss choices and retain the catalog gloss", async ({ page }) => {
+	await page.locator("#word-input").fill("arnaq");
+	await page.locator("#analyze-btn").click();
+	await expect.poll(() => page.evaluate(() => {
+		const block = globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((candidate) => candidate.data === "arnaq");
+		return { label: block?.getFieldValue("LABEL"), visible: block?.getInput("GLOSS_CHOICE")?.isVisible() };
+	})).toEqual({ label: "arnaq — woman, female", visible: true });
+	await page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
+		.find((candidate) => candidate.data === "arnaq").getField("GLOSS_CHOICE").showEditor_());
+	await page.getByText("English: lady", { exact: true }).click();
+	await expect.poll(() => page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
+		.find((candidate) => candidate.data === "arnaq")?.getFieldValue("LABEL"))).toBe("arnaq — lady");
+});
+
 for (const [view, selector] of [["tree", '.derivation-node[data-node^="m-"]'], ["stepper", "[data-stage]"]]) {
 	test(`${view} label modes retain zero nodes and engine result displays`, async ({ page }) => {
 		await page.goto("/?chain=qimmeq%2CN_ABS_SG");

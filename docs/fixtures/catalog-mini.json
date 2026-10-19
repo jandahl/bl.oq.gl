@@ -10,6 +10,11 @@
       "application_logic": { "underlying_form": "qimmeq", "continuation_class": "N_POSTBASE" },
       "plain_gloss": { "en_short": "dog", "da_short": "hund", "en": "dog", "da": "hund" }
     }],
+    "arnaq": [{
+      "lexical_facts": { "morpheme_type": "stem", "word_class": "N", "meaning": "woman, female" },
+      "application_logic": { "underlying_form": "arnaq", "continuation_class": "N_POSTBASE" },
+      "plain_gloss": { "en_short": "woman, female", "da_short": "kvinde", "en": "woman, female", "da": "kvinde" }
+    }],
     "neri": [{
       "lexical_facts": { "morpheme_type": "stem", "word_class": "V", "meaning": "to eat" },
       "application_logic": { "underlying_form": "neri", "continuation_class": "V_POSTBASE" },

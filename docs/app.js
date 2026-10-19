@@ -1,11 +1,11 @@
-import { buildWord, presentSequence, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, setActiveLocale } from "./oq-api.js";
+import { buildWord, presentSequence, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, setActiveLocale, DICT_SOURCES, searchEntries, stemWordClass } from "./oq-api.js";
 import { mountVisualizations } from "./visualizations.js";
 import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelSentences, renderSentencePlan, relabelBlocks, labelContainers,
 	buildVerbEndingIndex, buildNounEndingIndex, defineVerbEndingPickerBlock, defineNounEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
 	bindVerbPickerCatalog, bindNounPickerCatalog, reresolveBoundVerbPickers, reresolveBoundNounPickers,
-	presetMatchesQuery, labelFor, canvasTree, setViewLayout, getViewLayout, nounStemBlock, planFromCanvas,
+	presetMatchesQuery, labelFor, canvasTree, setViewLayout, getViewLayout, nounStemBlock, planFromCanvas, setGlossOptionsById,
 } from "./blocks.js";
 import { sameIdTree } from "./id-tree.js";
 import {
@@ -19,6 +19,7 @@ import { readState, writeState, routeForState } from "./router.js";
 import { isSentenceInput, planFromLattice, withInitialCapital, assemblyReading } from "./sentence-plan.js";
 import { loadExamplesCatalog, mountExamplesPanel } from "./examples.js";
 import { setLocale, applyLocale, t } from "./i18n.js";
+import { lookupGlossOptions } from "./gloss-options.js";
 
 import { enhanceSegmented } from "./segmented.js";
 
@@ -208,6 +209,29 @@ function sentenceLang(opts = displayOptions()) {
 	// "both" analyzes the lattice in English (primary) and may request DA
 	// alongside — same meaning as glossOptions().lang for the primary pass.
 	return opts.lang === "da" ? "da" : "en";
+}
+
+function prepareGlossChoices(sequences, run) {
+	void lookupGlossOptions(sequences, {
+		sources: DICT_SOURCES,
+		searchEntries,
+		stemWordClass,
+		presetsById: session.presetsById,
+	}).then((optionsById) => {
+		if (run !== session.deconstructRun) return;
+		const choices = new Map([...optionsById].map(([id, options]) => [id,
+			[...new Set(["en", "da"].flatMap((lang) => options[lang].map((text) => `${lang}|${text}`)))].map((value) => {
+				const [lang, text] = value.split("|");
+				return {
+				value,
+				lang,
+				text,
+				};
+			}),
+		]));
+		setGlossOptionsById(choices);
+		if (session.workspace) relabelBlocks(session.workspace, session.presetsById, displayOptions());
+	}).catch(() => {});
 }
 
 function showMoodLabels() {
@@ -499,6 +523,7 @@ function injectWorkspace(serializedState = null) {
 		// The breakdown is not a build product. A noun presentation change
 		// still has to repaint it, or it stays on the value from when it opened.
 		if (event?.type === Blockly.Events.BLOCK_CHANGE && event.name === "PRESENTATION") rerenderBreakdown();
+		if (event?.type === Blockly.Events.BLOCK_CHANGE && event.name === "GLOSS_CHOICE") relabelBlocks(session.workspace, session.presetsById, displayOptions());
 	});
 	if (serializedState) Blockly.serialization.workspaces.load(serializedState, session.workspace);
 	registerVerbPickerReactivity(session.workspace);
@@ -1030,6 +1055,7 @@ async function runSentenceDeconstruct(surface, { skipCanvas = false, run }) {
 			daLattice,
 		}));
 		if (run !== session.deconstructRun) return;
+		prepareGlossChoices(plan.sentences.flatMap((sentence) => sentence.words.map((word) => word.seq).filter(Boolean)), run);
 		session.lastDeconstructWord = surface;
 		session.lastSentencePlan = plan;
 		const placed = plan.sentences.flatMap((sentence) => sentence.words.filter((word) => word.seq && word.built?.ok));
@@ -1135,6 +1161,7 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 			});
 		}
 		if (run !== session.deconstructRun) return;
+		prepareGlossChoices(parts.flatMap((part) => (part.readings ?? []).map((reading) => reading.seq)), run);
 		session.lastDeconstructWord = surface;
 		const okParts = parts.filter((p) => !p.missing && p.seq);
 		session.lastDeconstructParts = okParts.length ? okParts : parts;

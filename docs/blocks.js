@@ -97,6 +97,32 @@ const NOUN_PRESENTATION_OPTIONS = [
 	["plural · indefinite", "plural|indefinite"],
 	["plural · definite", "plural|definite"],
 ];
+const GLOSS_SOURCE = "__catalog__";
+let glossOptionsById = new Map();
+
+function glossChoiceMenu() {
+	const block = this.getSourceBlock?.();
+	const options = glossOptionsById.get(block?.data) ?? [];
+	return [[t("catalogGlossChoice"), GLOSS_SOURCE], ...options.map((option) => [
+		t(option.lang === "da" ? "danishGlossOption" : "englishGlossOption", { gloss: option.text }), option.value,
+	])];
+}
+
+function updateGlossChoiceVisibility(block) {
+	const input = block.getInput?.("GLOSS_CHOICE");
+	if (!input) return;
+	input.setVisible((glossOptionsById.get(block.data)?.length ?? 0) > 0);
+}
+
+export function setGlossOptionsById(optionsById) {
+	glossOptionsById = optionsById instanceof Map ? optionsById : new Map();
+}
+
+function glossOverrideFor(block) {
+	const choice = block.getFieldValue?.("GLOSS_CHOICE");
+	if (!choice || choice === GLOSS_SOURCE) return undefined;
+	return glossOptionsById.get(block.data)?.find((option) => option.value === choice)?.text;
+}
 
 // grammarian's lexical_facts.morpheme_type enum (verified against the live
 // published catalog — see README's "Morpheme catalog" note). Order here is
@@ -200,7 +226,7 @@ export function labelFor(preset, opts = {}) {
 	const otherGloss = lang === "both"
 		? plainStringGloss(preset.plainGloss?.da_short) ?? plainStringGloss(preset.plainGloss?.da)
 		: null;
-	const displayGloss = otherGloss && otherGloss !== gloss ? `${gloss} / ${otherGloss}` : gloss;
+	const displayGloss = opts.glossOverride ?? (otherGloss && otherGloss !== gloss ? `${gloss} / ${otherGloss}` : gloss);
 
 	const core = spellingMode === "spelling-only" ? spelling
 		: spellingMode === "gloss-only" ? displayGloss
@@ -322,6 +348,12 @@ export function defineMorphemeBlocks() {
 					this.appendDummyInput("PRESENTATION")
 						.appendField(`${UI_INDENT}translation`)
 						.appendField(new Blockly.FieldDropdown(NOUN_PRESENTATION_OPTIONS), "PRESENTATION");
+				}
+				if (["stem_n", "stem_v"].includes(cat.id)) {
+					this.appendDummyInput("GLOSS_CHOICE")
+						.appendField(`${UI_INDENT}${t("glossChoiceLabel")}`)
+						.appendField(new Blockly.FieldDropdown(glossChoiceMenu), "GLOSS_CHOICE");
+					this.getInput("GLOSS_CHOICE").setVisible(false);
 				}
 				this.setStyle(`${cat.colourClass}_blocks`);
 				applyChainConnections(this, cat);
@@ -663,9 +695,11 @@ export function planFromCanvas(workspace) {
 					return { surface: word.block?.getFieldValue?.("TITLE") || "…", heldLabel: word.held };
 				}
 				const presentation = nounStemBlock(word.block)?.getFieldValue?.("PRESENTATION");
+				const glossChoice = lexicalStemBlock(word.block)?.getFieldValue?.("GLOSS_CHOICE");
 				return {
 					canvasIds: word.ids.slice(),
 					...(presentation ? { presentation } : {}),
+					...(glossChoice && glossChoice !== GLOSS_SOURCE ? { glossChoice } : {}),
 				};
 			}),
 		};
@@ -743,9 +777,40 @@ export function nounStemBlock(block) {
 	return null;
 }
 
+/** The lexical stem block inside a word, including a wrap layout's ROWS → CHAIN. */
+export function lexicalStemBlock(block) {
+	if (!block) return null;
+	const stemTypes = ["stem_n", "stem_v", "stem_other"].map((type) => `${BLOCK_TYPE_PREFIX}${type}`);
+	if (stemTypes.includes(block.type)) return block;
+	if (block.getInput?.("ROWS")) {
+		let row = block.getInputTargetBlock?.("ROWS");
+		while (row) {
+			const stem = lexicalStemBlock(row.getInputTargetBlock?.("CHAIN"));
+			if (stem) return stem;
+			row = row.getNextBlock?.() || null;
+		}
+		return null;
+	}
+	const start = block.type === WORD_CONTAINER_TYPE ? block.getInputTargetBlock?.("MORPHEMES") : block;
+	let cur = start;
+	const seen = new Set();
+	while (cur && !seen.has(cur)) {
+		seen.add(cur);
+		if (stemTypes.includes(cur.type)) return cur;
+		const next = cur.getInputTargetBlock?.("NEXT");
+		cur = next || cur.getNextBlock?.() || null;
+	}
+	return null;
+}
+
 function paintPresentation(block, presentation) {
 	if (!presentation) return;
 	nounStemBlock(block)?.setFieldValue?.(presentation, "PRESENTATION");
+}
+
+function paintGlossChoice(block, glossChoice) {
+	if (!glossChoice) return;
+	lexicalStemBlock(block)?.setFieldValue?.(glossChoice, "GLOSS_CHOICE");
 }
 
 function paintWordPresentations(first, words) {
@@ -753,6 +818,15 @@ function paintWordPresentations(first, words) {
 	for (const word of words ?? []) {
 		if (!block) return;
 		paintPresentation(block, word.presentation);
+		block = block.getNextBlock?.() || null;
+	}
+}
+
+function paintWordGlossChoices(first, words) {
+	let block = first;
+	for (const word of words ?? []) {
+		if (!block) return;
+		paintGlossChoice(block, word.glossChoice);
 		block = block.getNextBlock?.() || null;
 	}
 }
@@ -820,6 +894,7 @@ export function renderSentencePlan(workspace, sentences, presetsById, displayOpt
 			if (chains.length <= 1) {
 				const container = buildWordBlock(workspace, chains[0] ?? [], presetsById, displayOptions);
 				paintPresentation(container, list[0].words[0]?.presentation);
+				paintGlossChoice(container, list[0].words[0]?.glossChoice);
 				container.moveBy(20, 20);
 				return;
 			}
@@ -829,6 +904,7 @@ export function renderSentencePlan(workspace, sentences, presetsById, displayOpt
 			sentence.moveBy(20, 20);
 			connectWords(workspace, sentence, chains, presetsById, displayOptions);
 			paintWordPresentations(sentence.getInputTargetBlock("WORDS"), list[0].words);
+			paintWordGlossChoices(sentence.getInputTargetBlock("WORDS"), list[0].words);
 			return;
 		}
 
@@ -849,6 +925,7 @@ export function renderSentencePlan(workspace, sentences, presetsById, displayOpt
 					: buildHeldWord(workspace, !prevWord ? withInitialCapital(word.surface || word.raw) : (word.surface || word.raw), word.heldLabel || "heldNotDrawn");
 				if (ids.length) drawable.push(ids);
 				if (ids.length) paintPresentation(wordBlock, word.presentation);
+				if (ids.length) paintGlossChoice(wordBlock, word.glossChoice);
 				if (prevWord) prevWord.nextConnection.connect(wordBlock.previousConnection);
 				else sentence.getInput("WORDS").connection.connect(wordBlock.previousConnection);
 				prevWord = wordBlock;
@@ -1009,6 +1086,7 @@ function createMorphemeBlock(workspace, id, presetsById, displayOptions) {
 	if (!isVerbEnding && !isNounEnding) {
 		block.data = id;
 		block.setFieldValue(labelFor(preset, displayOptions), "LABEL");
+		updateGlossChoiceVisibility(block);
 	}
 	block.initSvg();
 	block.render();
@@ -1099,7 +1177,10 @@ export function relabelBlocks(workspace, presetsById, displayOptions) {
 		}
 		if (!isMorphemeBlockType(block.type) || !block.data) continue;
 		const preset = presetsById.get(block.data);
-		if (preset) block.setFieldValue(labelFor(preset, displayOptions), "LABEL");
+		if (preset) {
+			updateGlossChoiceVisibility(block);
+			block.setFieldValue(labelFor(preset, { ...displayOptions, glossOverride: glossOverrideFor(block) }), "LABEL");
+		}
 	}
 }
 
