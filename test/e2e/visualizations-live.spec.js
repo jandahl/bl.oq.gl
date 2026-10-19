@@ -8,8 +8,9 @@ test("analysis stem blocks offer pinned API dictionary gloss options [api-featur
 	await expect.poll(() => page.evaluate(() => {
 		const block = globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((candidate) => candidate.data === "arnaq");
 		const word = globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((candidate) => candidate.type === "morpheme_block__word_container");
-		return { label: block?.getFieldValue("LABEL"), visible: block?.getField("GLOSS_CHOICE")?.isVisible(), choice: block?.getFieldValue("GLOSS_CHOICE"), translation: word?.getFieldValue("TRANSLATION") };
-	})).toMatchObject({ label: "arnaq — woman, female", visible: true, choice: "__catalog__" });
+		const field = block?.getField("GLOSS_CHOICE");
+		return { label: block?.getFieldValue("LABEL"), visible: field?.isVisible(), rendered: (field?.getSvgRoot()?.getBoundingClientRect().width ?? 0) > 0, choice: block?.getFieldValue("GLOSS_CHOICE"), translation: word?.getFieldValue("TRANSLATION") };
+	})).toMatchObject({ label: "arnaq — woman, female", visible: true, rendered: true, choice: "__catalog__" });
 	await expect.poll(() => page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
 		.find((candidate) => candidate.type === "morpheme_block__word_container")?.getFieldValue("TRANSLATION")))
 		.toMatch(/the one and only woman, female/i);

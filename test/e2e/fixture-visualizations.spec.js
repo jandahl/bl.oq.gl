@@ -8,8 +8,9 @@ test("analysis stem blocks offer dictionary gloss choices and retain the catalog
 	await page.locator("#analyze-btn").click();
 	await expect.poll(() => page.evaluate(() => {
 		const block = globalThis.Blockly.getMainWorkspace().getAllBlocks(false).find((candidate) => candidate.data === "arnaq");
-		return { label: block?.getFieldValue("LABEL"), visible: block?.getField("GLOSS_CHOICE")?.isVisible(), choice: block?.getFieldValue("GLOSS_CHOICE") };
-	})).toEqual({ label: "arnaq — woman, female", visible: true, choice: "__catalog__" });
+		const field = block?.getField("GLOSS_CHOICE");
+		return { label: block?.getFieldValue("LABEL"), visible: field?.isVisible(), rendered: (field?.getSvgRoot()?.getBoundingClientRect().width ?? 0) > 0, choice: block?.getFieldValue("GLOSS_CHOICE") };
+	})).toEqual({ label: "arnaq — woman, female", visible: true, rendered: true, choice: "__catalog__" });
 	await page.evaluate(() => globalThis.Blockly.getMainWorkspace().getAllBlocks(false)
 		.find((candidate) => candidate.data === "arnaq").getField("GLOSS_CHOICE").showEditor_());
 	await page.getByText("English: lady", { exact: true }).click();
