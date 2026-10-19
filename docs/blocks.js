@@ -109,9 +109,9 @@ function glossChoiceMenu() {
 }
 
 function updateGlossChoiceVisibility(block) {
-	const input = block.getInput?.("GLOSS_CHOICE");
-	if (!input) return;
-	input.setVisible((glossOptionsById.get(block.data)?.length ?? 0) > 0);
+	const field = block.getField?.("GLOSS_CHOICE");
+	if (!field) return;
+	field.setVisible((glossOptionsById.get(block.data)?.length ?? 0) > 0);
 }
 
 export function setGlossOptionsById(optionsById) {
@@ -122,6 +122,16 @@ function glossOverrideFor(block) {
 	const choice = block.getFieldValue?.("GLOSS_CHOICE");
 	if (!choice || choice === GLOSS_SOURCE) return undefined;
 	return glossOptionsById.get(block.data)?.find((option) => option.value === choice)?.text;
+}
+
+/** Selected dictionary gloss for a word's lexical stem, if one is active. */
+export function selectedGlossForWord(block) {
+	const stem = lexicalStemBlock(block);
+	const choice = stem?.getFieldValue?.("GLOSS_CHOICE");
+	if (!choice || choice === GLOSS_SOURCE) return null;
+	const separator = choice.indexOf("|");
+	if (separator < 0) return null;
+	return { lang: choice.slice(0, separator), text: choice.slice(separator + 1) };
 }
 
 // grammarian's lexical_facts.morpheme_type enum (verified against the live
@@ -342,7 +352,7 @@ export function defineMorphemeBlocks() {
 	for (const cat of [...CATEGORY_ORDER, FALLBACK_CATEGORY]) {
 		Blockly.Blocks[blockTypeForCategory(cat)] = {
 			init() {
-				this.appendDummyInput()
+				const labelRow = this.appendDummyInput("LABEL_ROW")
 					.appendField(new Blockly.FieldLabelSerializable(""), "LABEL");
 				if (cat.id === "stem_n") {
 					this.appendDummyInput("PRESENTATION")
@@ -350,10 +360,11 @@ export function defineMorphemeBlocks() {
 						.appendField(new Blockly.FieldDropdown(NOUN_PRESENTATION_OPTIONS), "PRESENTATION");
 				}
 				if (["stem_n", "stem_v"].includes(cat.id)) {
-					this.appendDummyInput("GLOSS_CHOICE")
-						.appendField(`${UI_INDENT}${t("glossChoiceLabel")}`)
-						.appendField(new Blockly.FieldDropdown(glossChoiceMenu), "GLOSS_CHOICE");
-					this.getInput("GLOSS_CHOICE").setVisible(false);
+					const field = new Blockly.FieldDropdown(glossChoiceMenu);
+					field.setTooltip(t("glossChoiceLabel"));
+					labelRow.appendField(field, "GLOSS_CHOICE");
+					this.setFieldValue(GLOSS_SOURCE, "GLOSS_CHOICE");
+					field.setVisible(false);
 				}
 				this.setStyle(`${cat.colourClass}_blocks`);
 				applyChainConnections(this, cat);
@@ -810,7 +821,10 @@ function paintPresentation(block, presentation) {
 
 function paintGlossChoice(block, glossChoice) {
 	if (!glossChoice) return;
-	lexicalStemBlock(block)?.setFieldValue?.(glossChoice, "GLOSS_CHOICE");
+	const stem = lexicalStemBlock(block);
+	stem?.getField?.("GLOSS_CHOICE")?.getOptions?.(false);
+	stem?.setFieldValue?.(glossChoice, "GLOSS_CHOICE");
+	if (stem && glossChoice !== GLOSS_SOURCE) stem.bloqGlossChoiceUserSelected = true;
 }
 
 function paintWordPresentations(first, words) {
@@ -937,6 +951,9 @@ export function renderSentencePlan(workspace, sentences, presetsById, displayOpt
 			y += Math.max(height, 72) + 28;
 		}
 	});
+	if (typeof workspace.getAllBlocks === "function") {
+		withBlocklyEventsDisabled(() => relabelBlocks(workspace, presetsById, displayOptions));
+	}
 }
 
 function buildHeldWord(workspace, surface, label) {
@@ -1178,7 +1195,11 @@ export function relabelBlocks(workspace, presetsById, displayOptions) {
 		if (!isMorphemeBlockType(block.type) || !block.data) continue;
 		const preset = presetsById.get(block.data);
 		if (preset) {
+			block.getField?.("GLOSS_CHOICE")?.getOptions?.(false);
 			updateGlossChoiceVisibility(block);
+			if (glossOptionsById.has(block.data) && !block.bloqGlossChoiceUserSelected) {
+				block.setFieldValue(GLOSS_SOURCE, "GLOSS_CHOICE");
+			}
 			block.setFieldValue(labelFor(preset, { ...displayOptions, glossOverride: glossOverrideFor(block) }), "LABEL");
 		}
 	}
