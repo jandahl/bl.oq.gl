@@ -52,8 +52,6 @@ export const {
 	glossText,
 	STANDARD_EXAMPLES_SCHEMA,
 	STANDARD_EXAMPLES_ID,
-	DICT_SOURCES,
-	searchEntries,
 	NOUN_PARADIGM_CELLS,
 	matchNounStem,
 	nounForm,
