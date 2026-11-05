@@ -30,7 +30,7 @@ import { raceCatalogResponses } from "./catalog-fetch.js";
 // are fetched together: the oq-api URL still wins when it answers within a
 // few seconds, and a hung primary is aborted so the mirror can proceed.
 export const GRAMMAR_MORPHEMES_FALLBACK_URL =
-	"https://jandahl.github.io/oq-grammarian/v2/grammar/morphemes-by-id.json";
+	"https://jandahl.github.io/oq-grammarian/v3/grammar/morphemes-by-id.json";
 
 /**
  * Compatibility for grammarian mirrors published before the structured
