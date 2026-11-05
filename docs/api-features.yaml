@@ -1,6 +1,6 @@
 contract_version: 1
 api: oq-api
-api_version: 0.4.32
+api_version: 0.4.203
 consumer: jandahl/bl.oq.gl
 consumes:
   - sentence-analysis
