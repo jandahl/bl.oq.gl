@@ -271,3 +271,33 @@ test("Martha speech controls render in results and breakdowns, update with local
 	await page.keyboard.press("Escape");
 	await expect(page.locator("#display-panel")).toBeHidden();
 });
+
+test("OQ cross-links render in Results bar, Breakdown panel, and footer with locale support", async ({ page }) => {
+	await page.route("**/fixtures/engine-stub.js", async (route) => {
+		const response = await route.fetch();
+		const source = await response.text();
+		const body = source.replace("export async function analyzeWordAsync(word) {", `export async function analyzeWordAsync(word) {
+			return { matches: [
+				{ seq: [{ id: "neri", text: "neri" }, { id: "V_IND_INTR_3SG", text: "voq" }] },
+			], evalCount: 1 };
+		`);
+		await route.fulfill({ response, body });
+	});
+	await page.goto("/?w=nerivoq");
+	await expect(page.locator("#status-line")).toHaveText("nerivoq");
+	await expect(page.locator("#status .oq-status-link")).toHaveAttribute("href", "https://oq.gl/?q=nerivoq");
+	await expect(page.locator("#status .oq-status-link")).toHaveText("Look up in OQ");
+
+	await page.locator("#breakdown-summary").click();
+	const primary = page.locator("#primary-breakdown");
+	await expect(primary.locator(".oq-dict-link")).toHaveAttribute("href", "https://oq.gl/?q=nerivoq");
+	await expect(primary.locator(".oq-builder-link")).toHaveAttribute("href", "https://oq.gl/builder/?seq=%5B%22neri%22%2C%22V_IND_INTR_3SG%22%5D");
+	await expect(primary.locator(".breakdown-spelling").first()).toHaveAttribute("href", /https:\/\/oq\.gl\/deconstruct\/\?w=nerivoq&detail=/);
+
+	await expect(page.locator("footer .oq-footer-link")).toHaveAttribute("href", "https://oq.gl/");
+	await expect(page.locator("footer .oq-footer-link")).toHaveText("Dictionary & Word Builder at oq.gl");
+
+	await page.locator("#display-toggle").click();
+	await page.locator('#opt-ui-lang [data-value="da"]').click();
+	await expect(page.locator("footer .oq-footer-link")).toHaveText("Ordbog og ordbygger på oq.gl");
+});
