@@ -222,7 +222,7 @@ test("analysis lane selection updates the primary breakdown and alternatives", a
 	await page.route("**/fixtures/engine-stub.js", async (route) => {
 		const response = await route.fetch();
 		const source = await response.text();
-		const body = source.replace("export async function analyzeWordAsync() {", `export async function analyzeWordAsync() {
+		const body = source.replace("export async function analyzeWordAsync(word) {", `export async function analyzeWordAsync(word) {
 			return { matches: [
 				{ seq: [{ id: "neri", text: "neri" }, { id: "V_IND_INTR_3SG", text: "voq" }] },
 				{ seq: [{ id: "neri", text: "neri" }, { id: "V_IND_INTR_1SG", text: "vunga" }] },
@@ -246,4 +246,28 @@ test("analysis lane selection updates the primary breakdown and alternatives", a
 	await page.locator('[data-analysis-lane="0"]').click();
 	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("nerivoq");
 	await expect(page.locator(".alternative-breakdown .breakdown-word")).toHaveText("nerivunga");
+});
+
+test("Martha speech controls render in results and breakdowns, update with locale, and toggle in Settings", async ({ page }) => {
+	await page.goto("/?chain=qimmeq,N_ABS_SG");
+	await expect(page.locator("#status-line")).toHaveText("qimmeq");
+	const statusMartha = page.locator("#status .martha-controls");
+	await expect(statusMartha).toBeVisible();
+	await expect(statusMartha.locator(".martha-link")).toHaveAttribute("data-martha-word", "qimmeq");
+	await expect(statusMartha.locator(".martha-page-link")).toHaveAttribute("href", "https://oqaasileriffik.gl/en/langtech/martha/?st=qimmeq");
+
+	await page.locator("#display-toggle").click();
+	await expect(page.locator("#display-panel")).toBeVisible();
+	await page.locator('#opt-ui-lang [data-value="da"]').click();
+	await expect(statusMartha.locator(".martha-link")).toContainText("Lyt (Martha)");
+	await expect(statusMartha.locator(".martha-page-link")).toHaveText("Martha-side");
+	await expect(statusMartha.locator(".martha-page-link")).toHaveAttribute("href", "https://oqaasileriffik.gl/da/sprogteknologi/martha/?st=qimmeq");
+
+	await page.locator("#opt-martha-speech").uncheck();
+	await expect(statusMartha).toBeHidden();
+	await page.locator("#opt-martha-speech").check();
+	await expect(statusMartha).toBeVisible();
+
+	await page.keyboard.press("Escape");
+	await expect(page.locator("#display-panel")).toBeHidden();
 });
