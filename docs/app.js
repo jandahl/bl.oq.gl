@@ -12,7 +12,7 @@ import {
 	createSession, clearAnalysisCaches, cancelDeconstruct, seqForChain as resolveSeqForChain, planMatchesCanvas,
 	deconstructIdsMatchSentences, computeBuild, formatStatus, labelsForCanvasWords,
 } from "./session.js";
-import { renderSentenceBreakdown, renderWordBreakdowns, renderTonedPhrases, wordTone } from "./breakdown.js";
+import { renderSentenceBreakdown, renderWordBreakdowns, renderTonedPhrases, wordTone, oqDictionaryUrl } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
 import { readState, writeState, routeForState } from "./router.js";
@@ -593,6 +593,7 @@ function setStatus(text, kind, meta) {
 	statusEl.setAttribute("aria-live", kind === "error" ? "assertive" : "polite");
 	statusLine.textContent = text;
 	statusEl.querySelector(".martha-controls")?.remove();
+	statusEl.querySelector(".oq-status-link")?.remove();
 	const oldMeta = statusEl.querySelector(".meta");
 	if (oldMeta) oldMeta.remove();
 	if (meta) {
@@ -606,15 +607,25 @@ function setStatus(text, kind, meta) {
 function setStatusWords(words, kind, meta) {
 	setStatus("", kind, meta);
 	renderTonedPhrases(statusLine, words, "status-word");
-	const spoken = (words ?? [])
+	const cleanWords = (words ?? [])
 		.map((word) => String(word ?? "").replace(/^\s*≈\s*/u, "").trim())
-		.filter(Boolean)
-		.join(" ");
+		.filter(Boolean);
+	const spoken = cleanWords.join(" ");
+	const metaEl = statusEl.querySelector(".meta");
 	const martha = createMarthaLink(spoken);
 	if (martha) {
-		const metaEl = statusEl.querySelector(".meta");
 		if (metaEl) statusEl.insertBefore(martha, metaEl);
 		else statusEl.appendChild(martha);
+	}
+	if (cleanWords.length === 1) {
+		const oqLink = document.createElement("a");
+		oqLink.className = "oq-link oq-status-link";
+		oqLink.href = oqDictionaryUrl(cleanWords[0]);
+		oqLink.target = "_blank";
+		oqLink.rel = "noopener noreferrer";
+		oqLink.textContent = t("oqLookup");
+		if (metaEl) statusEl.insertBefore(oqLink, metaEl);
+		else statusEl.appendChild(oqLink);
 	}
 }
 

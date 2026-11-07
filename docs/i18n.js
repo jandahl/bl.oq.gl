@@ -71,6 +71,7 @@ const messages = {
 		"noteOpaqueName": "Name is not a catalog stem, so it is kept in the sentence gloss and not drawn as a block.",
 		"noteSoftExact": "Soft exact — closed, but not a gold reading.",
 		"notePartOfAttested": "Part of an attested phrase, and not a catalog stem.",
+		"oqLookup": "Look up in OQ", "oqDeconstruct": "Deconstruct in OQ", "oqOpenBuilder": "Open in OQ Builder", "oqMorphemeDetails": "Open {morpheme} in OQ", "footerOqLink": "Dictionary & Word Builder at oq.gl",
 	},
 	da: {
 		inflectionPurpose: "Hvordan ændres en stamme, når du ændrer hvem der handler, verbets måde eller et navneords tal og kasus?",
@@ -144,6 +145,7 @@ const messages = {
 		"noteOpaqueName": "Navnet er ikke en katalogstamme, så det bliver i sætningsglossen og tegnes ikke som en blok.",
 		"noteSoftExact": "Blød eksakt — lukket, men ikke en guld-læsning.",
 		"notePartOfAttested": "Del af en belagt frase, og ikke en katalogstamme.",
+		"oqLookup": "Slå op i OQ", "oqDeconstruct": "Dekonstruér i OQ", "oqOpenBuilder": "Åbn i OQ-ordbygger", "oqMorphemeDetails": "Åbn {morpheme} i OQ", "footerOqLink": "Ordbog og ordbygger på oq.gl",
 	},
 };
 
