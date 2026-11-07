@@ -214,15 +214,20 @@ test("renderSentenceBreakdown shows a band for a built word and does not draw a 
 	assert.equal(meta, "The dog is bad.");
 	assert.equal(seenPrefs.numberPreference, "plural");
 	assert.equal(seenPrefs.determinationPreference, "definite");
+	const firstOqDeconstruct = articles[0].querySelector(".oq-deconstruct-link");
+	assert.ok(firstOqDeconstruct);
+	assert.equal(firstOqDeconstruct.href, "https://oq.gl/deconstruct/?w=qimmeq");
 	const firstOqBuilder = articles[0].querySelector(".oq-builder-link");
 	assert.ok(firstOqBuilder);
 	assert.equal(firstOqBuilder.href, "https://oq.gl/builder/?seq=%5B%22qimmeq%22%5D");
+	assert.equal(articles[0].querySelector(".oq-dict-link")?.hidden, true);
 	const secondOqDeconstruct = articles[1].querySelector(".oq-deconstruct-link");
 	assert.ok(secondOqDeconstruct);
 	assert.equal(secondOqDeconstruct.href, "https://oq.gl/deconstruct/?w=ajorpoq");
+	assert.equal(articles[1].querySelector(".oq-builder-link"), null);
 });
 
-test("OQ cross-link helpers respect honesty boundary and strip trailing N_ABS_SG for OQ Builder", () => {
+test("OQ cross-link helpers respect honesty boundary, strip trailing N_ABS_SG, and gate dictionary link on dictHit", () => {
 	installDomShim();
 	assert.equal(oqDictionaryUrl("≈ qimmeq"), "https://oq.gl/?q=qimmeq");
 	assert.equal(oqDeconstructUrl("qimmeqarpunga", "N_qaq_Vb"), "https://oq.gl/deconstruct/?w=qimmeqarpunga&detail=N_qaq_Vb");
@@ -231,22 +236,34 @@ test("OQ cross-link helpers respect honesty boundary and strip trailing N_ABS_SG
 		"https://oq.gl/builder/?seq=%5B%22qimmeq%22%5D",
 	);
 
-	// Approximate or open breakdowns link to OQ Deconstruct, never OQ Builder.
-	const approxContainer = document.createElement("div");
+	// Exact closed breakdown with dictHit: false shows Deconstruct and Builder, hides Dictionary.
+	const exactContainer = document.createElement("div");
 	const seq = [{ id: "qimmeq", text: "qimmeq", marker: "" }];
 	const glossSummaryItems = (items) => items.map((item) => ({ text: item.text, marker: "", gloss: "dog", id: item.id }));
-	renderBreakdown(approxContainer, "qimmeq", seq, { word: "qimmeq", approximate: true, closed: true }, glossSummaryItems, { lang: "en" });
+	renderBreakdown(exactContainer, "qimmeq", seq, { word: "qimmeq", approximate: false, closed: true }, glossSummaryItems, { lang: "en", dictHit: false });
+	assert.equal(exactContainer.querySelector(".oq-deconstruct-link")?.href, "https://oq.gl/deconstruct/?w=qimmeq");
+	assert.equal(exactContainer.querySelector(".oq-builder-link")?.href, "https://oq.gl/builder/?seq=%5B%22qimmeq%22%5D");
+	assert.equal(exactContainer.querySelector(".oq-dict-link")?.hidden, true);
+
+	// Approximate or open breakdowns link to OQ Deconstruct, never OQ Builder; dictHit: true unhides Dictionary.
+	const approxContainer = document.createElement("div");
+	renderBreakdown(approxContainer, "qimmeq", seq, { word: "qimmeq", approximate: true, closed: true }, glossSummaryItems, { lang: "en", dictHit: true });
 	assert.equal(approxContainer.querySelector(".oq-builder-link"), null);
 	assert.equal(approxContainer.querySelector(".oq-deconstruct-link")?.href, "https://oq.gl/deconstruct/?w=qimmeq");
 	assert.equal(approxContainer.querySelector(".oq-dict-link")?.href, "https://oq.gl/?q=qimmeq");
+	assert.equal(approxContainer.querySelector(".oq-dict-link")?.hidden, false);
 	assert.equal(
 		approxContainer.querySelector(".breakdown-spelling")?.href,
 		"https://oq.gl/deconstruct/?w=qimmeq&detail=qimmeq",
 	);
 
-	// Missing word in renderWordBreakdowns still gets OQ Lookup and Deconstruct links.
+	// Missing word in renderWordBreakdowns gets OQ Deconstruct and gates OQ Lookup on isDictHit.
 	const missingContainer = document.createElement("div");
-	renderWordBreakdowns(missingContainer, [{ word: "illu", missing: true, seq: null, built: null }], glossSummaryItems, { lang: "en" });
-	assert.equal(missingContainer.querySelector(".oq-dict-link")?.href, "https://oq.gl/?q=illu");
+	renderWordBreakdowns(missingContainer, [{ word: "illu", missing: true, seq: null, built: null }], glossSummaryItems, {
+		lang: "en",
+		isDictHit: (word) => word === "illu",
+	});
 	assert.equal(missingContainer.querySelector(".oq-deconstruct-link")?.href, "https://oq.gl/deconstruct/?w=illu");
+	assert.equal(missingContainer.querySelector(".oq-dict-link")?.href, "https://oq.gl/?q=illu");
+	assert.equal(missingContainer.querySelector(".oq-dict-link")?.hidden, false);
 });

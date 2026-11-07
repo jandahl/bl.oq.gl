@@ -12,7 +12,7 @@ import {
 	createSession, clearAnalysisCaches, cancelDeconstruct, seqForChain as resolveSeqForChain, planMatchesCanvas,
 	deconstructIdsMatchSentences, computeBuild, formatStatus, labelsForCanvasWords,
 } from "./session.js";
-import { renderSentenceBreakdown, renderWordBreakdowns, renderTonedPhrases, wordTone, oqDictionaryUrl } from "./breakdown.js";
+import { renderSentenceBreakdown, renderWordBreakdowns, renderTonedPhrases, wordTone, createOqLinks } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
 import { readState, writeState, routeForState } from "./router.js";
@@ -587,12 +587,58 @@ function initTheme() {
 	});
 }
 
+const dictHitByWord = new Map();
+const dictHitPending = new Map();
+
+function normalizeDictKey(word) {
+	return String(word ?? "").replace(/^\s*≈\s*/u, "").trim().replace(/[\s!?.,:;]+$/u, "").toLocaleLowerCase("kl");
+}
+
+function isKnownDictHit(word) {
+	return dictHitByWord.get(normalizeDictKey(word)) === true;
+}
+
+function syncDictLinksForKey(key, isHit) {
+	for (const root of [statusEl, breakdownDiv]) {
+		if (!root) continue;
+		for (const el of root.querySelectorAll(".oq-dict-link[data-oq-dict-word]")) {
+			if (el.dataset.oqDictWord === key) el.hidden = !isHit;
+		}
+	}
+}
+
+function resolveDictHit(word) {
+	const key = normalizeDictKey(word);
+	if (!key) return Promise.resolve(false);
+	if (dictHitByWord.has(key)) {
+		const cached = dictHitByWord.get(key) === true;
+		syncDictLinksForKey(key, cached);
+		return Promise.resolve(cached);
+	}
+	if (dictHitPending.has(key)) return dictHitPending.get(key);
+	const pending = searchEntries(DICT_SOURCES, key, { lang: "kl", match: "exact" })
+		.then((res) => {
+			if (res?.failed) return false;
+			const isHit = (res?.results ?? []).some((entry) => normalizeDictKey(entry?.surface ?? entry?.expected ?? entry?.kalaallisut ?? entry?.stem) === key);
+			dictHitByWord.set(key, isHit);
+			syncDictLinksForKey(key, isHit);
+			return isHit;
+		})
+		.catch(() => false)
+		.finally(() => {
+			dictHitPending.delete(key);
+		});
+	dictHitPending.set(key, pending);
+	return pending;
+}
+
 function setStatus(text, kind, meta) {
 	statusEl.hidden = false;
 	statusEl.className = kind ?? "";
 	statusEl.setAttribute("aria-live", kind === "error" ? "assertive" : "polite");
 	statusLine.textContent = text;
 	statusEl.querySelector(".martha-controls")?.remove();
+	statusEl.querySelector(".oq-status-links")?.remove();
 	statusEl.querySelector(".oq-status-link")?.remove();
 	const oldMeta = statusEl.querySelector(".meta");
 	if (oldMeta) oldMeta.remove();
@@ -604,7 +650,7 @@ function setStatus(text, kind, meta) {
 	}
 }
 
-function setStatusWords(words, kind, meta) {
+function setStatusWords(words, kind, meta, singleWordContext = null) {
 	setStatus("", kind, meta);
 	renderTonedPhrases(statusLine, words, "status-word");
 	const cleanWords = (words ?? [])
@@ -618,21 +664,24 @@ function setStatusWords(words, kind, meta) {
 		else statusEl.appendChild(martha);
 	}
 	if (cleanWords.length === 1) {
-		const oqLink = document.createElement("a");
-		oqLink.className = "oq-link oq-status-link";
-		oqLink.href = oqDictionaryUrl(cleanWords[0]);
-		oqLink.target = "_blank";
-		oqLink.rel = "noopener noreferrer";
-		oqLink.textContent = t("oqLookup");
-		if (metaEl) statusEl.insertBefore(oqLink, metaEl);
-		else statusEl.appendChild(oqLink);
+		const clean = cleanWords[0];
+		const oqLinks = createOqLinks(clean, singleWordContext?.seq ?? null, singleWordContext?.built ?? null, {
+			dictHit: isKnownDictHit(clean),
+			t,
+		});
+		if (oqLinks) {
+			oqLinks.classList.add("oq-status-links");
+			if (metaEl) statusEl.insertBefore(oqLinks, metaEl);
+			else statusEl.appendChild(oqLinks);
+		}
+		void resolveDictHit(clean);
 	}
 }
 
 /** Render a formatStatus contract onto the status live region. */
-function applyStatus(status) {
+function applyStatus(status, singleWordContext = null) {
 	if (status.words?.length) {
-		setStatusWords(status.words, status.kind, status.meta);
+		setStatusWords(status.words, status.kind, status.meta, singleWordContext);
 		return;
 	}
 	setStatus(status.detail, status.kind, status.meta);
@@ -855,12 +904,16 @@ function canvasMatchesPlan(plan) {
 }
 
 function showPlanStatus(plan) {
+	const words = (plan?.sentences ?? []).flatMap((sentence) => sentence.words);
+	const singleWordContext = words.length === 1 && words[0].seq && words[0].built?.ok
+		? { seq: words[0].seq, built: words[0].built }
+		: null;
 	applyStatus(formatStatus({
 		plan,
 		surfaces: sentenceInitialWords(plan),
 		meta: planStatusMeta(plan),
 		empty: false,
-	}, { t }));
+	}, { t }), singleWordContext);
 }
 
 function sentenceInitialWords(plan) {
@@ -953,7 +1006,10 @@ function refreshBuild() {
 	}
 
 	paintCanvasLabels(result);
-	applyStatus(formatStatus(result, { t }));
+	const singleWordContext = !result.error && result.seqs?.length === 1 && result.built?.length === 1
+		? { seq: result.seqs[0], built: result.built[0] }
+		: null;
+	applyStatus(formatStatus(result, { t }), singleWordContext);
 	updateReadingLine(result.error ? null : result.seqs);
 	return result;
 }
@@ -1004,6 +1060,7 @@ function breakdownView() {
 		headlineGloss,
 		showDanish: opts.lang === "both",
 		visibleAssembly,
+		isDictHit: isKnownDictHit,
 		builderHref: (seq) => `${routeForState(location.pathname)}${writeState({ view: visualizations?.getView(), chain: seq.map((item) => item.id).filter(Boolean) })}`,
 	};
 }
@@ -1017,9 +1074,18 @@ function revealBreakdown(meta) {
 	if (firstShow) breakdownDetails.open = false;
 }
 
+function refreshBreakdownDictHits() {
+	if (!breakdownDiv) return;
+	for (const el of breakdownDiv.querySelectorAll(".oq-dict-link[data-oq-dict-word]")) {
+		const word = el.dataset.oqDictWord;
+		if (word) void resolveDictHit(word);
+	}
+}
+
 function rerenderBreakdown() {
 	if (session.lastSentencePlan) {
 		revealBreakdown(renderSentenceBreakdown(breakdownDiv, session.lastSentencePlan, glossSummaryItems, breakdownView()));
+		refreshBreakdownDictHits();
 		return;
 	}
 	const parts = session.lastDeconstructParts?.length
@@ -1029,6 +1095,7 @@ function rerenderBreakdown() {
 			: []);
 	if (!parts.length) return;
 	revealBreakdown(renderWordBreakdowns(breakdownDiv, parts, glossSummaryItems, breakdownView()));
+	refreshBreakdownDictHits();
 }
 
 function materializePlan(plan) {

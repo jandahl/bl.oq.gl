@@ -41,20 +41,21 @@ export function oqBuilderUrl(seq) {
 	return `https://oq.gl/builder/?${new URLSearchParams({ seq: JSON.stringify(ids) }).toString()}`;
 }
 
-export function createOqLinks(word, seq, buildResult, tFn = translate) {
+export function createOqLinks(word, seq, buildResult, opts = {}) {
+	const tFn = opts.t ?? translate;
 	const clean = cleanSurfaceWord(word || buildResult?.word);
 	if (!clean || typeof document === "undefined") return null;
 
 	const wrap = document.createElement("div");
 	wrap.className = "oq-links";
 
-	const dictLink = document.createElement("a");
-	dictLink.className = "oq-link oq-dict-link";
-	dictLink.href = oqDictionaryUrl(clean);
-	dictLink.target = "_blank";
-	dictLink.rel = "noopener noreferrer";
-	dictLink.textContent = tFn("oqLookup");
-	wrap.appendChild(dictLink);
+	const deconstructLink = document.createElement("a");
+	deconstructLink.className = "oq-link oq-deconstruct-link";
+	deconstructLink.href = oqDeconstructUrl(clean);
+	deconstructLink.target = "_blank";
+	deconstructLink.rel = "noopener noreferrer";
+	deconstructLink.textContent = tFn("oqDeconstruct");
+	wrap.appendChild(deconstructLink);
 
 	const canOpenInBuilder = Array.isArray(seq)
 		&& seq.length > 0
@@ -70,15 +71,17 @@ export function createOqLinks(word, seq, buildResult, tFn = translate) {
 		builderLink.rel = "noopener noreferrer";
 		builderLink.textContent = tFn("oqOpenBuilder");
 		wrap.appendChild(builderLink);
-	} else {
-		const deconstructLink = document.createElement("a");
-		deconstructLink.className = "oq-link oq-deconstruct-link";
-		deconstructLink.href = oqDeconstructUrl(clean);
-		deconstructLink.target = "_blank";
-		deconstructLink.rel = "noopener noreferrer";
-		deconstructLink.textContent = tFn("oqDeconstruct");
-		wrap.appendChild(deconstructLink);
 	}
+
+	const dictLink = document.createElement("a");
+	dictLink.className = "oq-link oq-dict-link";
+	dictLink.href = oqDictionaryUrl(clean);
+	dictLink.target = "_blank";
+	dictLink.rel = "noopener noreferrer";
+	dictLink.textContent = tFn("oqLookup");
+	dictLink.dataset.oqDictWord = clean.toLocaleLowerCase("kl");
+	dictLink.hidden = !opts.dictHit;
+	wrap.appendChild(dictLink);
 
 	return wrap;
 }
@@ -135,7 +138,8 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 	host.appendChild(heading);
 	const martha = createMarthaLink(surfaceWord);
 	if (martha) host.appendChild(martha);
-	const oqLinks = createOqLinks(surfaceWord, seq, buildResult);
+	const dictHit = typeof opts.dictHit === "boolean" ? opts.dictHit : Boolean(opts.isDictHit?.(surfaceWord));
+	const oqLinks = createOqLinks(surfaceWord, seq, buildResult, { dictHit });
 	if (oqLinks) host.appendChild(oqLinks);
 
 	const presentationPreferences = opts.presentationPreferences ?? { numberPreference: "singular", determinationPreference: "indefinite" };
@@ -335,15 +339,19 @@ export function renderSentenceBreakdown(container, plan, glossSummaryItems, opts
 					showOther: opts.showOther,
 					headlineGloss: opts.headlineGloss,
 					presentationPreferences: opts.presentationPreferences,
+					dictHit: word.dictHit,
+					isDictHit: opts.isDictHit,
 				});
 			} else {
 				const heading = document.createElement("div");
 				heading.className = "breakdown-word";
 				heading.textContent = word.raw;
 				article.appendChild(heading);
-				const wordMartha = createMarthaLink(word.surface || word.raw);
+				const surfaceOrRaw = word.surface || word.raw;
+				const wordMartha = createMarthaLink(surfaceOrRaw);
 				if (wordMartha) article.appendChild(wordMartha);
-				const wordOqLinks = createOqLinks(word.surface || word.raw, null, null);
+				const dictHit = typeof word.dictHit === "boolean" ? word.dictHit : Boolean(opts.isDictHit?.(surfaceOrRaw));
+				const wordOqLinks = createOqLinks(surfaceOrRaw, null, null, { dictHit });
 				if (wordOqLinks) article.appendChild(wordOqLinks);
 				if (word.headline && word.headline !== word.raw) {
 					const gloss = document.createElement("p");
@@ -398,7 +406,8 @@ export function renderWordBreakdowns(container, parts, glossSummaryItems, opts =
 			note.className = "breakdown-note";
 			note.textContent = translate("noVerifiedBreakdown", { token: part.word });
 			article.appendChild(note);
-			const missingOqLinks = createOqLinks(part.word, null, null);
+			const dictHit = typeof part.dictHit === "boolean" ? part.dictHit : Boolean(opts.isDictHit?.(part.word));
+			const missingOqLinks = createOqLinks(part.word, null, null, { dictHit });
 			if (missingOqLinks) article.appendChild(missingOqLinks);
 			container.appendChild(article);
 			metas.push(note.textContent);
@@ -411,6 +420,8 @@ export function renderWordBreakdowns(container, parts, glossSummaryItems, opts =
 			showOther: opts.showOther,
 			headlineGloss: opts.headlineGloss,
 			presentationPreferences: opts.presentationPreferences,
+			dictHit: part.dictHit,
+			isDictHit: opts.isDictHit,
 		});
 		container.appendChild(article);
 		if (part.alternatives?.length) {
@@ -423,6 +434,8 @@ export function renderWordBreakdowns(container, parts, glossSummaryItems, opts =
 				headlineGloss: opts.headlineGloss,
 				builderHref: opts.builderHref,
 				presentationPreferences: opts.presentationPreferences,
+				dictHit: part.dictHit,
+				isDictHit: opts.isDictHit,
 			});
 		}
 		const n = article.querySelectorAll(".breakdown-row").length;

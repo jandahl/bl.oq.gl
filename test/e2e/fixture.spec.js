@@ -272,27 +272,47 @@ test("Martha speech controls render in results and breakdowns, update with local
 	await expect(page.locator("#display-panel")).toBeHidden();
 });
 
-test("OQ cross-links render in Results bar, Breakdown panel, and footer with locale support", async ({ page }) => {
+test("OQ cross-links render Deconstruct, Word Builder, and dictionary-hit-gated Dictionary links", async ({ page }) => {
 	await page.route("**/fixtures/engine-stub.js", async (route) => {
 		const response = await route.fetch();
 		const source = await response.text();
 		const body = source.replace("export async function analyzeWordAsync(word) {", `export async function analyzeWordAsync(word) {
-			return { matches: [
-				{ seq: [{ id: "neri", text: "neri" }, { id: "V_IND_INTR_3SG", text: "voq" }] },
-			], evalCount: 1 };
+			if (String(word).toLowerCase() === "nerivoq") {
+				return { matches: [
+					{ seq: [{ id: "neri", text: "neri" }, { id: "V_IND_INTR_3SG", text: "voq" }] },
+				], evalCount: 1 };
+			}
 		`);
 		await route.fulfill({ response, body });
 	});
+
+	// 1. Non-dict hit ("nerivoq"): shows Deconstruct and Builder links, hides Dictionary link.
 	await page.goto("/?w=nerivoq");
 	await expect(page.locator("#status-line")).toHaveText("nerivoq");
-	await expect(page.locator("#status .oq-status-link")).toHaveAttribute("href", "https://oq.gl/?q=nerivoq");
-	await expect(page.locator("#status .oq-status-link")).toHaveText("Look up in OQ");
+	await expect(page.locator("#status .oq-deconstruct-link")).toHaveAttribute("href", "https://oq.gl/deconstruct/?w=nerivoq");
+	await expect(page.locator("#status .oq-builder-link")).toHaveAttribute("href", "https://oq.gl/builder/?seq=%5B%22neri%22%2C%22V_IND_INTR_3SG%22%5D");
+	await expect(page.locator("#status .oq-dict-link")).toBeHidden();
 
 	await page.locator("#breakdown-summary").click();
 	const primary = page.locator("#primary-breakdown");
-	await expect(primary.locator(".oq-dict-link")).toHaveAttribute("href", "https://oq.gl/?q=nerivoq");
+	await expect(primary.locator(".oq-deconstruct-link")).toHaveAttribute("href", "https://oq.gl/deconstruct/?w=nerivoq");
 	await expect(primary.locator(".oq-builder-link")).toHaveAttribute("href", "https://oq.gl/builder/?seq=%5B%22neri%22%2C%22V_IND_INTR_3SG%22%5D");
+	await expect(primary.locator(".oq-dict-link")).toBeHidden();
 	await expect(primary.locator(".breakdown-spelling").first()).toHaveAttribute("href", /https:\/\/oq\.gl\/deconstruct\/\?w=nerivoq&detail=/);
+
+	// 2. Dict hit ("arnaq"): shows Deconstruct, Builder, AND Dictionary links.
+	await page.goto("/?w=arnaq");
+	await expect(page.locator("#status-line")).toHaveText("arnaq");
+	await expect(page.locator("#status .oq-deconstruct-link")).toHaveAttribute("href", "https://oq.gl/deconstruct/?w=arnaq");
+	await expect(page.locator("#status .oq-builder-link")).toHaveAttribute("href", "https://oq.gl/builder/?seq=%5B%22arnaq%22%5D");
+	await expect(page.locator("#status .oq-dict-link")).toBeVisible();
+	await expect(page.locator("#status .oq-dict-link")).toHaveAttribute("href", "https://oq.gl/?q=arnaq");
+
+	await page.locator("#breakdown-summary").click();
+	await expect(primary.locator(".oq-deconstruct-link")).toHaveAttribute("href", "https://oq.gl/deconstruct/?w=arnaq");
+	await expect(primary.locator(".oq-builder-link")).toHaveAttribute("href", "https://oq.gl/builder/?seq=%5B%22arnaq%22%5D");
+	await expect(primary.locator(".oq-dict-link")).toBeVisible();
+	await expect(primary.locator(".oq-dict-link")).toHaveAttribute("href", "https://oq.gl/?q=arnaq");
 
 	await expect(page.locator("footer .oq-footer-link")).toHaveAttribute("href", "https://oq.gl/");
 	await expect(page.locator("footer .oq-footer-link")).toHaveText("Dictionary & Word Builder at oq.gl");
