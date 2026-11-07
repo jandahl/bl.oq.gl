@@ -20,6 +20,7 @@ import { isSentenceInput, planFromLattice, withInitialCapital, assemblyReading }
 import { loadExamplesCatalog, mountExamplesPanel } from "./examples.js";
 import { setLocale, applyLocale, t } from "./i18n.js";
 import { lookupGlossOptions } from "./gloss-options.js";
+import { createMarthaLink, isMarthaSpeechEnabled, setMarthaSpeechEnabled, syncMarthaLinks } from "./martha.js";
 
 import { enhanceSegmented } from "./segmented.js";
 
@@ -67,6 +68,7 @@ let showIdsCheckbox;
 let showZeroCheckbox;
 let fillBlanksCheckbox;
 let showMoodCheckbox;
+let marthaSpeechCheckbox;
 let readingOrderCheckbox;
 let langSelect;
 let uiLangSelect;
@@ -122,6 +124,7 @@ function bindDom() {
 	showIdsCheckbox = document.getElementById("opt-show-ids");
 	showZeroCheckbox = document.getElementById("opt-show-zero");
 	showMoodCheckbox = document.getElementById("opt-show-mood");
+	marthaSpeechCheckbox = document.getElementById("opt-martha-speech");
 	readingOrderCheckbox = document.getElementById("opt-reading-order");
 	langSelect = enhanceSegmented(document.getElementById("opt-lang"));
 	uiLangSelect = enhanceSegmented(document.getElementById("opt-ui-lang"));
@@ -296,6 +299,7 @@ function initDisplayOptions() {
 	showIdsCheckbox.checked = stored(SHOW_IDS_KEY_RENAMED, SHOW_IDS_KEY) === "true";
 	showZeroCheckbox.checked = stored("bloq:show-zero") === "true";
 	showMoodCheckbox.checked = stored(SHOW_MOOD_KEY_RENAMED, SHOW_MOOD_KEY) === "true"; // default off
+	if (marthaSpeechCheckbox) marthaSpeechCheckbox.checked = isMarthaSpeechEnabled();
 	readingOrderCheckbox.checked = stored(READING_ORDER_KEY_RENAMED, READING_ORDER_KEY) !== "false"; // default on
 	langSelect.value = ["en", "da", "both"].includes(stored(LANG_KEY_RENAMED, LANG_KEY)) ? stored(LANG_KEY_RENAMED, LANG_KEY) : "en";
 	spellingSelect.value = ["both", "spelling-only", "gloss-only"].includes(stored(SPELLING_KEY_RENAMED, SPELLING_KEY))
@@ -313,6 +317,7 @@ function initDisplayOptions() {
 		setLocale(uiLangSelect.value);
 		setActiveLocale(uiLangSelect.value);
 		applyLocale();
+		syncMarthaLinks();
 		syncPaletteToggle();
 		examplesPanel?.refreshChrome();
 		syncDocumentTitle();
@@ -331,6 +336,9 @@ function initDisplayOptions() {
 	showMoodCheckbox.addEventListener("change", () => {
 		storePreference(SHOW_MOOD_KEY_RENAMED, SHOW_MOOD_KEY, String(showMoodCheckbox.checked));
 		syncMoodLabels();
+	});
+	marthaSpeechCheckbox?.addEventListener("change", () => {
+		setMarthaSpeechEnabled(marthaSpeechCheckbox.checked);
 	});
 	langSelect.addEventListener("change", () => {
 		storePreference(LANG_KEY_RENAMED, LANG_KEY, langSelect.value);
@@ -486,7 +494,13 @@ function initDisplayChrome() {
 		displayPanel.classList.toggle("is-open", open);
 		sync();
 	});
-	displayCloseBtn?.addEventListener("click", () => { displayPanel.classList.remove("is-open"); sync(); });
+	displayCloseBtn?.addEventListener("click", () => { displayPanel.classList.remove("is-open"); sync(); displayToggleBtn.focus(); });
+	document.addEventListener("keydown", (event) => {
+		if (event.key !== "Escape" || !displayPanel.classList.contains("is-open")) return;
+		displayPanel.classList.remove("is-open");
+		sync();
+		displayToggleBtn.focus();
+	});
 	document.addEventListener("pointerdown", (event) => {
 		if (!displayPanel.classList.contains("is-open") || displayPanel.contains(event.target)) return;
 		displayPanel.classList.remove("is-open");
@@ -578,6 +592,7 @@ function setStatus(text, kind, meta) {
 	statusEl.className = kind ?? "";
 	statusEl.setAttribute("aria-live", kind === "error" ? "assertive" : "polite");
 	statusLine.textContent = text;
+	statusEl.querySelector(".martha-controls")?.remove();
 	const oldMeta = statusEl.querySelector(".meta");
 	if (oldMeta) oldMeta.remove();
 	if (meta) {
@@ -591,6 +606,16 @@ function setStatus(text, kind, meta) {
 function setStatusWords(words, kind, meta) {
 	setStatus("", kind, meta);
 	renderTonedPhrases(statusLine, words, "status-word");
+	const spoken = (words ?? [])
+		.map((word) => String(word ?? "").replace(/^\s*≈\s*/u, "").trim())
+		.filter(Boolean)
+		.join(" ");
+	const martha = createMarthaLink(spoken);
+	if (martha) {
+		const metaEl = statusEl.querySelector(".meta");
+		if (metaEl) statusEl.insertBefore(martha, metaEl);
+		else statusEl.appendChild(martha);
+	}
 }
 
 /** Render a formatStatus contract onto the status live region. */

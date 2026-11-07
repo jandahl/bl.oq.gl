@@ -15,12 +15,18 @@ test("i18n exposes the main page's English and Danish UI labels", () => {
 	assert.equal(t("loadingTitle"), "Loading");
 	assert.equal(t("showMood"), "Show mood labels");
 	assert.equal(t("layoutHorizontal"), "Horizontal");
+	assert.equal(t("settings.marthaSpeech"), "Speech synthesis Martha (Oqaasileriffik)");
+	assert.equal(t("martha.listen"), "Listen (Martha)");
+	assert.equal(t("martha.openPage"), "Martha page");
 	setLocale("da");
 	assert.equal(t("buildHeading"), "Byg et ord");
 	assert.equal(t("clearFilter"), "Ryd filter");
 	assert.equal(t("exampleWordsLabel"), "Ord");
 	assert.equal(t("showMood"), "Vis modusmarkeringer");
 	assert.equal(t("layoutWrap"), "Ombryd");
+	assert.equal(t("settings.marthaSpeech"), "Talesyntese Martha (Oqaasileriffik)");
+	assert.equal(t("martha.listen"), "Lyt (Martha)");
+	assert.equal(t("martha.openPage"), "Martha-side");
 	setLocale("en");
 });
 

@@ -9,6 +9,7 @@
 
 import { splitMoodLabel, composedTranslation } from "./gloss.js";
 import { t as translate } from "./i18n.js";
+import { createMarthaLink } from "./martha.js";
 
 export const WORD_TONE_COUNT = 6;
 
@@ -61,6 +62,8 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 	heading.className = "breakdown-word";
 	heading.textContent = (buildResult.approximate ? "≈ " : "") + buildResult.word;
 	host.appendChild(heading);
+	const martha = createMarthaLink(buildResult.word || word);
+	if (martha) host.appendChild(martha);
 
 	const presentationPreferences = opts.presentationPreferences ?? { numberPreference: "singular", determinationPreference: "indefinite" };
 	const allItems = glossSummaryItems(seq, { lang: opts.lang, ...presentationPreferences });
@@ -214,6 +217,8 @@ export function renderSentenceBreakdown(container, plan, glossSummaryItems, opts
 		source.className = "sentence-source";
 		source.textContent = sentence.source;
 		head.appendChild(source);
+		const sentenceMartha = createMarthaLink(sentence.source);
+		if (sentenceMartha) head.appendChild(sentenceMartha);
 		if (sentence.assembly?.text) {
 			const line = document.createElement("p");
 			line.className = "sentence-assembly";
@@ -255,6 +260,8 @@ export function renderSentenceBreakdown(container, plan, glossSummaryItems, opts
 				heading.className = "breakdown-word";
 				heading.textContent = word.raw;
 				article.appendChild(heading);
+				const wordMartha = createMarthaLink(word.surface || word.raw);
+				if (wordMartha) article.appendChild(wordMartha);
 				if (word.headline && word.headline !== word.raw) {
 					const gloss = document.createElement("p");
 					gloss.className = "breakdown-translation";

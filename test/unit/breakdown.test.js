@@ -119,6 +119,12 @@ test("renderBreakdown: fixture seq renders via injected glossSummaryItems", () =
 	const heading = container.querySelector(".breakdown-word");
 	assert.ok(heading);
 	assert.equal(heading.textContent, "qimmeqarpunga");
+	const marthaBtn = container.querySelector(".martha-link");
+	const marthaPage = container.querySelector(".martha-page-link");
+	assert.ok(marthaBtn);
+	assert.equal(marthaBtn.dataset.marthaWord, "qimmeqarpunga");
+	assert.ok(marthaPage);
+	assert.match(marthaPage.href, /oqaasileriffik\.gl.*st=qimmeqarpunga/);
 	// Rows are appended after the translation; composedTranslation shape is
 	// covered in gloss.test.js — here we only need the fixture path to run.
 	assert.ok(container.children.length >= 1);
