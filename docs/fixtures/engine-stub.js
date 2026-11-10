@@ -419,3 +419,19 @@ export function semanticFrameFromSequence(seq, _catalog) {
 export function semanticFrameOrLegacy(seq, catalog) {
 	return semanticFrameFromSequence(seq, catalog);
 }
+
+export const UNSPACED_FORMULA_WORD_REGEX = /^[^\s+]+(?:\+[^\s+]+)+$/;
+
+export function tokenizeFormula(str) {
+	return typeof str === "string" ? str.split("+").map((s) => s.trim()).filter(Boolean) : [];
+}
+
+export function buildFromFormula(formulaStr, _catalog) {
+	const parts = tokenizeFormula(formulaStr);
+	return {
+		ok: parts.length > 0,
+		word: parts.join(""),
+		approximate: false,
+		seq: parts.map((p) => ({ id: p })),
+	};
+}

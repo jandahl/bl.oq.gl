@@ -1,4 +1,4 @@
-import { buildWord, presentSequence, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, setActiveLocale, DICT_SOURCES, searchEntries, stemWordClass } from "./oq-api.js";
+import { buildWord, buildFromFormula, UNSPACED_FORMULA_WORD_REGEX, presentSequence, analyzeWordAsync, tokenizeSentence, analyzeSentence, assembleClause, glossSummaryItems, headlineGloss, resolveMoodLabel, resolvePersonLabel, setActiveLocale, DICT_SOURCES, searchEntries, stemWordClass } from "./oq-api.js";
 import { mountVisualizations } from "./visualizations.js";
 import { loadCatalog } from "./catalog.js";
 import {
@@ -1253,9 +1253,56 @@ async function runDeconstruct({ skipCanvas = false } = {}) {
 		const parts = [];
 		const failures = [];
 		for (const token of tokens) {
-			const result = await analyzeWordAsync(token, session.presets, {}, { signal: session.deconstructAbort.signal });
+			let lookupWord = token;
+			let formulaSeq = null;
+			let formulaBuilt = null;
+			if (UNSPACED_FORMULA_WORD_REGEX && UNSPACED_FORMULA_WORD_REGEX.test(token) && typeof buildFromFormula === "function") {
+				const catalog = {
+					findStem(root) {
+						const found = session.presets.filter((e) => e.morpheme_type === "stem" && (e.underlyingForm === root || e.id === root));
+						if (found.length) return found;
+						const stemType = root.endsWith("q") ? "uvular_final_stem" : root.endsWith("k") ? "consonant_final_stem" : root.endsWith("t") ? "t_final_stem" : "vowel_final_stem";
+						return [
+							{
+								id: root,
+								lexical_facts: { morpheme_type: "stem", word_class: "N", meaning: root },
+								application_logic: { underlying_form: root, continuation_class: "N_POSTBASE" },
+								morphology_class: { stem_type: stemType },
+							},
+							{
+								id: `${root}_v`,
+								lexical_facts: { morpheme_type: "stem", word_class: "V", meaning: root, valency: "intransitive" },
+								application_logic: { underlying_form: root, continuation_class: "V_POSTBASE" },
+							},
+						];
+					},
+					flat: session.presets.map((p) => p.raw || p),
+				};
+				const formulaRes = buildFromFormula(token, catalog);
+				if (formulaRes && formulaRes.ok && formulaRes.word) {
+					lookupWord = formulaRes.word;
+					formulaSeq = formulaRes.seq;
+					formulaBuilt = formulaRes;
+				}
+			}
+
+			const result = await analyzeWordAsync(lookupWord, session.presets, {}, { signal: session.deconstructAbort.signal });
 			if (run !== session.deconstructRun) return;
 			if (!result.matches || result.matches.length === 0) {
+				if (formulaSeq && formulaBuilt) {
+					// Fall back to the synthesized formula chain
+					const ids = formulaSeq.map((item) => item.id).filter(Boolean);
+					parts.push({
+						word: lookupWord,
+						formula: token,
+						seq: formulaSeq,
+						built: formulaBuilt,
+						alternatives: [],
+						readings: [{ seq: formulaSeq, built: formulaBuilt }],
+						ids,
+					});
+					continue;
+				}
 				failures.push({ token, evalCount: result.evalCount });
 				parts.push({
 					word: token,
